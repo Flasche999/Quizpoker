@@ -20,8 +20,8 @@
 
   <!-- Chips für ALLE Spieler setzen -->
   <div style="margin-top: 30px;">
-    <input type="number" id="chipValue" placeholder="z. B. 2500" />
-    <button class="admin" onclick="setzeChipsFürAlle()">💰 Chips für alle setzen</button>
+    <input type="number" id="chipsFeld" placeholder="Chips für alle Spieler" />
+    <button onclick="setzeChipsFürAlle()">💰 Chips für alle setzen</button>
   </div>
 
   <h2 style="margin-top: 40px;">👥 Spielerübersicht</h2>
@@ -39,7 +39,6 @@
 
   <script>
     const socket = io();
-
     let frageIndex = 0;
     let fragen = [];
     let spielerDaten = {};
@@ -67,16 +66,20 @@
     }
 
     function setzeChipsFürAlle() {
-      const betrag = parseInt(document.getElementById("chipValue").value);
+      const betrag = parseInt(document.getElementById("chipsFeld").value);
       if (isNaN(betrag) || betrag < 0) {
-        alert("❗ Bitte gültigen Betrag eingeben.");
+        alert("Bitte gültigen Betrag eingeben.");
         return;
       }
       socket.emit("setAllChips", betrag);
     }
 
     socket.on('updateSpieler', (spieler) => {
-      spielerDaten[spieler.id] = spieler;
+      if (spieler.disconnect) {
+        delete spielerDaten[spieler.id];
+      } else {
+        spielerDaten[spieler.id] = spieler;
+      }
       aktualisiereTabelle();
     });
 
