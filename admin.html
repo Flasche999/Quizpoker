@@ -14,10 +14,10 @@
   <div style="margin-top: 30px;">
     <button class="admin" onclick="startFrage()">🎯 Frage starten</button>
     <br /><br />
-    <input type="text" id="hinweisText1" placeholder="Hinweis 1 eingeben" />
+    
     <button class="admin" onclick="zeigeHinweis(1)">💡 Hinweis 1</button>
     <br /><br />
-    <input type="text" id="hinweisText2" placeholder="Hinweis 2 eingeben" />
+    
     <button class="admin" onclick="zeigeHinweis(2)">💡 Hinweis 2</button>
     <br /><br />
     <button class="admin" onclick="zeigeAufloesung()">✅ Auflösung</button>
@@ -60,16 +60,24 @@
 
     function startFrage() {
       const frage = fragen[frageIndex];
-      document.getElementById('frage').textContent = "Frage: " + frage.frage;
+      document.getElementById('frage').innerHTML = "Frage: " + frage.frage;
       socket.emit('frageStart', frage);
     }
 
     function zeigeHinweis(num) {
-  const frage = fragen[frageIndex];
-  const text = num === 1 ? frage.hinweis1 : frage.hinweis2;
-  socket.emit('hinweis', text);
-}
+      const frage = fragen[frageIndex];
+      const hinweisText = num === 1 ? frage.hinweis1 : frage.hinweis2;
 
+      if (!hinweisText) {
+        alert("Hinweis nicht vorhanden.");
+        return;
+      }
+
+      const frageDiv = document.getElementById("frage");
+      frageDiv.innerHTML += `<br>💡 Hinweis ${num}: ${hinweisText}`;
+
+      socket.emit('hinweis', hinweisText);
+    }
 
     function zeigeAufloesung() {
       const frage = fragen[frageIndex];
