@@ -34,8 +34,8 @@
       <button onclick="sendeAktion('allin')">💥 All In</button>
     </div>
 
-    <div id="hinweis"></div>
-    <div id="ergebnis"></div>
+    <div id="hinweis" style="margin-top:20px; font-weight:bold;"></div>
+    <div id="ergebnis" style="margin-top:10px;"></div>
   </div>
 
   <script>
@@ -89,11 +89,9 @@
       document.getElementById("ergebnis").textContent = "";
     });
 
-    socket.on("hinweis", (num) => {
-      document.getElementById("hinweis").textContent = "💡 Hinweis " + num;
-
-      // Nach Hinweis neue Setzrunde starten
-      document.getElementById("aktionen").style.display = "block";
+    socket.on("hinweis", (data) => {
+      document.getElementById("hinweis").textContent = `💡 Hinweis ${data.num}: ${data.text}`;
+      document.getElementById("aktionen").style.display = "block"; // neue Setzrunde
     });
 
     socket.on("aufloesung", (antwort) => {
