@@ -89,10 +89,12 @@
       document.getElementById("ergebnis").textContent = "";
     });
 
-    socket.on("hinweis", (data) => {
-      document.getElementById("hinweis").textContent = `💡 Hinweis ${data.num}: ${data.text}`;
-      document.getElementById("aktionen").style.display = "block"; // neue Setzrunde
-    });
+    socket.on("hinweis", (text) => {
+  document.getElementById("hinweis").textContent = "💡 " + text;
+
+  // Neue Setzrunde aktivieren
+  document.getElementById("aktionen").style.display = "block";
+});
 
     socket.on("aufloesung", (antwort) => {
       document.getElementById("ergebnis").textContent = "✅ Richtige Antwort: " + antwort;
