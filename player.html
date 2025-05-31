@@ -87,14 +87,19 @@
       document.getElementById("aktionen").style.display = "none";
       document.getElementById("hinweis").textContent = "";
       document.getElementById("ergebnis").textContent = "";
+      aktuelleAntwort = "";
+      aktuelleAktion = "";
     });
 
     socket.on("hinweis", (text) => {
-  document.getElementById("hinweis").textContent = "💡 " + text;
+      // Hinweis anhängen (nicht ersetzen)
+      const hinweisDiv = document.getElementById("hinweis");
+      hinweisDiv.textContent += "\n💡 " + text;
 
-  // Neue Setzrunde aktivieren
-  document.getElementById("aktionen").style.display = "block";
-});
+      // Aktion zurücksetzen und neue Runde aktivieren
+      aktuelleAktion = "";
+      document.getElementById("aktionen").style.display = "block";
+    });
 
     socket.on("aufloesung", (antwort) => {
       document.getElementById("ergebnis").textContent = "✅ Richtige Antwort: " + antwort;
