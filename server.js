@@ -25,9 +25,10 @@ io.on('connection', (socket) => {
     io.emit('frageStart', frage);
   });
 
-  // Admin zeigt Hinweis an
-  socket.on('hinweis', (num) => {
-    io.emit('hinweis', num);
+  // Admin zeigt Hinweis an (jetzt mit Text)
+  socket.on('hinweis', ({ num, text }) => {
+    console.log(`📢 Hinweis ${num}: ${text}`);
+    io.emit('hinweis', { num, text });
   });
 
   // Admin zeigt Auflösung an
