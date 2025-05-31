@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <title>QuizPoker – Spieler</title>
+  <link rel="stylesheet" href="style.css" />
+  <script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
+  <h1>QuizPoker – Spieler</h1>
+
+  <div id="name-area">
+    <label for="name">Dein Name:</label>
+    <input type="text" id="name" />
+    <button onclick="sendeName()">Beitreten</button>
+  </div>
+
+  <div id="game-area" style="display:none;">
+    <div id="frage">Warte auf Start...</div>
+
+    <div id="antwort-bereich">
+      <label for="antwort">Deine Schätzung:</label>
+      <input type="number" id="antwort" />
+      <button onclick="sendeAntwort()">Antwort senden</button>
+    </div>
+
+    <div id="aktionen" style="display:none;">
+      <h3>Aktion wählen:</h3>
+      <button onclick="sendeAktion('fold')">❌ Passen</button>
+      <button onclick="sendeAktion('call')">➕ Mitgehen</button>
+      <button onclick="sendeAktion('raise')">⬆️ Erhöhen</button>
+      <button onclick="sendeAktion('allin')">💥 All In</button>
+    </div>
+
+    <div id="hinweis"></div>
+    <div id="ergebnis"></div>
+  </div>
+
+  <script>
+    const socket = io();
+    let name = "";
+    let chips = 1000;
+    let aktuelleAntwort = "";
+    let aktuelleAktion = "";
+
+    function sendeName() {
+      name = document.getElementById("name").value.trim();
+      if (!name) return alert("Bitte Namen eingeben.");
+      document.getElementById("name-area").style.display = "none";
+      document.getElementById("game-area").style.display = "block";
+      sendePlayerData();
+    }
+
+    function sendeAntwort() {
+      aktuelleAntwort = document.getElementById("antwort").value;
+      document.getElementById("antwort-bereich").style.display = "none";
+      document.getElementById("aktionen").style.display = "block";
+    }
+
+    function sendeAktion(aktion) {
+      aktuelleAktion = aktion;
+      if (aktion === 'allin') chips = 0;
+      sendePlayerData();
+      document.getElementById("aktionen").style.display = "none";
+    }
+
+    function sendePlayerData() {
+      socket.emit("playerData", {
+        name: name,
+        antwort: aktuelleAntwort,
+        aktion: aktuelleAktion,
+        chips: chips
+      });
+    }
+
+    socket.on("frageStart", (frage) => {
+      document.getElementById("frage").textContent = frage.frage;
+      document.getElementById("antwort-bereich").style.display = "block";
+      document.getElementById("hinweis").textContent = "";
+      document.getElementById("ergebnis").textContent = "";
+    });
+
+    socket.on("hinweis", (num) => {
+      document.getElementById("hinweis").textContent = "💡 Hinweis " + num;
+    });
+
+    socket.on("aufloesung", (antwort) => {
+      document.getElementById("ergebnis").textContent = "✅ Richtige Antwort: " + antwort;
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <title>QuizPoker – Admin</title>
+  <link rel="stylesheet" href="style.css" />
+  <script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
+  <h1>QuizPoker – Admin-Panel</h1>
+
+  <div id="frage">Frage: <span style="color:#fff">–</span></div>
+
+  <div style="margin-top: 30px;">
+    <button class="admin" onclick="startFrage()">🎯 Frage starten</button>
+    <button class="admin" onclick="zeigeHinweis(1)">💡 Hinweis 1</button>
+    <button class="admin" onclick="zeigeHinweis(2)">💡 Hinweis 2</button>
+    <button class="admin" onclick="zeigeAufloesung()">✅ Auflösung</button>
+  </div>
+
+  <h2 style="margin-top: 40px;">👥 Spielerübersicht</h2>
+  <table id="spielertabelle" style="margin: 0 auto; border-collapse: collapse;">
+    <thead>
+      <tr style="background:#222;">
+        <th style="padding:10px;">Name</th>
+        <th>Antwort</th>
+        <th>Aktion</th>
+        <th>Chips</th>
+      </tr>
+    </thead>
+    <tbody id="spielerbody"></tbody>
+  </table>
+
+  <script>
+    const socket = io();
+
+    let frageIndex = 0;
+    let fragen = [];
+    let spielerDaten = {};
+
+    fetch("fragen.json")
+      .then(res => res.json())
+      .then(data => {
+        fragen = data;
+      });
+
+    function startFrage() {
+      const frage = fragen[frageIndex];
+      document.getElementById('frage').textContent = "Frage: " + frage.frage;
+      socket.emit('frageStart', frage);
+    }
+
+    function zeigeHinweis(num) {
+      socket.emit('hinweis', num);
+    }
+
+    function zeigeAufloesung() {
+      const frage = fragen[frageIndex];
+      socket.emit('aufloesung', frage.antwort);
+      frageIndex = (frageIndex + 1) % fragen.length;
+    }
+
+    socket.on('updateSpieler', (spieler) => {
+      spielerDaten[spieler.id] = spieler;
+      aktualisiereTabelle();
+    });
+
+    function aktualisiereTabelle() {
+      const body = document.getElementById("spielerbody");
+      body.innerHTML = '';
+      Object.values(spielerDaten).forEach(spieler => {
+        const row = document.createElement("tr");
+        row.innerHTML = `
+          <td style="padding:8px;">${spieler.name}</td>
+          <td>${spieler.antwort || '-'}</td>
+          <td>${spieler.aktion || '-'}</td>
+          <td>${spieler.chips}</td>
+        `;
+        body.appendChild(row);
+      });
+    }
+  </script>
+</body>
+</html>
