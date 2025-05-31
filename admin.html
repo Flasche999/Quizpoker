@@ -65,13 +65,11 @@
     }
 
     function zeigeHinweis(num) {
-      const text = document.getElementById("hinweisText" + num).value.trim();
-      if (!text) {
-        alert("Bitte Hinweistext eingeben.");
-        return;
-      }
-      socket.emit('hinweis', { num, text });
-    }
+  const frage = fragen[frageIndex];
+  const text = num === 1 ? frage.hinweis1 : frage.hinweis2;
+  socket.emit('hinweis', text);
+}
+
 
     function zeigeAufloesung() {
       const frage = fragen[frageIndex];
