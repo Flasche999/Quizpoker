@@ -17,6 +17,7 @@
 
   <div id="game-area" style="display:none;">
     <div id="chips" style="margin-bottom:10px;">💰 Chips: <span id="chip-anzahl">–</span></div>
+    <div id="einsatz" style="margin-bottom:10px;">🎯 Einsatz: <span id="einsatz-anzahl">–</span></div>
     <div id="frage">Warte auf Start...</div>
 
     <div id="antwort-bereich">
@@ -40,7 +41,7 @@
   <script>
     const socket = io();
     let name = "";
-    let chips = 1000; // Standardwert, wird ggf. vom Server überschrieben
+    let chips = 1000;
     let aktuelleAntwort = "";
     let aktuelleAktion = "";
 
@@ -97,12 +98,16 @@
     });
 
     socket.on("updateSpieler", (data) => {
-      // Chips aktualisieren, wenn dieser Client gemeint ist
-      if (data.name === name || data.id === socket.id) {
+      if (data.name === name) {
         chips = data.chips;
         aktualisiereChipAnzeige();
       }
     });
+
+    socket.on("einsatzAktualisiert", (betrag) => {
+      document.getElementById("einsatz-anzahl").textContent = betrag;
+    });
   </script>
 </body>
 </html>
+
