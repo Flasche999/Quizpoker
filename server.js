@@ -9,11 +9,12 @@ const io = new Server(server);
 app.use(express.static(__dirname));
 
 let spieler = {};
+let aktuellerEinsatz = 0;
 
 io.on('connection', (socket) => {
   console.log('🔌 Spieler verbunden:', socket.id);
 
-  // Spieler sendet seine Daten (Name, Antwort, Aktion, Chips)
+  // Spieler sendet seine Daten
   socket.on('playerData', (data) => {
     spieler[socket.id] = { id: socket.id, ...data };
     io.emit('updateSpieler', spieler[socket.id]);
@@ -34,13 +35,20 @@ io.on('connection', (socket) => {
     io.emit('aufloesung', antwort);
   });
 
-  // Admin setzt einen Betrag für ALLE Spieler
+  // Admin setzt Chips für alle Spieler
   socket.on('setAllChips', (betrag) => {
     console.log(`💰 Admin setzt bei allen Spielern die Chips auf ${betrag}`);
     Object.values(spieler).forEach((s) => {
       s.chips = betrag;
       io.to(s.id).emit("updateSpieler", s);
     });
+  });
+
+  // Admin setzt den aktuellen Einsatz für die Runde
+  socket.on('setEinsatz', (betrag) => {
+    aktuellerEinsatz = betrag;
+    console.log(`🎯 Aktueller Einsatz: ${betrag} Chips`);
+    io.emit("einsatzAktualisiert", aktuellerEinsatz);
   });
 
   // Spieler verlässt das Spiel
