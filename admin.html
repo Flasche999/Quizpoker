@@ -18,10 +18,14 @@
     <button class="admin" onclick="zeigeAufloesung()">✅ Auflösung</button>
   </div>
 
-  <!-- Chips für ALLE Spieler setzen -->
   <div style="margin-top: 30px;">
     <input type="number" id="chipsFeld" placeholder="Chips für alle Spieler" />
     <button onclick="setzeChipsFürAlle()">💰 Chips für alle setzen</button>
+  </div>
+
+  <div style="margin-top: 20px;">
+    <input type="number" id="einsatzFeld" placeholder="Aktueller Einsatz" />
+    <button onclick="setzeEinsatz()">🎯 Einsatz setzen</button>
   </div>
 
   <h2 style="margin-top: 40px;">👥 Spielerübersicht</h2>
@@ -72,6 +76,15 @@
         return;
       }
       socket.emit("setAllChips", betrag);
+    }
+
+    function setzeEinsatz() {
+      const betrag = parseInt(document.getElementById("einsatzFeld").value);
+      if (isNaN(betrag) || betrag < 0) {
+        alert("Bitte gültigen Einsatz eingeben.");
+        return;
+      }
+      socket.emit("setEinsatz", betrag);
     }
 
     socket.on('updateSpieler', (spieler) => {
