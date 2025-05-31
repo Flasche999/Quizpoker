@@ -36,6 +36,11 @@
 
     <div id="hinweis" style="margin-top:20px; font-weight:bold;"></div>
     <div id="ergebnis" style="margin-top:10px;"></div>
+
+    <div id="spieler-uebersicht" style="margin-top: 30px;">
+      <h3>Spielerübersicht</h3>
+      <ul id="spieler-liste"></ul>
+    </div>
   </div>
 
   <script>
@@ -44,6 +49,9 @@
     let chips = 1000;
     let aktuelleAntwort = "";
     let aktuelleAktion = "";
+
+    const spielerListe = document.getElementById("spieler-liste");
+    const spielerStatus = new Map();
 
     function sendeName() {
       name = document.getElementById("name").value.trim();
@@ -80,6 +88,23 @@
       document.getElementById("chip-anzahl").textContent = chips;
     }
 
+    function aktualisiereSpielerListe() {
+      spielerListe.innerHTML = "";
+      spielerStatus.forEach((info, spielerName) => {
+        const li = document.createElement("li");
+        li.innerHTML = `<strong>${spielerName}</strong>: ${info.aktion || "🕓 wartet"} (${info.chips} Chips)`;
+        spielerListe.appendChild(li);
+      });
+    }
+
+    socket.on("playerData", (data) => {
+      spielerStatus.set(data.name, {
+        aktion: data.aktion,
+        chips: data.chips
+      });
+      aktualisiereSpielerListe();
+    });
+
     socket.on("frageStart", (frage) => {
       document.getElementById("frage").textContent = frage.frage;
       document.getElementById("antwort").value = "";
@@ -91,16 +116,12 @@
       aktuelleAktion = "";
     });
 
-socket.on("hinweis", ({ num, text }) => {
-  const hinweisDiv = document.getElementById("hinweis");
-
-  // Vorherigen Text beibehalten + neuen Hinweis anhängen
-  hinweisDiv.textContent += `\n💡 Hinweis ${num}: ${text}`;
-
-  aktuelleAktion = "";
-  document.getElementById("aktionen").style.display = "block";
-});
-
+    socket.on("hinweis", ({ num, text }) => {
+      const hinweisDiv = document.getElementById("hinweis");
+      hinweisDiv.textContent += `\n💡 Hinweis ${num}: ${text}`;
+      aktuelleAktion = "";
+      document.getElementById("aktionen").style.display = "block";
+    });
 
     socket.on("aufloesung", (antwort) => {
       document.getElementById("ergebnis").textContent = "✅ Richtige Antwort: " + antwort;
