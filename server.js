@@ -17,7 +17,16 @@ io.on('connection', (socket) => {
   // Spieler sendet seine Daten
   socket.on('playerData', (data) => {
     spieler[socket.id] = { id: socket.id, ...data };
+
+    // Einzelnes Update an alle Spieler
     io.emit('updateSpieler', spieler[socket.id]);
+
+    // Zusätzlich: Broadcast an alle mit Name, Aktion und Chips (für Spielerübersicht)
+    io.emit('playerData', {
+      name: data.name,
+      aktion: data.aktion,
+      chips: data.chips
+    });
   });
 
   // Admin startet eine neue Frage
