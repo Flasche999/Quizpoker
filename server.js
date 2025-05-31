@@ -34,12 +34,12 @@ io.on('connection', (socket) => {
     io.emit('aufloesung', antwort);
   });
 
-  // Admin setzt Startchips für alle Spieler
-  socket.on('setStartChips', (chipWert) => {
-    console.log(`💰 Admin setzt Startchips auf ${chipWert}`);
+  // Admin setzt einen Betrag für ALLE Spieler
+  socket.on('setAllChips', (betrag) => {
+    console.log(`💰 Admin setzt bei allen Spielern die Chips auf ${betrag}`);
     Object.values(spieler).forEach((s) => {
-      s.chips = chipWert;
-      io.to(s.id).emit('updateSpieler', s); // Einzelnes Update an jeweiligen Client
+      s.chips = betrag;
+      io.to(s.id).emit("updateSpieler", s);
     });
   });
 
