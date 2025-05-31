@@ -13,8 +13,13 @@
 
   <div style="margin-top: 30px;">
     <button class="admin" onclick="startFrage()">🎯 Frage starten</button>
+    <br /><br />
+    <input type="text" id="hinweisText1" placeholder="Hinweis 1 eingeben" />
     <button class="admin" onclick="zeigeHinweis(1)">💡 Hinweis 1</button>
+    <br /><br />
+    <input type="text" id="hinweisText2" placeholder="Hinweis 2 eingeben" />
     <button class="admin" onclick="zeigeHinweis(2)">💡 Hinweis 2</button>
+    <br /><br />
     <button class="admin" onclick="zeigeAufloesung()">✅ Auflösung</button>
   </div>
 
@@ -60,7 +65,12 @@
     }
 
     function zeigeHinweis(num) {
-      socket.emit('hinweis', num);
+      const text = document.getElementById("hinweisText" + num).value.trim();
+      if (!text) {
+        alert("Bitte Hinweistext eingeben.");
+        return;
+      }
+      socket.emit('hinweis', { num, text });
     }
 
     function zeigeAufloesung() {
