@@ -76,7 +76,8 @@
       const frageDiv = document.getElementById("frage");
       frageDiv.innerHTML += `<br>💡 Hinweis ${num}: ${hinweisText}`;
 
-      socket.emit('hinweis', hinweisText);
+      socket.emit('hinweis', { num: num, text: hinweisText });
+
     }
 
     function zeigeAufloesung() {
