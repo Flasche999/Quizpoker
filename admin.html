@@ -18,10 +18,10 @@
     <button class="admin" onclick="zeigeAufloesung()">✅ Auflösung</button>
   </div>
 
-  <!-- Startbetrag setzen -->
+  <!-- Chips für ALLE Spieler setzen -->
   <div style="margin-top: 30px;">
-    <input type="number" id="startChips" placeholder="Startchips" value="1000" />
-    <button class="admin" onclick="setzeStartChips()">💰 Startbetrag setzen</button>
+    <input type="number" id="chipValue" placeholder="z. B. 2500" />
+    <button class="admin" onclick="setzeChipsFürAlle()">💰 Chips für alle setzen</button>
   </div>
 
   <h2 style="margin-top: 40px;">👥 Spielerübersicht</h2>
@@ -66,13 +66,13 @@
       frageIndex = (frageIndex + 1) % fragen.length;
     }
 
-    function setzeStartChips() {
-      const betrag = parseInt(document.getElementById("startChips").value);
-      if (isNaN(betrag) || betrag <= 0) {
-        alert("Bitte einen gültigen Betrag eingeben.");
+    function setzeChipsFürAlle() {
+      const betrag = parseInt(document.getElementById("chipValue").value);
+      if (isNaN(betrag) || betrag < 0) {
+        alert("❗ Bitte gültigen Betrag eingeben.");
         return;
       }
-      socket.emit("setStartChips", betrag);
+      socket.emit("setAllChips", betrag);
     }
 
     socket.on('updateSpieler', (spieler) => {
