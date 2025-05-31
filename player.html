@@ -16,6 +16,7 @@
   </div>
 
   <div id="game-area" style="display:none;">
+    <div id="chips" style="margin-bottom:10px;">💰 Chips: <span id="chip-anzahl">–</span></div>
     <div id="frage">Warte auf Start...</div>
 
     <div id="antwort-bereich">
@@ -39,7 +40,7 @@
   <script>
     const socket = io();
     let name = "";
-    let chips = 1000;
+    let chips = 1000; // Standardwert, wird ggf. vom Server aktualisiert
     let aktuelleAntwort = "";
     let aktuelleAktion = "";
 
@@ -48,6 +49,7 @@
       if (!name) return alert("Bitte Namen eingeben.");
       document.getElementById("name-area").style.display = "none";
       document.getElementById("game-area").style.display = "block";
+      aktualisiereChipAnzeige();
       sendePlayerData();
     }
 
@@ -59,7 +61,7 @@
 
     function sendeAktion(aktion) {
       aktuelleAktion = aktion;
-      if (aktion === 'allin') chips = 0;
+      if (aktion === 'allin') chips = 0; // Setze Chips auf 0 bei All In
       sendePlayerData();
       document.getElementById("aktionen").style.display = "none";
     }
@@ -73,9 +75,15 @@
       });
     }
 
+    function aktualisiereChipAnzeige() {
+      document.getElementById("chip-anzahl").textContent = chips;
+    }
+
     socket.on("frageStart", (frage) => {
       document.getElementById("frage").textContent = frage.frage;
+      document.getElementById("antwort").value = "";
       document.getElementById("antwort-bereich").style.display = "block";
+      document.getElementById("aktionen").style.display = "none";
       document.getElementById("hinweis").textContent = "";
       document.getElementById("ergebnis").textContent = "";
     });
@@ -86,6 +94,14 @@
 
     socket.on("aufloesung", (antwort) => {
       document.getElementById("ergebnis").textContent = "✅ Richtige Antwort: " + antwort;
+    });
+
+    // Falls Admin neue Chips setzt
+    socket.on("updateSpieler", (data) => {
+      if (data.name === name) {
+        chips = data.chips;
+        aktualisiereChipAnzeige();
+      }
     });
   </script>
 </body>
