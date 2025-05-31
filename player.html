@@ -40,7 +40,7 @@
   <script>
     const socket = io();
     let name = "";
-    let chips = 1000; // Standardwert, wird ggf. vom Server aktualisiert
+    let chips = 1000; // Standardwert, wird ggf. vom Server überschrieben
     let aktuelleAntwort = "";
     let aktuelleAktion = "";
 
@@ -61,7 +61,7 @@
 
     function sendeAktion(aktion) {
       aktuelleAktion = aktion;
-      if (aktion === 'allin') chips = 0; // Setze Chips auf 0 bei All In
+      if (aktion === 'allin') chips = 0;
       sendePlayerData();
       document.getElementById("aktionen").style.display = "none";
     }
@@ -96,9 +96,9 @@
       document.getElementById("ergebnis").textContent = "✅ Richtige Antwort: " + antwort;
     });
 
-    // Falls Admin neue Chips setzt
     socket.on("updateSpieler", (data) => {
-      if (data.name === name) {
+      // Chips aktualisieren, wenn dieser Client gemeint ist
+      if (data.name === name || data.id === socket.id) {
         chips = data.chips;
         aktualisiereChipAnzeige();
       }
