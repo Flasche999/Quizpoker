@@ -91,15 +91,16 @@
       aktuelleAktion = "";
     });
 
-    socket.on("hinweis", (text) => {
-      // Hinweis anhängen (nicht ersetzen)
-      const hinweisDiv = document.getElementById("hinweis");
-      hinweisDiv.textContent += "\n💡 " + text;
+socket.on("hinweis", ({ num, text }) => {
+  const hinweisDiv = document.getElementById("hinweis");
 
-      // Aktion zurücksetzen und neue Runde aktivieren
-      aktuelleAktion = "";
-      document.getElementById("aktionen").style.display = "block";
-    });
+  // Vorherigen Text beibehalten + neuen Hinweis anhängen
+  hinweisDiv.textContent += `\n💡 Hinweis ${num}: ${text}`;
+
+  aktuelleAktion = "";
+  document.getElementById("aktionen").style.display = "block";
+});
+
 
     socket.on("aufloesung", (antwort) => {
       document.getElementById("ergebnis").textContent = "✅ Richtige Antwort: " + antwort;
