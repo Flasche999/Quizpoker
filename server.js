@@ -40,7 +40,11 @@ io.on('connection', (socket) => {
     console.log(`💰 Admin setzt bei allen Spielern die Chips auf ${betrag}`);
     Object.values(spieler).forEach((s) => {
       s.chips = betrag;
-      io.to(s.id).emit("updateSpieler", s);
+    });
+
+    // ❗ Chips-Update an alle Clients inkl. Admin
+    Object.values(spieler).forEach((s) => {
+      io.emit("updateSpieler", s);
     });
   });
 
