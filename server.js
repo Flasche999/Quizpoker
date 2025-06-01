@@ -320,6 +320,15 @@ io.on('connection', (socket) => {
     verteilePot(gewinnerListe);
   });
 
+  
+  socket.on("gewinnerAnimation", () => {
+    const nochDrin = Object.values(spieler).filter(s => s.chips > 0);
+    if (nochDrin.length === 1) {
+      const gewinnerID = nochDrin[0].id;
+      io.to(gewinnerID).emit("starteGewinnerAnimation");
+    }
+  });
+
   socket.on('disconnect', () => {
     delete spieler[socket.id];
     io.emit('updateSpieler', { id: socket.id, disconnect: true });
