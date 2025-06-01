@@ -190,24 +190,38 @@ io.on('connection', (socket) => {
     }
 
     if (aktion === "call") {
-      const toCall = aktuellerEinsatz - (s.imPot || 0);
-      const callBetrag = Math.min(toCall, s.chips);
-      s.chips -= callBetrag;
-      s.imPot = (s.imPot || 0) + callBetrag;
-      pot += callBetrag;
-      s.aktion = "Call";
-    }
+  const toCall = aktuellerEinsatz - (s.imPot || 0);
+  const callBetrag = Math.min(toCall, s.chips);
+  s.imPot = (s.imPot || 0) + callBetrag;
+  pot += callBetrag;
+  s.chips -= callBetrag;
+
+  if (s.chips === 0) {
+    s.aktion = "All In";
+  } else {
+    s.aktion = "Call";
+  }
+}
+
 
     if (aktion === "raise") {
-      const raiseGesamt = parseInt(raiseBetrag);
-      if (raiseGesamt > s.chips) return;
+  const raiseGesamt = parseInt(raiseBetrag);
+  if (raiseGesamt >= s.chips) {
+    // Spieler hat nicht genug zum Raisen → All In
+    aktuellerEinsatz = s.chips;
+    pot += s.chips;
+    s.imPot = (s.imPot || 0) + s.chips;
+    s.aktion = "All In";
+    s.chips = 0;
+  } else {
+    aktuellerEinsatz = raiseGesamt;
+    s.chips -= raiseGesamt;
+    s.imPot = (s.imPot || 0) + raiseGesamt;
+    pot += raiseGesamt;
+    s.aktion = "Raise";
+  }
+}
 
-      aktuellerEinsatz = raiseGesamt;
-      s.chips -= raiseGesamt;
-      s.imPot = (s.imPot || 0) + raiseGesamt;
-      pot += raiseGesamt;
-      s.aktion = "Raise";
-    }
 
     if (aktion === "allin") {
       pot += s.chips;
