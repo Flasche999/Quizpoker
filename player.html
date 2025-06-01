@@ -68,19 +68,7 @@
       aktuelleAntwort = document.getElementById("antwort").value;
       document.getElementById("antwort-bereich").style.display = "none";
 
-      // 🔁 NEU: Sende Schätzantwort an Server
-      socket.emit("schaetzAntwort", {
-        name: name,
-        wert: aktuelleAntwort
-      });
-    }
-
-    function sendeAktion(aktion) {
-      aktuelleAktion = aktion;
-      if (aktion === 'allin') chips = 0;
-      sendePlayerData();
-      document.getElementById("aktionen").style.display = "none";
-      socket.emit("spielerAktionFertig");
+      socket.emit("schaetzAntwort", parseInt(aktuelleAntwort));
     }
 
     function spielerAktion(aktion) {
@@ -165,6 +153,13 @@
     socket.on("aktionErlaubt", ({ aktuellerEinsatz, pot }) => {
       document.getElementById("aktionen").style.display = "block";
       document.getElementById("raise-betrag").value = aktuellerEinsatz + 20;
+    });
+
+    // ✅ Schätzantwort eines anderen Spielers wurde eingereicht (verdeckt)
+    socket.on("zeigeSchaetzAntwortVerdeckt", ({ name }) => {
+      const eintrag = document.createElement("li");
+      eintrag.textContent = `${name} hat eine Schätzung abgegeben.`;
+      spielerListe.appendChild(eintrag);
     });
   </script>
 </body>
