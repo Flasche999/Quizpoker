@@ -105,6 +105,8 @@ io.on('connection', (socket) => {
       chips: data.chips
     });
 
+    io.emit('updateAlleSpieler', spieler); // ✅ NEU
+
     prüfeObAlleGesendetHaben();
   });
 
@@ -220,6 +222,7 @@ io.on('connection', (socket) => {
   socket.on('disconnect', () => {
     delete spieler[socket.id];
     io.emit('updateSpieler', { id: socket.id, disconnect: true });
+    io.emit('updateAlleSpieler', spieler); // ✅ NEU
   });
 });
 
