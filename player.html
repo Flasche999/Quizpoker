@@ -65,7 +65,7 @@
     function sendeAntwort() {
       aktuelleAntwort = document.getElementById("antwort").value;
       document.getElementById("antwort-bereich").style.display = "none";
-      document.getElementById("aktionen").style.display = "block";
+      // Warten auf AktionErlaubt – Buttons erst dann anzeigen
     }
 
     function sendeAktion(aktion) {
@@ -73,6 +73,7 @@
       if (aktion === 'allin') chips = 0;
       sendePlayerData();
       document.getElementById("aktionen").style.display = "none";
+      socket.emit("spielerAktionFertig"); // 🆕 Nächsten Spieler aktivieren
     }
 
     function sendePlayerData() {
@@ -125,8 +126,6 @@
     socket.on("hinweis", ({ num, text }) => {
       const hinweisDiv = document.getElementById("hinweis");
       hinweisDiv.textContent += `\n💡 Hinweis ${num}: ${text}`;
-      aktuelleAktion = "";
-      document.getElementById("aktionen").style.display = "block";
     });
 
     socket.on("aufloesung", (antwort) => {
@@ -142,6 +141,11 @@
 
     socket.on("einsatzAktualisiert", (betrag) => {
       document.getElementById("einsatz-anzahl").textContent = betrag;
+    });
+
+    // 🆕 Nur wenn dieser Spieler dran ist
+    socket.on("aktionErlaubt", () => {
+      document.getElementById("aktionen").style.display = "block";
     });
   </script>
 </body>
