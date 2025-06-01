@@ -62,6 +62,13 @@
       const frage = fragen[frageIndex];
       document.getElementById('frage').innerHTML = "Frage: " + frage.frage;
       socket.emit('frageStart', frage);
+
+      // 🧹 Aktionen und Antworten zurücksetzen
+      Object.values(spielerDaten).forEach(spieler => {
+        spieler.aktion = "";
+        spieler.antwort = "";
+      });
+      aktualisiereTabelle();
     }
 
     function zeigeHinweis(num) {
@@ -77,7 +84,6 @@
       frageDiv.innerHTML += `<br>💡 Hinweis ${num}: ${hinweisText}`;
 
       socket.emit('hinweis', { num: num, text: hinweisText });
-
     }
 
     function zeigeAufloesung() {
