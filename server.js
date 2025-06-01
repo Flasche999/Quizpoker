@@ -105,9 +105,16 @@ io.on('connection', (socket) => {
       chips: data.chips
     });
 
-    io.emit('updateAlleSpieler', spieler); // ✅ NEU
-
+    io.emit('updateAlleSpieler', spieler);
     prüfeObAlleGesendetHaben();
+  });
+
+  socket.on("schaetzAntwort", (wert) => {
+    const s = spieler[socket.id];
+    if (s) {
+      s.antwort = wert;
+      io.emit("zeigeSchaetzAntwort", { name: s.name, wert });
+    }
   });
 
   socket.on('spielerAktion', ({ aktion, raiseBetrag }) => {
@@ -222,7 +229,7 @@ io.on('connection', (socket) => {
   socket.on('disconnect', () => {
     delete spieler[socket.id];
     io.emit('updateSpieler', { id: socket.id, disconnect: true });
-    io.emit('updateAlleSpieler', spieler); // ✅ NEU
+    io.emit('updateAlleSpieler', spieler);
   });
 });
 
