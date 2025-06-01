@@ -41,177 +41,6 @@
     "hinweis2": "Die Zahl ist durch 4 teilbar.",
     "antwort": "32"
   },
-
-  {
-    "frage": "Wie viele Beine hat ein Tausendfüßler durchschnittlich?",
-    "hinweis1": "Weniger als sein Name vermuten lässt.",
-    "hinweis2": "Meistens sind es einige hundert.",
-    "antwort": "300"
-  },
-
-  {
-    "frage": "Wie viele Jahre umfasst ein Jahrzehnt?",
-    "hinweis1": "Wird oft als 'Dekade' bezeichnet.",
-    "hinweis2": "Ein einfacher Zeitraum.",
-    "antwort": "10"
-  },
-  {
-    "frage": "Wie viele Zähne hat ein erwachsener Mensch vollständig?",
-    "hinweis1": "Die Weisheitszähne zählen mit.",
-    "hinweis2": "Zahl ist durch 4 teilbar.",
-    "antwort": "32"
-  },
-  {
-    "frage": "Wie viele Seiten hat ein Würfel in Dungeons & Dragons (Standard)?",
-    "hinweis1": "Wird oft für Initiativen verwendet.",
-    "hinweis2": "Mehr als 10, aber weniger als 25.",
-    "antwort": "20"
-  },
-  {
-    "frage": "Wie viele Länder grenzen direkt an Deutschland?",
-    "hinweis1": "Es sind mehr als 5.",
-    "hinweis2": "Mehr als die meisten europäischen Länder haben.",
-    "antwort": "9"
-  },
-  {
-    "frage": "Wie viele Spieler stehen bei einem Fußballspiel insgesamt auf dem Platz (ohne Schiedsrichter)?",
-    "hinweis1": "Gleich viele pro Team.",
-    "hinweis2": "Ein Team hat elf davon.",
-    "antwort": "22"
-  },
-  {
-    "frage": "Wie viele Nullen hat eine Billion?",
-    "hinweis1": "Mehr als bei einer Million.",
-    "hinweis2": "Die Zahl ist zweistellig.",
-    "antwort": "12"
-  },
-  {
-    "frage": "Wie viele Monate hat ein Jahr?",
-    "hinweis1": "Es gibt 4 Quartale.",
-    "hinweis2": "Jeder Jahreszeit hat meist 3 davon.",
-    "antwort": "12"
-  },
-  {
-    "frage": "Wie viele Augen hat eine Spinne üblicherweise?",
-    "hinweis1": "Es sind immer mehr als 4.",
-    "hinweis2": "Gleichmäßig verteilt im Kopfbereich.",
-    "antwort": "8"
-  },
-  {
-    "frage": "Wie viele Weltwunder der Antike gibt es?",
-    "hinweis1": "Es ist eine klassische Liste.",
-    "hinweis2": "Alle beginnen mit dem Buchstaben „s“. (im Deutschen)",
-    "antwort": "7"
-  },
-  {
-    "frage": "Wie viele Punkte hat ein Würfel durchschnittlich auf allen Seiten zusammen?",
-    "hinweis1": "Man würfelt 1 bis 6.",
-    "hinweis2": "Die Summe aller Seiten.",
-    "antwort": "21"
-  },
-  {
-    "frage": "Wie viele Buchstaben hat das englische Alphabet?",
-    "hinweis1": "Es ist identisch mit dem deutschen Grundalphabet.",
-    "hinweis2": "Beginnt mit A, endet mit Z.",
-    "antwort": "26"
-  },
-  {
-    "frage": "Wie viele Staffeln hat die Serie 'Stranger Things' (bis 2024)?",
-    "hinweis1": "Mehr als 3.",
-    "hinweis2": "Sie soll mit der nächsten enden.",
-    "antwort": "4"
-  },
-  {
-    "frage": "Wie viele Beine hat ein Hummer?",
-    "hinweis1": "Zwei davon sind große Scheren.",
-    "hinweis2": "Er bewegt sich mit fünf Paaren.",
-    "antwort": "10"
-  },
-  {
-    "frage": "Wie viele PS hat ein typisches Go-Kart?",
-    "hinweis1": "Es ist deutlich weniger als bei einem Auto.",
-    "hinweis2": "Einstellig, oft für Anfänger.",
-    "antwort": "6"
-  },
-  {
-    "frage": "Wie viele Planeten unseres Sonnensystems sind Gasriesen?",
-    "hinweis1": "Sie befinden sich weit außen.",
-    "hinweis2": "Zwei davon sind sehr bekannt – einer mit Ringen.",
-    "antwort": "4"
-  },
-  {
-    "frage": "Wie viele Herzen hat ein Regenwurm?",
-    "hinweis1": "Es sind mehr als ein Mensch besitzt.",
-    "hinweis2": "Sie sind als Aortabögen angeordnet.",
-    "antwort": "5"
-  },
-  {
-    "frage": "Wie viele Kilobyte ergeben ein Megabyte?",
-    "hinweis1": "Zahl liegt knapp über 1000.",
-    "hinweis2": "Basis: binär gerechnet.",
-    "antwort": "1024"
-  },
-  {
-    "frage": "Wie viele Beine hat ein Krebs (z. B. Taschenkrebs)?",
-    "hinweis1": "Er hat mehr als 6.",
-    "hinweis2": "Zahl ist identisch mit Hummer.",
-    "antwort": "10"
-  },
-  {
-    "frage": "Wie viele Jahre dauert eine Amtszeit des US-Präsidenten?",
-    "hinweis1": "Länger als Bundestag, kürzer als Kanzler oft regiert.",
-    "hinweis2": "Zahl ist gerade.",
-    "antwort": "4"
-  },
-  {
-    "frage": "Wie viele Felder hat ein Sudoku-Gitter?",
-    "hinweis1": "Es sind 9 Reihen à 9 Felder.",
-    "hinweis2": "Quadrat mit 81 kleinen Zellen.",
-    "antwort": "81"
-  }
-
-  {
-    "frage": "Wie viele Farben hat ein Regenbogen?",
-    "hinweis1": "Mehr als die Grundfarben.",
-    "hinweis2": "Er enthält auch Indigo und Violett.",
-    "antwort": "7"
-  },
-  {
-    "frage": "Wie viele Karten sind in einem normalen Skatblatt?",
-    "hinweis1": "Weniger als beim Pokerdeck.",
-    "hinweis2": "Es gibt 4 Farben mit je 8 Karten.",
-    "antwort": "32"
-  },
-  {
-    "frage": "Wie viele Stunden hat eine Woche?",
-    "hinweis1": "Ein Tag hat immer gleich viele.",
-    "hinweis2": "Multipliziere das mit den Tagen der Woche.",
-    "antwort": "168"
-  },
-  {
-    "frage": "Wie viele Beine hat ein Insekt?",
-    "hinweis1": "Mehr als ein Mensch, weniger als eine Spinne.",
-    "hinweis2": "Typisch für Käfer und Bienen.",
-    "antwort": "6"
-  },
-  {
-    "frage": "Wie viele Tasten hat ein klassisches Klavier?",
-    "hinweis1": "Es sind mehr als 70.",
-    "hinweis2": "Die schwarzen und weißen Tasten zusammen ergeben diese Zahl.",
-    "antwort": "88"
-  },
-  {
-    "frage": "Wie viele Tage dauert der Februar in einem Nicht-Schaltjahr?",
-    "hinweis1": "Kürzester Monat des Jahres.",
-    "hinweis2": "Nur einmal pro Jahr mit dieser Länge.",
-    "antwort": "28"
-  },
-  {
-    "frage": "Wie viele Level hat Super Mario Bros. (NES)?",
-    "hinweis1": "Es gibt mehrere Welten mit gleich vielen Abschnitten.",
-    "hinweis2": "Die Zahl ist durch 4 teilbar.",
-    "antwort": "32"
-  },
   {
     "frage": "Wie viele Beine hat ein Tausendfüßler durchschnittlich?",
     "hinweis1": "Weniger als sein Name vermuten lässt.",
@@ -355,5 +184,186 @@
     "hinweis1": "Wird auch als Sechseck bezeichnet.",
     "hinweis2": "Die Anzahl entspricht einem Würfelwurf von 6.",
     "antwort": "6"
+  },
+
+    {
+    "frage": "Wie viele Münzen benötigt man in Super Mario, um ein Extraleben zu erhalten?",
+    "hinweis1": "Es ist eine runde Zahl.",
+    "hinweis2": "Sie endet auf null.",
+    "antwort": "100"
+  },
+  {
+    "frage": "Wie viele Speicherplätze bietet Skyrim standardmäßig?",
+    "hinweis1": "Mehr als 100.",
+    "hinweis2": "Typisch für Open-World-Spiele mit vielen Speicherständen.",
+    "antwort": "1000"
+  },
+  {
+    "frage": "Wie viele Bossgegner gibt es in Dark Souls 1 (inkl. DLC)?",
+    "hinweis1": "Zweistellige Zahl.",
+    "hinweis2": "Mehr als 20, aber weniger als 30.",
+    "antwort": "26"
+  },
+  {
+    "frage": "Wie viele Herzen kann Link in Breath of the Wild maximal haben?",
+    "hinweis1": "Mehr als 25.",
+    "hinweis2": "Man muss dafür viel grinden.",
+    "antwort": "30"
+  },
+  {
+    "frage": "Wie viele Charaktere gibt es in Super Smash Bros. Ultimate (inkl. DLC)?",
+    "hinweis1": "Es sind über 70.",
+    "hinweis2": "Die genaue Zahl ist 89.",
+    "antwort": "89"
+  },
+  {
+    "frage": "Wie viele Enden gibt es in The Witcher 3: Wild Hunt?",
+    "hinweis1": "Mehr als zwei.",
+    "hinweis2": "Es sind drei.",
+    "antwort": "3"
+  },
+  {
+    "frage": "Wie viele Punkte benötigt man für ein Level-Up in Call of Duty (typisch)?",
+    "hinweis1": "Vierstellig.",
+    "hinweis2": "Hängt vom Modus ab, aber meist etwa 1000–2000.",
+    "antwort": "1500"
+  },
+  {
+    "frage": "Wie viele Pokémon-Editionen erschienen auf dem Game Boy?",
+    "hinweis1": "Die erste Generation.",
+    "hinweis2": "Rot, Blau, Gelb.",
+    "antwort": "3"
+  },
+  {
+    "frage": "Wie viele Spieler sind in einem Among Us-Spiel maximal möglich?",
+    "hinweis1": "Es ist zweistellig.",
+    "hinweis2": "Maximalanzahl seit Update.",
+    "antwort": "15"
+  },
+  {
+    "frage": "Wie viele Waffen gibt es in Fortnite (Battle Royale, Haupttypen)?",
+    "hinweis1": "Unter 15.",
+    "hinweis2": "Variiert je nach Season, Standard liegt bei 10.",
+    "antwort": "10"
+  },
+  {
+    "frage": "Wie viele Tränke kann man in Diablo II im Gürtel tragen?",
+    "hinweis1": "Anzahl hängt vom Gürteltyp ab.",
+    "hinweis2": "Maximal 16 Felder.",
+    "antwort": "16"
+  },
+  {
+    "frage": "Wie viele Teile umfasst die Hauptreihe von Assassin’s Creed (bis 2024)?",
+    "hinweis1": "Über 10.",
+    "hinweis2": "Zahl liegt bei 13.",
+    "antwort": "13"
+  },
+  {
+    "frage": "Wie viele Teammitglieder hat man in Apex Legends im Standardmodus?",
+    "hinweis1": "Wird als Trupp bezeichnet.",
+    "hinweis2": "Immer drei.",
+    "antwort": "3"
+  },
+  {
+    "frage": "Wie viele Teile gibt es von Half-Life (inkl. Alyx)?",
+    "hinweis1": "Weniger als 5.",
+    "hinweis2": "Zahl liegt bei 3.",
+    "antwort": "3"
+  },
+  {
+    "frage": "Wie viele Erfolge (Achievements) hat Hollow Knight auf Steam?",
+    "hinweis1": "Zwischen 50 und 70.",
+    "hinweis2": "Zahl liegt bei 63.",
+    "antwort": "63"
+  },
+  {
+    "frage": "Wie viele Karten gibt es in Hearthstone im Basis-Set?",
+    "hinweis1": "Mehr als 100.",
+    "hinweis2": "Etwa 130 Stück.",
+    "antwort": "130"
+  },
+  {
+    "frage": "Wie viele Tiere kann man in Stardew Valley auf dem Hof halten (ohne Mods)?",
+    "hinweis1": "Zahl liegt zwischen 10 und 20.",
+    "hinweis2": "Maximalanzahl pro Gebäude zählt.",
+    "antwort": "12"
+  },
+  {
+    "frage": "Wie viele Speicherplätze bietet ein Spielstand in Animal Crossing: New Horizons?",
+    "hinweis1": "Sehr begrenzt.",
+    "hinweis2": "Nur eine Insel pro Konsole.",
+    "antwort": "1"
+  },
+  {
+    "frage": "Wie viele Ringe kann man in Sonic the Hedgehog maximal halten, bevor man getroffen wird?",
+    "hinweis1": "Es gibt keine feste Obergrenze, aber eine typische Zahl im HUD.",
+    "hinweis2": "Meistens 999 angezeigt.",
+    "antwort": "999"
+  },
+  {
+    "frage": "Wie viele Hauptteile gibt es von Resident Evil (bis 2024)?",
+    "hinweis1": "Es sind mehr als 7.",
+    "hinweis2": "Zahl liegt bei 9.",
+    "antwort": "9"
+  },
+  {
+    "frage": "Wie viele Minuten dauert ein Fußballspiel (regulär)?",
+    "hinweis1": "Zwei gleich lange Halbzeiten.",
+    "hinweis2": "Insgesamt anderthalb Stunden.",
+    "antwort": "90"
+  },
+  {
+    "frage": "Wie viele Spieler stehen bei einem Volleyballspiel pro Team auf dem Feld?",
+    "hinweis1": "Wird im Kreis rotiert.",
+    "hinweis2": "Zahl ist doppelt so hoch wie bei Basketball.",
+    "antwort": "6"
+  },
+  {
+    "frage": "Wie viele Bahnen hat ein offizielles Schwimmbecken bei Olympia?",
+    "hinweis1": "Mehr als 5, weniger als 10.",
+    "hinweis2": "Jede Bahn ist 2,5 m breit.",
+    "antwort": "8"
+  },
+  {
+    "frage": "Wie viele Sekunden dauert ein 100-Meter-Lauf bei Weltrekord?",
+    "hinweis1": "Einstelliger Wert.",
+    "hinweis2": "Usain Bolt hält den Rekord.",
+    "antwort": "9"
+  },
+  {
+    "frage": "Wie viele Fouls führen im Basketball zur Disqualifikation (NBA)?",
+    "hinweis1": "Ein Spieler darf viele Fouls begehen, aber nicht zu viele.",
+    "hinweis2": "Die Zahl ist 6.",
+    "antwort": "6"
+  },
+  {
+    "frage": "Wie viele Punkte gibt es für einen Touchdown im American Football?",
+    "hinweis1": "Es ist mehr als bei einem Field Goal.",
+    "hinweis2": "Zahl liegt bei 6.",
+    "antwort": "6"
+  },
+  {
+    "frage": "Wie viele Spieler hat ein Rugby-Team auf dem Feld?",
+    "hinweis1": "Es sind mehr als im Fußball.",
+    "hinweis2": "Zahl liegt bei 15.",
+    "antwort": "15"
+  },
+  {
+    "frage": "Wie viele Minuten dauert ein Eishockey-Drittel?",
+    "hinweis1": "Drei Drittel ergeben die Gesamtdauer.",
+    "hinweis2": "Jedes dauert 20 Minuten.",
+    "antwort": "20"
+  },
+  {
+    "frage": "Wie viele Spieler sind bei einem Baseballteam gleichzeitig im Feld?",
+    "hinweis1": "Alle Positionen abgedeckt.",
+    "hinweis2": "Zahl ist 9.",
+    "antwort": "9"
+  },
+  {
+    "frage": "Wie viele Schläge benötigt man im Golf, um ein Par-3-Loch zu spielen?",
+    "hinweis1": "Kleine Löcher, wenig Schläge.",
+    "hinweis2": "Zahl ist 3.",
+    "antwort": "3"
   }
 ]
