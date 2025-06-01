@@ -10,6 +10,8 @@
   <h1>QuizPoker – Admin-Panel</h1>
 
   <div id="frage">Frage: <span style="color:#fff">–</span></div>
+  <div id="richtige-loesung" style="margin-top: 10px; font-weight: bold; color: #4caf50;"></div>
+  <div id="sieger-anzeige" style="margin-top: 10px; font-weight: bold; color: #ffd700;"></div>
 
   <div style="margin-top: 30px;">
     <button class="admin" onclick="startFrage()">🎯 Frage starten</button>
@@ -24,11 +26,6 @@
   <div style="margin-top: 30px;">
     <input type="number" id="chipsFeld" placeholder="Chips für alle Spieler" />
     <button onclick="setzeChipsFürAlle()">💰 Chips für alle setzen</button>
-  </div>
-
-  <div style="margin-top: 20px;">
-    <input type="number" id="einsatzFeld" placeholder="Aktueller Einsatz" />
-    <button onclick="setzeEinsatz()">🎯 Einsatz setzen</button>
   </div>
 
   <div style="margin-top: 30px;">
@@ -61,9 +58,6 @@
   <div id="gewinner-auswahl" style="margin-bottom: 10px;"></div>
   <button onclick="potAuszahlen()">✅ Pot an ausgewählte Spieler</button>
 
-  <h3 style="margin-top:40px;">📊 Schätzantworten</h3>
-  <ul id="schaetz-liste"></ul>
-
   <script>
     const socket = io();
     let frageIndex = 0;
@@ -80,7 +74,8 @@
     function startFrage() {
       const frage = fragen[frageIndex];
       document.getElementById('frage').innerHTML = "Frage: " + frage.frage;
-      document.getElementById("schaetz-liste").innerHTML = "";
+      document.getElementById("richtige-loesung").textContent = "";
+      document.getElementById("sieger-anzeige").textContent = "";
       socket.emit('frageStart', frage);
     }
 
@@ -203,10 +198,15 @@
     }
 
     socket.on("zeigeSchaetzAntwort", (data) => {
-      const ul = document.getElementById("schaetz-liste");
-      const li = document.createElement("li");
-      li.textContent = `${data.name}: ${data.wert}`;
-      ul.appendChild(li);
+      // Optional: einzeln anzeigen (falls du Listen machen willst)
+    });
+
+    socket.on("aufloesung", (antwort) => {
+      document.getElementById("richtige-loesung").textContent = "✅ Richtige Antwort: " + antwort;
+    });
+
+    socket.on("schaetzSieger", (name) => {
+      document.getElementById("sieger-anzeige").textContent = "🏆 " + name + " war am nächsten dran!";
     });
   </script>
 </body>
