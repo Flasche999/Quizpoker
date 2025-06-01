@@ -11,7 +11,7 @@ app.use(express.static(__dirname));
 let spieler = {};
 let aktuellerEinsatz = 0;
 
-// 🔁 NEU: Reihenfolge für Aktionsphase
+// 🔁 Reihenfolge für Aktionsphase
 let spielReihenfolge = [];
 let aktuellerSpielerIndex = -1;
 
@@ -20,7 +20,23 @@ function prüfeObAlleGesendetHaben() {
   const alleFertig = Object.values(spieler).length > 0 && Object.values(spieler).every(s => s.antwort !== "");
   if (alleFertig) {
     // Reihenfolge festlegen
-    spielReihenfolge = Object.values(spieler).map(s => s.id);
+    const aktuelleReihenfolge = Object.values(spieler).map(s => s.id);
+
+    // 🔁 Rotiere Startspieler, falls schon eine Reihenfolge existiert
+    if (spielReihenfolge.length > 0) {
+      const letzterStartspieler = spielReihenfolge[0];
+      const index = aktuelleReihenfolge.indexOf(letzterStartspieler);
+      if (index !== -1) {
+        const vorne = aktuelleReihenfolge.slice(index + 1);
+        const hinten = aktuelleReihenfolge.slice(0, index + 1);
+        spielReihenfolge = vorne.concat(hinten);
+      } else {
+        spielReihenfolge = aktuelleReihenfolge;
+      }
+    } else {
+      spielReihenfolge = aktuelleReihenfolge;
+    }
+
     aktuellerSpielerIndex = 0;
 
     const erster = spielReihenfolge[0];
@@ -77,8 +93,8 @@ io.on('connection', (socket) => {
       });
     });
 
-    // Reihenfolge zurücksetzen
-    spielReihenfolge = [];
+    // Reihenfolge zurücksetzen – neue Reihenfolge wird bei prüfeObAlleGesendetHaben festgelegt
+    spielReihenfolge = spielReihenfolge.length > 0 ? spielReihenfolge : [];
     aktuellerSpielerIndex = -1;
   });
 
