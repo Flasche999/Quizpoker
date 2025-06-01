@@ -169,11 +169,12 @@ io.on('connection', (socket) => {
     const s = spieler[socket.id];
     if (!s) return;
 
-    if (s.chips <= 0) {
-      s.aktion = "Ausgeschieden";
-      io.emit("updateSpieler", s);
-      return;
-    }
+    if (s.chips <= 0 && s.aktion !== "All In") {
+  s.aktion = "Ausgeschieden";
+  io.emit("updateSpieler", s);
+  return;
+}
+
 
     if (aktion === "fold") {
       s.aktion = "Fold";
