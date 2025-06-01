@@ -169,4 +169,191 @@
     "hinweis2": "Quadrat mit 81 kleinen Zellen.",
     "antwort": "81"
   }
+
+  {
+    "frage": "Wie viele Farben hat ein Regenbogen?",
+    "hinweis1": "Mehr als die Grundfarben.",
+    "hinweis2": "Er enthält auch Indigo und Violett.",
+    "antwort": "7"
+  },
+  {
+    "frage": "Wie viele Karten sind in einem normalen Skatblatt?",
+    "hinweis1": "Weniger als beim Pokerdeck.",
+    "hinweis2": "Es gibt 4 Farben mit je 8 Karten.",
+    "antwort": "32"
+  },
+  {
+    "frage": "Wie viele Stunden hat eine Woche?",
+    "hinweis1": "Ein Tag hat immer gleich viele.",
+    "hinweis2": "Multipliziere das mit den Tagen der Woche.",
+    "antwort": "168"
+  },
+  {
+    "frage": "Wie viele Beine hat ein Insekt?",
+    "hinweis1": "Mehr als ein Mensch, weniger als eine Spinne.",
+    "hinweis2": "Typisch für Käfer und Bienen.",
+    "antwort": "6"
+  },
+  {
+    "frage": "Wie viele Tasten hat ein klassisches Klavier?",
+    "hinweis1": "Es sind mehr als 70.",
+    "hinweis2": "Die schwarzen und weißen Tasten zusammen ergeben diese Zahl.",
+    "antwort": "88"
+  },
+  {
+    "frage": "Wie viele Tage dauert der Februar in einem Nicht-Schaltjahr?",
+    "hinweis1": "Kürzester Monat des Jahres.",
+    "hinweis2": "Nur einmal pro Jahr mit dieser Länge.",
+    "antwort": "28"
+  },
+  {
+    "frage": "Wie viele Level hat Super Mario Bros. (NES)?",
+    "hinweis1": "Es gibt mehrere Welten mit gleich vielen Abschnitten.",
+    "hinweis2": "Die Zahl ist durch 4 teilbar.",
+    "antwort": "32"
+  },
+  {
+    "frage": "Wie viele Beine hat ein Tausendfüßler durchschnittlich?",
+    "hinweis1": "Weniger als sein Name vermuten lässt.",
+    "hinweis2": "Meistens sind es einige hundert.",
+    "antwort": "300"
+  },
+  {
+    "frage": "Wie viele Jahre umfasst ein Jahrzehnt?",
+    "hinweis1": "Wird oft als 'Dekade' bezeichnet.",
+    "hinweis2": "Ein einfacher Zeitraum.",
+    "antwort": "10"
+  },
+  {
+    "frage": "Wie viele Zähne hat ein erwachsener Mensch vollständig?",
+    "hinweis1": "Die Weisheitszähne zählen mit.",
+    "hinweis2": "Zahl ist durch 4 teilbar.",
+    "antwort": "32"
+  },
+  {
+    "frage": "Wie viele Seiten hat ein Würfel in Dungeons & Dragons (Standard)?",
+    "hinweis1": "Wird oft für Initiativen verwendet.",
+    "hinweis2": "Mehr als 10, aber weniger als 25.",
+    "antwort": "20"
+  },
+  {
+    "frage": "Wie viele Länder grenzen direkt an Deutschland?",
+    "hinweis1": "Es sind mehr als 5.",
+    "hinweis2": "Mehr als die meisten europäischen Länder haben.",
+    "antwort": "9"
+  },
+  {
+    "frage": "Wie viele Spieler stehen bei einem Fußballspiel insgesamt auf dem Platz (ohne Schiedsrichter)?",
+    "hinweis1": "Gleich viele pro Team.",
+    "hinweis2": "Ein Team hat elf davon.",
+    "antwort": "22"
+  },
+  {
+    "frage": "Wie viele Nullen hat eine Billion?",
+    "hinweis1": "Mehr als bei einer Million.",
+    "hinweis2": "Die Zahl ist zweistellig.",
+    "antwort": "12"
+  },
+  {
+    "frage": "Wie viele Monate hat ein Jahr?",
+    "hinweis1": "Es gibt 4 Quartale.",
+    "hinweis2": "Jeder Jahreszeit hat meist 3 davon.",
+    "antwort": "12"
+  },
+  {
+    "frage": "Wie viele Augen hat eine Spinne üblicherweise?",
+    "hinweis1": "Es sind immer mehr als 4.",
+    "hinweis2": "Gleichmäßig verteilt im Kopfbereich.",
+    "antwort": "8"
+  },
+  {
+    "frage": "Wie viele Weltwunder der Antike gibt es?",
+    "hinweis1": "Es ist eine klassische Liste.",
+    "hinweis2": "Alle beginnen mit dem Buchstaben „s“. (im Deutschen)",
+    "antwort": "7"
+  },
+  {
+    "frage": "Wie viele Punkte hat ein Würfel durchschnittlich auf allen Seiten zusammen?",
+    "hinweis1": "Man würfelt 1 bis 6.",
+    "hinweis2": "Die Summe aller Seiten.",
+    "antwort": "21"
+  },
+  {
+    "frage": "Wie viele Buchstaben hat das englische Alphabet?",
+    "hinweis1": "Es ist identisch mit dem deutschen Grundalphabet.",
+    "hinweis2": "Beginnt mit A, endet mit Z.",
+    "antwort": "26"
+  },
+  {
+    "frage": "Wie viele Staffeln hat die Serie 'Stranger Things' (bis 2024)?",
+    "hinweis1": "Mehr als 3.",
+    "hinweis2": "Sie soll mit der nächsten enden.",
+    "antwort": "4"
+  },
+  {
+    "frage": "Wie viele Beine hat ein Hummer?",
+    "hinweis1": "Zwei davon sind große Scheren.",
+    "hinweis2": "Er bewegt sich mit fünf Paaren.",
+    "antwort": "10"
+  },
+  {
+    "frage": "Wie viele PS hat ein typisches Go-Kart?",
+    "hinweis1": "Es ist deutlich weniger als bei einem Auto.",
+    "hinweis2": "Einstellig, oft für Anfänger.",
+    "antwort": "6"
+  },
+  {
+    "frage": "Wie viele Planeten unseres Sonnensystems sind Gasriesen?",
+    "hinweis1": "Sie befinden sich weit außen.",
+    "hinweis2": "Zwei davon sind sehr bekannt – einer mit Ringen.",
+    "antwort": "4"
+  },
+  {
+    "frage": "Wie viele Herzen hat ein Regenwurm?",
+    "hinweis1": "Es sind mehr als ein Mensch besitzt.",
+    "hinweis2": "Sie sind als Aortabögen angeordnet.",
+    "antwort": "5"
+  },
+  {
+    "frage": "Wie viele Kilobyte ergeben ein Megabyte?",
+    "hinweis1": "Zahl liegt knapp über 1000.",
+    "hinweis2": "Basis: binär gerechnet.",
+    "antwort": "1024"
+  },
+  {
+    "frage": "Wie viele Beine hat ein Krebs (z. B. Taschenkrebs)?",
+    "hinweis1": "Er hat mehr als 6.",
+    "hinweis2": "Zahl ist identisch mit Hummer.",
+    "antwort": "10"
+  },
+  {
+    "frage": "Wie viele Jahre dauert eine Amtszeit des US-Präsidenten?",
+    "hinweis1": "Länger als Bundestag, kürzer als Kanzler oft regiert.",
+    "hinweis2": "Zahl ist gerade.",
+    "antwort": "4"
+  },
+  {
+    "frage": "Wie viele Felder hat ein Sudoku-Gitter?",
+    "hinweis1": "Es sind 9 Reihen à 9 Felder.",
+    "hinweis2": "Quadrat mit 81 kleinen Zellen.",
+    "antwort": "81"
+  },
+  {
+    "frage": "Wie viele Muskeln braucht man zum Lächeln?",
+    "hinweis1": "Es ist weniger als beim Stirnrunzeln.",
+    "hinweis2": "Liegt zwischen 15 und 20.",
+    "antwort": "17"
+  },
+  {
+    "frage": "Wie viele Planeten sind in unserem Sonnensystem?",
+    "hinweis1": "Pluto zählt nicht dazu.",
+    "hinweis2": "Die Zahl ist einstellig.",
+    "antwort": "8"
+  },
+  {
+    "frage": "Wie viele Seiten hat ein Hexagon?",
+    "hinweis1": "Wird auch als Sechseck bezeichnet.",
+    "hinweis2": "Die Anzahl entspricht einem Würfelwurf von 6.",
+    "antwort": "6"
+  }
 ]
