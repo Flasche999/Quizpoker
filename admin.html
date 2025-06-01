@@ -61,6 +61,9 @@
   <div id="gewinner-auswahl" style="margin-bottom: 10px;"></div>
   <button onclick="potAuszahlen()">✅ Pot an ausgewählte Spieler</button>
 
+  <h3 style="margin-top:40px;">📊 Schätzantworten</h3>
+  <ul id="schaetz-liste"></ul>
+
   <script>
     const socket = io();
     let frageIndex = 0;
@@ -77,6 +80,7 @@
     function startFrage() {
       const frage = fragen[frageIndex];
       document.getElementById('frage').innerHTML = "Frage: " + frage.frage;
+      document.getElementById("schaetz-liste").innerHTML = ""; // 🧹 Reset der Liste bei neuer Frage
       socket.emit('frageStart', frage);
     }
 
@@ -193,6 +197,14 @@
         body.appendChild(row);
       });
     }
+
+    // 🔁 NEU: Empfang von Schätzantworten
+    socket.on("zeigeSchaetzAntwort", (data) => {
+      const ul = document.getElementById("schaetz-liste");
+      const li = document.createElement("li");
+      li.textContent = `${data.name}: ${data.wert}`;
+      ul.appendChild(li);
+    });
   </script>
 </body>
 </html>
