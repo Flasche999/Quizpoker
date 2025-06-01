@@ -180,6 +180,13 @@ io.on('connection', (socket) => {
     io.emit("einsatzAktualisiert", aktuellerEinsatz);
   });
 
+  // 👉 HIER NEU
+  socket.on('setBlinds', ({ small, big }) => {
+    smallBlind = small;
+    bigBlind = big;
+    console.log(`⚙️ Neue Blinds gesetzt: Small = ${small}, Big = ${big}`);
+  });
+
   socket.on('disconnect', () => {
     delete spieler[socket.id];
     io.emit('updateSpieler', { id: socket.id, disconnect: true });
