@@ -16,7 +16,7 @@ let bigBlind = 20;
 let blindIndex = 0;
 let spielReihenfolge = [];
 let aktuellerSpielerIndex = -1;
-let letzterBigBlindId = null; // 👈 Neu: Big Blind merken
+let letzterBigBlindId = null;
 
 function setzeBlindsUndStart() {
   const spielerListe = Object.values(spieler).filter(s => s.chips > 0);
@@ -27,7 +27,6 @@ function setzeBlindsUndStart() {
   const small = spielerListe[blindIndex % spielerListe.length];
   const big = spielerListe[(blindIndex + 1) % spielerListe.length];
 
-  // Small Blind setzen
   if (small.chips <= smallBlind) {
     pot += small.chips;
     small.imPot = (small.imPot || 0) + small.chips;
@@ -39,7 +38,6 @@ function setzeBlindsUndStart() {
     pot += smallBlind;
   }
 
-  // Big Blind setzen
   if (big.chips <= bigBlind) {
     pot += big.chips;
     big.imPot = (big.imPot || 0) + big.chips;
@@ -152,8 +150,18 @@ io.on('connection', (socket) => {
     if (s && s.chips > 0) {
       s.antwort = wert;
 
-      io.emit("zeigeSchaetzAntwortAdmin", { name: s.name, wert });
+      io.emit("zeigeSchaetzAntwortAdmin", { name: s.name, wert, id: socket.id });
       socket.broadcast.emit("zeigeSchaetzAntwortVerdeckt", { name: s.name });
+    }
+  });
+
+  socket.on("adminVergibtPot", (gewinnerID) => {
+    const s = spieler[gewinnerID];
+    if (s) {
+      s.chips += pot;
+      io.emit("updateSpieler", s);
+      io.emit("potAktualisiert", 0);
+      pot = 0;
     }
   });
 
