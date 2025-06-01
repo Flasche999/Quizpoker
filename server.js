@@ -9,23 +9,44 @@ const io = new Server(server);
 app.use(express.static(__dirname));
 
 let spieler = {};
+let pot = 0;
 let aktuellerEinsatz = 0;
-
-// 🔁 Reihenfolge für Aktionsphase
+let smallBlind = 10;
+let bigBlind = 20;
+let blindIndex = 0;
 let spielReihenfolge = [];
 let aktuellerSpielerIndex = -1;
 
-// Hilfsfunktion: prüfen, ob alle Schätzungen da sind
+function setzeBlindsUndStart() {
+  const spielerListe = Object.values(spieler);
+  if (spielerListe.length < 2) return;
+
+  const small = spielerListe[blindIndex % spielerListe.length];
+  const big = spielerListe[(blindIndex + 1) % spielerListe.length];
+
+  small.chips -= smallBlind;
+  big.chips -= bigBlind;
+
+  small.imPot = smallBlind;
+  big.imPot = bigBlind;
+
+  aktuellerEinsatz = bigBlind;
+  pot = smallBlind + bigBlind;
+
+  io.emit("updateSpieler", small);
+  io.emit("updateSpieler", big);
+  io.emit("potAktualisiert", pot);
+
+  blindIndex++;
+}
+
 function prüfeObAlleGesendetHaben() {
   const alleFertig = Object.values(spieler).length > 0 && Object.values(spieler).every(s => s.antwort !== "");
   if (alleFertig) {
-    // Reihenfolge festlegen
     const aktuelleReihenfolge = Object.values(spieler).map(s => s.id);
-
-    // 🔁 Rotiere Startspieler, falls schon eine Reihenfolge existiert
     if (spielReihenfolge.length > 0) {
-      const letzterStartspieler = spielReihenfolge[0];
-      const index = aktuelleReihenfolge.indexOf(letzterStartspieler);
+      const letzterStart = spielReihenfolge[0];
+      const index = aktuelleReihenfolge.indexOf(letzterStart);
       if (index !== -1) {
         const vorne = aktuelleReihenfolge.slice(index + 1);
         const hinten = aktuelleReihenfolge.slice(0, index + 1);
@@ -38,10 +59,9 @@ function prüfeObAlleGesendetHaben() {
     }
 
     aktuellerSpielerIndex = 0;
-
     const erster = spielReihenfolge[0];
     if (erster) {
-      io.to(erster).emit("aktionErlaubt");
+      io.to(erster).emit("aktionErlaubt", { aktuellerEinsatz, pot });
     }
   }
 }
@@ -49,43 +69,80 @@ function prüfeObAlleGesendetHaben() {
 io.on('connection', (socket) => {
   console.log('🔌 Spieler verbunden:', socket.id);
 
-  // Spieler sendet seine Daten
   socket.on('playerData', (data) => {
-    spieler[socket.id] = { id: socket.id, ...data };
+    if (!spieler[socket.id]) {
+      spieler[socket.id] = { id: socket.id, imPot: 0 };
+    }
 
-    // Einzelnes Update an alle Spieler
+    spieler[socket.id] = {
+      ...spieler[socket.id],
+      ...data
+    };
+
     io.emit('updateSpieler', spieler[socket.id]);
-
-    // Zusätzlich: Broadcast an alle mit Name, Aktion und Chips (für Spielerübersicht)
     io.emit('playerData', {
       name: data.name,
       aktion: data.aktion,
       chips: data.chips
     });
 
-    // Nach Abgabe prüfen ob alle fertig
     prüfeObAlleGesendetHaben();
   });
 
-  // Spieler ist mit Aktion fertig
-  socket.on("spielerAktionFertig", () => {
+  socket.on('spielerAktion', ({ aktion, raiseBetrag }) => {
+    const s = spieler[socket.id];
+    if (!s || s.chips <= 0) return;
+
+    if (aktion === "fold") {
+      s.aktion = "Fold";
+    }
+
+    if (aktion === "call") {
+      const toCall = aktuellerEinsatz - (s.imPot || 0);
+      const callBetrag = Math.min(toCall, s.chips);
+      s.chips -= callBetrag;
+      s.imPot = (s.imPot || 0) + callBetrag;
+      pot += callBetrag;
+      s.aktion = "Call";
+    }
+
+    if (aktion === "raise") {
+      const raiseGesamt = parseInt(raiseBetrag);
+      if (raiseGesamt > s.chips) return;
+
+      aktuellerEinsatz = raiseGesamt;
+      s.chips -= raiseGesamt;
+      s.imPot = (s.imPot || 0) + raiseGesamt;
+      pot += raiseGesamt;
+      s.aktion = "Raise";
+    }
+
+    if (aktion === "allin") {
+      pot += s.chips;
+      s.aktion = "All In";
+      s.imPot = (s.imPot || 0) + s.chips;
+      s.chips = 0;
+    }
+
+    io.emit("updateSpieler", s);
+    io.emit("potAktualisiert", pot);
+
     aktuellerSpielerIndex++;
     if (aktuellerSpielerIndex < spielReihenfolge.length) {
-      const naechster = spielReihenfolge[aktuellerSpielerIndex];
-      io.to(naechster).emit("aktionErlaubt");
+      const nextID = spielReihenfolge[aktuellerSpielerIndex];
+      io.to(nextID).emit("aktionErlaubt", { aktuellerEinsatz, pot });
     } else {
-      console.log("✅ Alle Spieler haben ihre Aktion gewählt.");
+      console.log("✅ Alle Spieler haben gesetzt.");
     }
   });
 
-  // Admin startet eine neue Frage
   socket.on('frageStart', (frage) => {
     io.emit('frageStart', frage);
 
-    // Aktionen aller Spieler zurücksetzen
-    Object.values(spieler).forEach((s) => {
+    Object.values(spieler).forEach(s => {
       s.aktion = "";
       s.antwort = "";
+      s.imPot = 0;
       io.emit("playerData", {
         name: s.name,
         aktion: "",
@@ -93,43 +150,36 @@ io.on('connection', (socket) => {
       });
     });
 
-    // Reihenfolge zurücksetzen – neue Reihenfolge wird bei prüfeObAlleGesendetHaben festgelegt
-    spielReihenfolge = spielReihenfolge.length > 0 ? spielReihenfolge : [];
+    spielReihenfolge = [];
     aktuellerSpielerIndex = -1;
+    setzeBlindsUndStart();
   });
 
-  // Admin zeigt Hinweis an (jetzt mit Text)
   socket.on('hinweis', ({ num, text }) => {
     console.log(`📢 Hinweis ${num}: ${text}`);
     io.emit('hinweis', { num, text });
   });
 
-  // Admin zeigt Auflösung an
   socket.on('aufloesung', (antwort) => {
     io.emit('aufloesung', antwort);
   });
 
-  // Admin setzt Chips für alle Spieler
   socket.on('setAllChips', (betrag) => {
-    console.log(`💰 Admin setzt bei allen Spielern die Chips auf ${betrag}`);
-    Object.values(spieler).forEach((s) => {
+    Object.values(spieler).forEach(s => {
       s.chips = betrag;
+      s.imPot = 0;
     });
 
-    // ❗ Chips-Update an alle Clients inkl. Admin
-    Object.values(spieler).forEach((s) => {
+    Object.values(spieler).forEach(s => {
       io.emit("updateSpieler", s);
     });
   });
 
-  // Admin setzt den aktuellen Einsatz für die Runde
   socket.on('setEinsatz', (betrag) => {
     aktuellerEinsatz = betrag;
-    console.log(`🎯 Aktueller Einsatz: ${betrag} Chips`);
     io.emit("einsatzAktualisiert", aktuellerEinsatz);
   });
 
-  // Spieler verlässt das Spiel
   socket.on('disconnect', () => {
     delete spieler[socket.id];
     io.emit('updateSpieler', { id: socket.id, disconnect: true });
