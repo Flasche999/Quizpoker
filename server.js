@@ -11,6 +11,25 @@ app.use(express.static(__dirname));
 let spieler = {};
 let aktuellerEinsatz = 0;
 
+// 🔁 NEU: Reihenfolge für Aktionsphase
+let spielReihenfolge = [];
+let aktuellerSpielerIndex = -1;
+
+// Hilfsfunktion: prüfen, ob alle Schätzungen da sind
+function prüfeObAlleGesendetHaben() {
+  const alleFertig = Object.values(spieler).length > 0 && Object.values(spieler).every(s => s.antwort !== "");
+  if (alleFertig) {
+    // Reihenfolge festlegen
+    spielReihenfolge = Object.values(spieler).map(s => s.id);
+    aktuellerSpielerIndex = 0;
+
+    const erster = spielReihenfolge[0];
+    if (erster) {
+      io.to(erster).emit("aktionErlaubt");
+    }
+  }
+}
+
 io.on('connection', (socket) => {
   console.log('🔌 Spieler verbunden:', socket.id);
 
@@ -27,6 +46,20 @@ io.on('connection', (socket) => {
       aktion: data.aktion,
       chips: data.chips
     });
+
+    // Nach Abgabe prüfen ob alle fertig
+    prüfeObAlleGesendetHaben();
+  });
+
+  // Spieler ist mit Aktion fertig
+  socket.on("spielerAktionFertig", () => {
+    aktuellerSpielerIndex++;
+    if (aktuellerSpielerIndex < spielReihenfolge.length) {
+      const naechster = spielReihenfolge[aktuellerSpielerIndex];
+      io.to(naechster).emit("aktionErlaubt");
+    } else {
+      console.log("✅ Alle Spieler haben ihre Aktion gewählt.");
+    }
   });
 
   // Admin startet eine neue Frage
@@ -36,12 +69,17 @@ io.on('connection', (socket) => {
     // Aktionen aller Spieler zurücksetzen
     Object.values(spieler).forEach((s) => {
       s.aktion = "";
+      s.antwort = "";
       io.emit("playerData", {
         name: s.name,
         aktion: "",
         chips: s.chips
       });
     });
+
+    // Reihenfolge zurücksetzen
+    spielReihenfolge = [];
+    aktuellerSpielerIndex = -1;
   });
 
   // Admin zeigt Hinweis an (jetzt mit Text)
