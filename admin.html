@@ -13,6 +13,10 @@
   <div id="richtige-loesung" style="margin-top: 10px; font-weight: bold; color: #4caf50;"></div>
   <div id="sieger-anzeige" style="margin-top: 10px; font-weight: bold; color: #ffd700;"></div>
 
+  <!-- Neue Sektion: Live-Schätzantworten -->
+  <h3 style="margin-top: 30px;">📏 Schätzantworten</h3>
+  <ul id="schaetz-liste" style="list-style: none; padding: 0;"></ul>
+
   <div style="margin-top: 30px;">
     <button class="admin" onclick="startFrage()">🎯 Frage starten</button>
     <br /><br />
@@ -76,6 +80,7 @@
       document.getElementById('frage').innerHTML = "Frage: " + frage.frage;
       document.getElementById("richtige-loesung").textContent = "";
       document.getElementById("sieger-anzeige").textContent = "";
+      document.getElementById("schaetz-liste").innerHTML = "";
       socket.emit('frageStart', frage);
     }
 
@@ -106,15 +111,6 @@
         return;
       }
       socket.emit("setAllChips", betrag);
-    }
-
-    function setzeEinsatz() {
-      const betrag = parseInt(document.getElementById("einsatzFeld").value);
-      if (isNaN(betrag) || betrag < 0) {
-        alert("Bitte gültigen Einsatz eingeben.");
-        return;
-      }
-      socket.emit("setEinsatz", betrag);
     }
 
     function verteileBlinds() {
@@ -197,8 +193,19 @@
       });
     }
 
-    socket.on("zeigeSchaetzAntwort", (data) => {
-      // Optional: einzeln anzeigen (falls du Listen machen willst)
+    socket.on("zeigeSchaetzAntwortAdmin", ({ name, wert }) => {
+      const liste = document.getElementById("schaetz-liste");
+      if (!liste) return;
+
+      const bestehend = [...liste.children].find(li => li.dataset.name === name);
+      if (bestehend) {
+        bestehend.textContent = `${name}: ${wert}`;
+      } else {
+        const li = document.createElement("li");
+        li.dataset.name = name;
+        li.textContent = `${name}: ${wert}`;
+        liste.appendChild(li);
+      }
     });
 
     socket.on("aufloesung", (antwort) => {
