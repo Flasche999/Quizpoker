@@ -57,11 +57,16 @@
     <tbody id="spielerbody"></tbody>
   </table>
 
+  <h3 style="margin-top:40px;">🏆 Pot an Gewinner auszahlen</h3>
+  <div id="gewinner-auswahl" style="margin-bottom: 10px;"></div>
+  <button onclick="potAuszahlen()">✅ Pot an ausgewählte Spieler</button>
+
   <script>
     const socket = io();
     let frageIndex = 0;
     let fragen = [];
     let spielerDaten = {};
+    let ausgewaehlteSpieler = [];
 
     fetch("fragen.json")
       .then(res => res.json())
@@ -133,6 +138,42 @@
       }
       aktualisiereTabelle();
     });
+
+    socket.on("updateAlleSpieler", (alleSpieler) => {
+      const container = document.getElementById("gewinner-auswahl");
+      container.innerHTML = "";
+      ausgewaehlteSpieler = [];
+
+      for (const id in alleSpieler) {
+        const spieler = alleSpieler[id];
+        const label = document.createElement("label");
+        label.style.display = "block";
+        label.style.cursor = "pointer";
+
+        const checkbox = document.createElement("input");
+        checkbox.type = "checkbox";
+        checkbox.value = spieler.name;
+        checkbox.onchange = (e) => {
+          if (e.target.checked) {
+            ausgewaehlteSpieler.push(spieler.name);
+          } else {
+            ausgewaehlteSpieler = ausgewaehlteSpieler.filter(n => n !== spieler.name);
+          }
+        };
+
+        label.appendChild(checkbox);
+        label.append(` ${spieler.name}`);
+        container.appendChild(label);
+      }
+    });
+
+    function potAuszahlen() {
+      if (ausgewaehlteSpieler.length > 0) {
+        socket.emit("potAuszahlen", ausgewaehlteSpieler);
+      } else {
+        alert("Bitte mindestens einen Gewinner auswählen.");
+      }
+    }
 
     socket.on("potAktualisiert", (pot) => {
       document.getElementById("pot-anzahl").textContent = pot;
