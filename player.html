@@ -54,6 +54,7 @@
 
     const spielerListe = document.getElementById("spieler-liste");
     const spielerStatus = new Map();
+    let blinds = { small: "", big: "" };
 
     function sendeName() {
       name = document.getElementById("name").value.trim();
@@ -67,7 +68,6 @@
     function sendeAntwort() {
       aktuelleAntwort = document.getElementById("antwort").value;
       document.getElementById("antwort-bereich").style.display = "none";
-
       socket.emit("schaetzAntwort", parseInt(aktuelleAntwort));
     }
 
@@ -97,7 +97,12 @@
       spielerListe.innerHTML = "";
       spielerStatus.forEach((info, spielerName) => {
         const li = document.createElement("li");
-        li.innerHTML = `<strong>${spielerName}</strong>: ${info.aktion || "🕓 wartet"} (${info.chips} Chips)`;
+
+        let blindClass = "";
+        if (spielerName === blinds.small) blindClass = "small-blind";
+        else if (spielerName === blinds.big) blindClass = "big-blind";
+
+        li.innerHTML = `<strong class="${blindClass}">${spielerName}</strong>: ${info.aktion || "🕓 wartet"} (${info.chips} Chips)`;
         spielerListe.appendChild(li);
       });
     }
@@ -155,11 +160,15 @@
       document.getElementById("raise-betrag").value = aktuellerEinsatz + 20;
     });
 
-    // ✅ Schätzantwort eines anderen Spielers wurde eingereicht (verdeckt)
     socket.on("zeigeSchaetzAntwortVerdeckt", ({ name }) => {
       const eintrag = document.createElement("li");
       eintrag.textContent = `${name} hat eine Schätzung abgegeben.`;
       spielerListe.appendChild(eintrag);
+    });
+
+    socket.on("blindsMarkieren", (data) => {
+      blinds = data;
+      aktualisiereSpielerListe();
     });
   </script>
 </body>
