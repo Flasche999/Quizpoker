@@ -21,7 +21,6 @@ function setzeBlindsUndStart() {
   const spielerListe = Object.values(spieler);
   if (spielerListe.length < 2) return;
 
-  // Alle alten Blind-Markierungen zurücksetzen
   spielerListe.forEach(s => s.blind = null);
 
   const small = spielerListe[blindIndex % spielerListe.length];
@@ -39,13 +38,11 @@ function setzeBlindsUndStart() {
   aktuellerEinsatz = bigBlind;
   pot = smallBlind + bigBlind;
 
-  // Alle Spieler updaten – auch wegen Blind-Status
   spielerListe.forEach(s => {
     io.emit("updateSpieler", s);
   });
 
   io.emit("potAktualisiert", pot);
-
   io.emit("blindsMarkieren", {
     small: small.name,
     big: big.name
@@ -128,10 +125,7 @@ io.on('connection', (socket) => {
     if (s) {
       s.antwort = wert;
 
-      // Admin sieht echte Antwort
       io.emit("zeigeSchaetzAntwortAdmin", { name: s.name, wert });
-
-      // Spieler sehen nur, dass jemand geantwortet hat
       socket.broadcast.emit("zeigeSchaetzAntwortVerdeckt", { name: s.name });
     }
   });
@@ -214,7 +208,6 @@ io.on('connection', (socket) => {
   socket.on('aufloesung', (antwort) => {
     io.emit('aufloesung', antwort);
 
-    // ✨ Gewinner automatisch ermitteln (für Admin später erweiterbar)
     const gültigeSpieler = Object.values(spieler).filter(s => typeof s.antwort === 'number');
     if (gültigeSpieler.length > 0) {
       let nächster = gültigeSpieler[0];
@@ -228,7 +221,7 @@ io.on('connection', (socket) => {
         }
       });
 
-      io.emit("naechsterDran", nächster.name);
+      io.emit("schaetzSieger", nächster.name);
     }
 
     setTimeout(() => {
