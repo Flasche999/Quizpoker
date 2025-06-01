@@ -115,36 +115,8 @@
 
     <h3>Wähle deinen Charakter:</h3>
     <div id="character-select" style="display: flex; flex-wrap: wrap; justify-content: center; gap: 10px;">
-      <label class="character-option">
-        <input type="radio" name="character" value="avatars/m1.png" /><img src="avatars/m1.png" />
-      </label>
-      <label class="character-option">
-        <input type="radio" name="character" value="avatars/m2.png" /><img src="avatars/m2.png" />
-      </label>
-      <label class="character-option">
-        <input type="radio" name="character" value="avatars/m3.png" /><img src="avatars/m3.png" />
-      </label>
-      <label class="character-option">
-        <input type="radio" name="character" value="avatars/m4.png" /><img src="avatars/m4.png" />
-      </label>
-      <label class="character-option">
-        <input type="radio" name="character" value="avatars/m5.png" /><img src="avatars/m5.png" />
-      </label>
-      <label class="character-option">
-        <input type="radio" name="character" value="avatars/w1.png" /><img src="avatars/w1.png" />
-      </label>
-      <label class="character-option">
-        <input type="radio" name="character" value="avatars/w2.png" /><img src="avatars/w2.png" />
-      </label>
-      <label class="character-option">
-        <input type="radio" name="character" value="avatars/w3.png" /><img src="avatars/w3.png" />
-      </label>
-      <label class="character-option">
-        <input type="radio" name="character" value="avatars/w4.png" /><img src="avatars/w4.png" />
-      </label>
-      <label class="character-option">
-        <input type="radio" name="character" value="avatars/w5.png" /><img src="avatars/w5.png" />
-      </label>
+      <!-- Avatare hier -->
+      <!-- ... (bleibt unverändert) ... -->
     </div>
 
     <br />
@@ -280,7 +252,13 @@
     socket.on("frageStart", (frage) => {
       document.getElementById("frage").textContent = frage.frage;
       document.getElementById("antwort").value = "";
-      document.getElementById("antwort-bereich").style.display = "block";
+
+      if (chips > 0) {
+        document.getElementById("antwort-bereich").style.display = "block";
+      } else {
+        document.getElementById("antwort-bereich").style.display = "none";
+      }
+
       document.getElementById("aktionen").style.display = "none";
       document.getElementById("hinweis").textContent = "";
       document.getElementById("ergebnis").textContent = "";
