@@ -14,10 +14,8 @@
   <div style="margin-top: 30px;">
     <button class="admin" onclick="startFrage()">🎯 Frage starten</button>
     <br /><br />
-    
     <button class="admin" onclick="zeigeHinweis(1)">💡 Hinweis 1</button>
     <br /><br />
-    
     <button class="admin" onclick="zeigeHinweis(2)">💡 Hinweis 2</button>
     <br /><br />
     <button class="admin" onclick="zeigeAufloesung()">✅ Auflösung</button>
@@ -31,6 +29,19 @@
   <div style="margin-top: 20px;">
     <input type="number" id="einsatzFeld" placeholder="Aktueller Einsatz" />
     <button onclick="setzeEinsatz()">🎯 Einsatz setzen</button>
+  </div>
+
+  <div style="margin-top: 30px;">
+    <h2>🪙 Blinds & Pot</h2>
+    <label>Small Blind:</label>
+    <input type="number" id="smallBlind" placeholder="z. B. 50" />
+    <br />
+    <label>Big Blind:</label>
+    <input type="number" id="bigBlind" placeholder="z. B. 100" />
+    <br /><br />
+    <button onclick="verteileBlinds()">📤 Blinds setzen</button>
+    <br /><br />
+    <div>🎲 Aktueller Pot: <span id="pot-anzahl">0</span> Chips</div>
   </div>
 
   <h2 style="margin-top: 40px;">👥 Spielerübersicht</h2>
@@ -62,13 +73,6 @@
       const frage = fragen[frageIndex];
       document.getElementById('frage').innerHTML = "Frage: " + frage.frage;
       socket.emit('frageStart', frage);
-
-      // 🧹 Aktionen und Antworten zurücksetzen
-      Object.values(spielerDaten).forEach(spieler => {
-        spieler.aktion = "";
-        spieler.antwort = "";
-      });
-      aktualisiereTabelle();
     }
 
     function zeigeHinweis(num) {
@@ -82,7 +86,6 @@
 
       const frageDiv = document.getElementById("frage");
       frageDiv.innerHTML += `<br>💡 Hinweis ${num}: ${hinweisText}`;
-
       socket.emit('hinweis', { num: num, text: hinweisText });
     }
 
@@ -110,6 +113,18 @@
       socket.emit("setEinsatz", betrag);
     }
 
+    function verteileBlinds() {
+      const small = parseInt(document.getElementById("smallBlind").value);
+      const big = parseInt(document.getElementById("bigBlind").value);
+
+      if (isNaN(small) || isNaN(big) || small <= 0 || big <= 0) {
+        alert("Bitte gültige Blind-Werte eingeben.");
+        return;
+      }
+
+      socket.emit("setBlinds", { small, big });
+    }
+
     socket.on('updateSpieler', (spieler) => {
       if (spieler.disconnect) {
         delete spielerDaten[spieler.id];
@@ -117,6 +132,10 @@
         spielerDaten[spieler.id] = spieler;
       }
       aktualisiereTabelle();
+    });
+
+    socket.on("potAktualisiert", (pot) => {
+      document.getElementById("pot-anzahl").textContent = pot;
     });
 
     function aktualisiereTabelle() {
