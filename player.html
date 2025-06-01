@@ -5,6 +5,87 @@
   <title>QuizPoker – Spieler</title>
   <link rel="stylesheet" href="style.css" />
   <script src="/socket.io/socket.io.js"></script>
+  <style>
+    .game-wrapper {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+    }
+
+    .player-row,
+    .player-column {
+      display: flex;
+      gap: 10px;
+      position: absolute;
+      z-index: 5;
+    }
+
+    .player-row.top {
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      flex-direction: row;
+    }
+
+    .player-row.bottom {
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      flex-direction: row;
+    }
+
+    .player-column.left {
+      left: 0;
+      top: 50%;
+      transform: translateY(-50%);
+      flex-direction: column;
+    }
+
+    .player-column.right {
+      right: 0;
+      top: 50%;
+      transform: translateY(-50%);
+      flex-direction: column;
+    }
+
+    .spieler-box {
+      background: #1a1a1a;
+      border-radius: 6px;
+      padding: 8px;
+      min-width: 120px;
+      text-align: center;
+      color: white;
+    }
+
+    .center-area {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center;
+    }
+
+    .frage-box,
+    .hinweis-box,
+    .antwort-box,
+    .pot-box {
+      margin: 10px 0;
+      padding: 10px;
+      background: #222;
+      border-radius: 8px;
+    }
+
+    .small-blind {
+      color: #2196F3;
+      font-weight: bold;
+    }
+
+    .big-blind {
+      color: #f44336;
+      font-weight: bold;
+    }
+  </style>
 </head>
 <body>
   <h1>QuizPoker – Spieler</h1>
@@ -15,33 +96,35 @@
     <button onclick="sendeName()">Beitreten</button>
   </div>
 
-  <div id="game-area" style="display:none;">
-    <div id="chips" style="margin-bottom:10px;">💰 Chips: <span id="chip-anzahl">–</span></div>
-    <div id="einsatz" style="margin-bottom:10px;">🎯 Einsatz: <span id="einsatz-anzahl">–</span></div>
-    <div id="pot" style="margin-bottom:10px;">🪙 Pot: <span id="pot-anzahl">0</span></div>
-    <div id="frage">Warte auf Start...</div>
+  <div id="game-area" style="display:none;" class="game-wrapper">
+    <div id="players-top" class="player-row top"></div>
+    <div id="players-left" class="player-column left"></div>
+    <div id="players-right" class="player-column right"></div>
+    <div id="players-bottom" class="player-row bottom"></div>
 
-    <div id="antwort-bereich">
-      <label for="antwort">Deine Schätzung:</label>
-      <input type="number" id="antwort" />
-      <button onclick="sendeAntwort()">Antwort senden</button>
-    </div>
+    <div class="center-area">
+      <div id="chips" style="margin-bottom:10px;">💰 Chips: <span id="chip-anzahl">–</span></div>
+      <div id="einsatz" style="margin-bottom:10px;">🎯 Einsatz: <span id="einsatz-anzahl">–</span></div>
+      <div id="pot" style="margin-bottom:10px;">🪙 Pot: <span id="pot-anzahl">0</span></div>
+      <div id="frage" class="frage-box">Warte auf Start...</div>
 
-    <div id="aktionen" style="display:none;">
-      <h3>Aktion wählen:</h3>
-      <button onclick="spielerAktion('fold')">❌ Passen</button>
-      <button onclick="spielerAktion('call')">➕ Mitgehen</button>
-      <input type="number" id="raise-betrag" placeholder="Raise-Betrag" style="width:100px;" />
-      <button onclick="spielerAktion('raise')">⬆️ Erhöhen</button>
-      <button onclick="spielerAktion('allin')">💥 All In</button>
-    </div>
+      <div id="antwort-bereich" class="antwort-box">
+        <label for="antwort">Deine Schätzung:</label>
+        <input type="number" id="antwort" />
+        <button onclick="sendeAntwort()">Antwort senden</button>
+      </div>
 
-    <div id="hinweis" style="margin-top:20px; font-weight:bold;"></div>
-    <div id="ergebnis" style="margin-top:10px;"></div>
+      <div id="aktionen" style="display:none;">
+        <h3>Aktion wählen:</h3>
+        <button onclick="spielerAktion('fold')">❌ Passen</button>
+        <button onclick="spielerAktion('call')">➕ Mitgehen</button>
+        <input type="number" id="raise-betrag" placeholder="Raise-Betrag" style="width:100px;" />
+        <button onclick="spielerAktion('raise')">⬆️ Erhöhen</button>
+        <button onclick="spielerAktion('allin')">💥 All In</button>
+      </div>
 
-    <div id="spieler-uebersicht" style="margin-top: 30px;">
-      <h3>Spielerübersicht</h3>
-      <ul id="spieler-liste"></ul>
+      <div id="hinweis" class="hinweis-box" style="font-weight:bold;"></div>
+      <div id="ergebnis" style="margin-top:10px;"></div>
     </div>
   </div>
 
@@ -52,7 +135,6 @@
     let aktuelleAntwort = "";
     let aktuelleAktion = "";
 
-    const spielerListe = document.getElementById("spieler-liste");
     const spielerStatus = new Map();
     let blinds = { small: "", big: "" };
 
@@ -93,17 +175,33 @@
       document.getElementById("chip-anzahl").textContent = chips;
     }
 
-    function aktualisiereSpielerListe() {
-      spielerListe.innerHTML = "";
-      spielerStatus.forEach((info, spielerName) => {
-        const li = document.createElement("li");
+    function aktualisiereSpielerPositionen() {
+      const oben = document.getElementById("players-top");
+      const unten = document.getElementById("players-bottom");
+      const links = document.getElementById("players-left");
+      const rechts = document.getElementById("players-right");
 
+      oben.innerHTML = '';
+      unten.innerHTML = '';
+      links.innerHTML = '';
+      rechts.innerHTML = '';
+
+      const alleSpieler = Array.from(spielerStatus.keys());
+
+      alleSpieler.forEach((spielerName, index) => {
+        const info = spielerStatus.get(spielerName);
+        const div = document.createElement("div");
         let blindClass = "";
         if (spielerName === blinds.small) blindClass = "small-blind";
         else if (spielerName === blinds.big) blindClass = "big-blind";
 
-        li.innerHTML = `<strong class="${blindClass}">${spielerName}</strong>: ${info.aktion || "🕓 wartet"} (${info.chips} Chips)`;
-        spielerListe.appendChild(li);
+        div.className = `spieler-box ${blindClass}`;
+        div.innerHTML = `<strong>${spielerName}</strong><br/>🪙 ${info.chips}`;
+
+        if (index === 0 || index === 4) links.appendChild(div);
+        else if (index === 1 || index === 5) oben.appendChild(div);
+        else if (index === 2 || index === 6) rechts.appendChild(div);
+        else if (index === 3 || index === 7) unten.appendChild(div);
       });
     }
 
@@ -112,7 +210,7 @@
         aktion: data.aktion,
         chips: data.chips
       });
-      aktualisiereSpielerListe();
+      aktualisiereSpielerPositionen();
     });
 
     socket.on("frageStart", (frage) => {
@@ -128,12 +226,12 @@
       spielerStatus.forEach((info, spielerName) => {
         info.aktion = "";
       });
-      aktualisiereSpielerListe();
+      aktualisiereSpielerPositionen();
     });
 
     socket.on("hinweis", ({ num, text }) => {
       const hinweisDiv = document.getElementById("hinweis");
-      hinweisDiv.textContent += `\n💡 Hinweis ${num}: ${text}`;
+      hinweisDiv.innerHTML += `💡 Hinweis ${num}: ${text}<br/>`;
     });
 
     socket.on("aufloesung", (antwort) => {
@@ -155,20 +253,19 @@
       document.getElementById("pot-anzahl").textContent = potWert;
     });
 
-    socket.on("aktionErlaubt", ({ aktuellerEinsatz, pot }) => {
+    socket.on("aktionErlaubt", ({ aktuellerEinsatz }) => {
       document.getElementById("aktionen").style.display = "block";
       document.getElementById("raise-betrag").value = aktuellerEinsatz + 20;
     });
 
     socket.on("zeigeSchaetzAntwortVerdeckt", ({ name }) => {
-      const eintrag = document.createElement("li");
-      eintrag.textContent = `${name} hat eine Schätzung abgegeben.`;
-      spielerListe.appendChild(eintrag);
+      const hinweisDiv = document.getElementById("hinweis");
+      hinweisDiv.innerHTML += `📨 ${name} hat geantwortet<br/>`;
     });
 
     socket.on("blindsMarkieren", (data) => {
       blinds = data;
-      aktualisiereSpielerListe();
+      aktualisiereSpielerPositionen();
     });
   </script>
 </body>
