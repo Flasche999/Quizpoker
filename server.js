@@ -67,7 +67,6 @@ function prüfeObAlleGesendetHaben() {
 }
 
 function starteSetzrunde() {
-  // Reset Aktionen nur für Spieler im Spiel
   Object.values(spieler).forEach(s => {
     if (s.aktion !== "Fold") {
       s.aktion = "";
@@ -179,7 +178,6 @@ io.on('connection', (socket) => {
     console.log(`📢 Hinweis ${num}: ${text}`);
     io.emit('hinweis', { num, text });
 
-    // ➕ Nach jedem Hinweis eine Setzrunde
     setTimeout(() => {
       starteSetzrunde();
     }, 500);
@@ -188,7 +186,6 @@ io.on('connection', (socket) => {
   socket.on('aufloesung', (antwort) => {
     io.emit('aufloesung', antwort);
 
-    // ➕ Nach der Auflösung letzte Setzrunde
     setTimeout(() => {
       starteSetzrunde();
     }, 500);
@@ -216,11 +213,33 @@ io.on('connection', (socket) => {
     console.log(`⚙️ Neue Blinds gesetzt: Small = ${small}, Big = ${big}`);
   });
 
+  socket.on('potAuszahlen', (gewinnerListe) => {
+    verteilePot(gewinnerListe);
+  });
+
   socket.on('disconnect', () => {
     delete spieler[socket.id];
     io.emit('updateSpieler', { id: socket.id, disconnect: true });
   });
 });
+
+function verteilePot(gewinnerNamen) {
+  if (gewinnerNamen.length === 0) return;
+
+  const anteil = Math.floor(pot / gewinnerNamen.length);
+  const rest = pot % gewinnerNamen.length;
+
+  gewinnerNamen.forEach((name, index) => {
+    const spielerObj = Object.values(spieler).find(s => s.name === name);
+    if (spielerObj) {
+      spielerObj.chips += anteil + (index < rest ? 1 : 0);
+      io.emit("updateSpieler", spielerObj);
+    }
+  });
+
+  pot = 0;
+  io.emit("potAktualisiert", pot);
+}
 
 server.listen(3000, () => {
   console.log('✅ Server läuft auf http://localhost:3000');
