@@ -19,7 +19,7 @@ let aktuellerSpielerIndex = -1;
 let letzterBigBlindId = null; // 👈 Neu: Big Blind merken
 
 function setzeBlindsUndStart() {
-  const spielerListe = Object.values(spieler);
+  const spielerListe = Object.values(spieler).filter(s => s.chips > 0);
   if (spielerListe.length < 2) return;
 
   spielerListe.forEach(s => s.blind = null);
@@ -81,16 +81,15 @@ function prüfeObAlleGesendetHaben() {
 
 function starteSetzrunde() {
   Object.values(spieler).forEach(s => {
-    if (s.aktion !== "Fold") {
+    if (s.aktion !== "Fold" && s.chips > 0) {
       s.aktion = "";
       io.emit("updateSpieler", s);
     }
   });
 
-  const aktiveSpieler = Object.values(spieler).filter(s => s.aktion !== "Fold");
+  const aktiveSpieler = Object.values(spieler).filter(s => s.aktion !== "Fold" && s.chips > 0);
   spielReihenfolge = aktiveSpieler.map(s => s.id);
 
-  // 👇 Spieler direkt nach dem Big Blind beginnt
   if (letzterBigBlindId) {
     const indexBB = spielReihenfolge.indexOf(letzterBigBlindId);
     if (indexBB !== -1) {
@@ -143,7 +142,13 @@ io.on('connection', (socket) => {
 
   socket.on('spielerAktion', ({ aktion, raiseBetrag }) => {
     const s = spieler[socket.id];
-    if (!s || s.chips <= 0) return;
+    if (!s) return;
+
+    if (s.chips <= 0) {
+      s.aktion = "Ausgeschieden";
+      io.emit("updateSpieler", s);
+      return;
+    }
 
     if (aktion === "fold") {
       s.aktion = "Fold";
