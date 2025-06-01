@@ -114,6 +114,12 @@
       document.getElementById("ergebnis").textContent = "";
       aktuelleAntwort = "";
       aktuelleAktion = "";
+
+      // 🔄 Spielerliste-Aktionen zurücksetzen
+      spielerStatus.forEach((info, spielerName) => {
+        info.aktion = "";
+      });
+      aktualisiereSpielerListe();
     });
 
     socket.on("hinweis", ({ num, text }) => {
