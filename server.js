@@ -16,6 +16,7 @@ let bigBlind = 20;
 let blindIndex = 0;
 let spielReihenfolge = [];
 let aktuellerSpielerIndex = -1;
+let letzterBigBlindId = null; // 👈 Neu: Big Blind merken
 
 function setzeBlindsUndStart() {
   const spielerListe = Object.values(spieler);
@@ -34,6 +35,7 @@ function setzeBlindsUndStart() {
 
   small.blind = 'small';
   big.blind = 'big';
+  letzterBigBlindId = big.id; // 👈 merken
 
   aktuellerEinsatz = bigBlind;
   pot = smallBlind + bigBlind;
@@ -85,9 +87,18 @@ function starteSetzrunde() {
     }
   });
 
-  spielReihenfolge = Object.values(spieler)
-    .filter(s => s.aktion !== "Fold")
-    .map(s => s.id);
+  const aktiveSpieler = Object.values(spieler).filter(s => s.aktion !== "Fold");
+  spielReihenfolge = aktiveSpieler.map(s => s.id);
+
+  // 👇 Spieler direkt nach dem Big Blind beginnt
+  if (letzterBigBlindId) {
+    const indexBB = spielReihenfolge.indexOf(letzterBigBlindId);
+    if (indexBB !== -1) {
+      const vorne = spielReihenfolge.slice(indexBB + 1);
+      const hinten = spielReihenfolge.slice(0, indexBB + 1);
+      spielReihenfolge = vorne.concat(hinten);
+    }
+  }
 
   aktuellerSpielerIndex = 0;
   const erster = spielReihenfolge[0];
