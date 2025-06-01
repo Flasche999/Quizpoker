@@ -21,6 +21,9 @@ function setzeBlindsUndStart() {
   const spielerListe = Object.values(spieler);
   if (spielerListe.length < 2) return;
 
+  // Alle alten Blind-Markierungen zurücksetzen
+  spielerListe.forEach(s => s.blind = null);
+
   const small = spielerListe[blindIndex % spielerListe.length];
   const big = spielerListe[(blindIndex + 1) % spielerListe.length];
 
@@ -30,11 +33,17 @@ function setzeBlindsUndStart() {
   small.imPot = smallBlind;
   big.imPot = bigBlind;
 
+  small.blind = 'small';
+  big.blind = 'big';
+
   aktuellerEinsatz = bigBlind;
   pot = smallBlind + bigBlind;
 
-  io.emit("updateSpieler", small);
-  io.emit("updateSpieler", big);
+  // Alle Spieler updaten – auch wegen Blind-Status
+  spielerListe.forEach(s => {
+    io.emit("updateSpieler", s);
+  });
+
   io.emit("potAktualisiert", pot);
 
   io.emit("blindsMarkieren", {
@@ -44,6 +53,7 @@ function setzeBlindsUndStart() {
 
   blindIndex++;
 }
+
 
 function prüfeObAlleGesendetHaben() {
   const alleFertig = Object.values(spieler).length > 0 && Object.values(spieler).every(s => s.antwort !== "");
