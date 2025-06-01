@@ -7,6 +7,16 @@
   <script src="/socket.io/socket.io.js"></script>
 </head>
 <body>
+  <audio id="bgm" autoplay loop>
+    <source src="sounds/background.mp3" type="audio/mpeg" />
+    Dein Browser unterstützt kein Audio.
+  </audio>
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      const bgm = document.getElementById("bgm");
+      if (bgm) bgm.volume = 0.2;
+    });
+  </script>
   <h1>QuizPoker – Admin-Panel</h1>
 
   <div id="fragen-zaehler" style="margin-top: 10px; font-size: 18px; font-weight: bold;">
