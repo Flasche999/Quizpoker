@@ -67,7 +67,12 @@
     function sendeAntwort() {
       aktuelleAntwort = document.getElementById("antwort").value;
       document.getElementById("antwort-bereich").style.display = "none";
-      // Warten auf aktionErlaubt
+
+      // 🔁 NEU: Sende Schätzantwort an Server
+      socket.emit("schaetzAntwort", {
+        name: name,
+        wert: aktuelleAntwort
+      });
     }
 
     function sendeAktion(aktion) {
@@ -127,7 +132,6 @@
       aktuelleAntwort = "";
       aktuelleAktion = "";
 
-      // Reset Spieleraktionen
       spielerStatus.forEach((info, spielerName) => {
         info.aktion = "";
       });
