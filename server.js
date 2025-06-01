@@ -32,6 +32,16 @@ io.on('connection', (socket) => {
   // Admin startet eine neue Frage
   socket.on('frageStart', (frage) => {
     io.emit('frageStart', frage);
+
+    // Aktionen aller Spieler zurücksetzen
+    Object.values(spieler).forEach((s) => {
+      s.aktion = "";
+      io.emit("playerData", {
+        name: s.name,
+        aktion: "",
+        chips: s.chips
+      });
+    });
   });
 
   // Admin zeigt Hinweis an (jetzt mit Text)
