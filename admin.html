@@ -182,7 +182,10 @@
         if (spieler.blind === 'small') blindKlasse = 'small-blind';
         if (spieler.blind === 'big') blindKlasse = 'big-blind';
 
-        const status = spieler.chips <= 0 ? "❌ Ausgeschieden" : (spieler.aktion || '-');
+        let status = spieler.aktion || '-';
+if (spieler.chips <= 0 && status !== "All In") {
+  status = "❌ Ausgeschieden";
+}
 
         const row = document.createElement("tr");
         row.innerHTML = `
