@@ -27,18 +27,35 @@ function setzeBlindsUndStart() {
   const small = spielerListe[blindIndex % spielerListe.length];
   const big = spielerListe[(blindIndex + 1) % spielerListe.length];
 
-  small.chips -= smallBlind;
-  big.chips -= bigBlind;
+  // Small Blind setzen
+  if (small.chips <= smallBlind) {
+    pot += small.chips;
+    small.imPot = (small.imPot || 0) + small.chips;
+    small.chips = 0;
+    small.aktion = "All In";
+  } else {
+    small.chips -= smallBlind;
+    small.imPot = (small.imPot || 0) + smallBlind;
+    pot += smallBlind;
+  }
 
-  small.imPot = smallBlind;
-  big.imPot = bigBlind;
+  // Big Blind setzen
+  if (big.chips <= bigBlind) {
+    pot += big.chips;
+    big.imPot = (big.imPot || 0) + big.chips;
+    big.chips = 0;
+    big.aktion = "All In";
+  } else {
+    big.chips -= bigBlind;
+    big.imPot = (big.imPot || 0) + bigBlind;
+    pot += bigBlind;
+  }
 
   small.blind = 'small';
   big.blind = 'big';
-  letzterBigBlindId = big.id; // 👈 merken
+  letzterBigBlindId = big.id;
 
-  aktuellerEinsatz = bigBlind;
-  pot = smallBlind + bigBlind;
+  aktuellerEinsatz = Math.max(small.imPot, big.imPot);
 
   spielerListe.forEach(s => {
     io.emit("updateSpieler", s);
