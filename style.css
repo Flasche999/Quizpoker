@@ -128,3 +128,23 @@ input {
   background: #222;
   border-radius: 8px;
 }
+
+#richtige-loesung {
+  font-size: 18px;
+  color: #4caf50;
+  margin-top: 10px;
+  background: #1b3b1b;
+  padding: 8px 12px;
+  border-radius: 6px;
+  display: inline-block;
+}
+
+#sieger-anzeige {
+  font-size: 18px;
+  color: #ffd700;
+  margin-top: 10px;
+  background: #3a3200;
+  padding: 8px 12px;
+  border-radius: 6px;
+  display: inline-block;
+}
