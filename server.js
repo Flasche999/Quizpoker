@@ -54,7 +54,6 @@ function setzeBlindsUndStart() {
   blindIndex++;
 }
 
-
 function prüfeObAlleGesendetHaben() {
   const alleFertig = Object.values(spieler).length > 0 && Object.values(spieler).every(s => s.antwort !== "");
   if (alleFertig) {
@@ -214,6 +213,23 @@ io.on('connection', (socket) => {
 
   socket.on('aufloesung', (antwort) => {
     io.emit('aufloesung', antwort);
+
+    // ✨ Gewinner automatisch ermitteln (für Admin später erweiterbar)
+    const gültigeSpieler = Object.values(spieler).filter(s => typeof s.antwort === 'number');
+    if (gültigeSpieler.length > 0) {
+      let nächster = gültigeSpieler[0];
+      let diff = Math.abs(nächster.antwort - antwort);
+
+      gültigeSpieler.forEach(s => {
+        const abweichung = Math.abs(s.antwort - antwort);
+        if (abweichung < diff) {
+          nächster = s;
+          diff = abweichung;
+        }
+      });
+
+      io.emit("naechsterDran", nächster.name);
+    }
 
     setTimeout(() => {
       starteSetzrunde();
