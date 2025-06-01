@@ -66,6 +66,26 @@ function prüfeObAlleGesendetHaben() {
   }
 }
 
+function starteSetzrunde() {
+  // Reset Aktionen nur für Spieler im Spiel
+  Object.values(spieler).forEach(s => {
+    if (s.aktion !== "Fold") {
+      s.aktion = "";
+      io.emit("updateSpieler", s);
+    }
+  });
+
+  spielReihenfolge = Object.values(spieler)
+    .filter(s => s.aktion !== "Fold")
+    .map(s => s.id);
+
+  aktuellerSpielerIndex = 0;
+  const erster = spielReihenfolge[0];
+  if (erster) {
+    io.to(erster).emit("aktionErlaubt", { aktuellerEinsatz, pot });
+  }
+}
+
 io.on('connection', (socket) => {
   console.log('🔌 Spieler verbunden:', socket.id);
 
@@ -158,10 +178,20 @@ io.on('connection', (socket) => {
   socket.on('hinweis', ({ num, text }) => {
     console.log(`📢 Hinweis ${num}: ${text}`);
     io.emit('hinweis', { num, text });
+
+    // ➕ Nach jedem Hinweis eine Setzrunde
+    setTimeout(() => {
+      starteSetzrunde();
+    }, 500);
   });
 
   socket.on('aufloesung', (antwort) => {
     io.emit('aufloesung', antwort);
+
+    // ➕ Nach der Auflösung letzte Setzrunde
+    setTimeout(() => {
+      starteSetzrunde();
+    }, 500);
   });
 
   socket.on('setAllChips', (betrag) => {
@@ -180,7 +210,6 @@ io.on('connection', (socket) => {
     io.emit("einsatzAktualisiert", aktuellerEinsatz);
   });
 
-  // 👉 HIER NEU
   socket.on('setBlinds', ({ small, big }) => {
     smallBlind = small;
     bigBlind = big;
