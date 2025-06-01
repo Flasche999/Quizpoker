@@ -85,6 +85,25 @@
       color: #f44336;
       font-weight: bold;
     }
+
+    .character-option {
+      margin: 4px;
+      cursor: pointer;
+    }
+
+    .character-option input {
+      display: none;
+    }
+
+    .character-option img {
+      width: 64px;
+      border: 2px solid transparent;
+      border-radius: 6px;
+    }
+
+    .character-option input:checked + img {
+      border-color: #4caf50;
+    }
   </style>
 </head>
 <body>
@@ -92,7 +111,43 @@
 
   <div id="name-area">
     <label for="name">Dein Name:</label>
-    <input type="text" id="name" />
+    <input type="text" id="name" /><br /><br />
+
+    <h3>Wähle deinen Charakter:</h3>
+    <div id="character-select" style="display: flex; flex-wrap: wrap; justify-content: center; gap: 10px;">
+      <label class="character-option">
+        <input type="radio" name="character" value="avatars/m1.png" /><img src="avatars/m1.png" />
+      </label>
+      <label class="character-option">
+        <input type="radio" name="character" value="avatars/m2.png" /><img src="avatars/m2.png" />
+      </label>
+      <label class="character-option">
+        <input type="radio" name="character" value="avatars/m3.png" /><img src="avatars/m3.png" />
+      </label>
+      <label class="character-option">
+        <input type="radio" name="character" value="avatars/m4.png" /><img src="avatars/m4.png" />
+      </label>
+      <label class="character-option">
+        <input type="radio" name="character" value="avatars/m5.png" /><img src="avatars/m5.png" />
+      </label>
+      <label class="character-option">
+        <input type="radio" name="character" value="avatars/w1.png" /><img src="avatars/w1.png" />
+      </label>
+      <label class="character-option">
+        <input type="radio" name="character" value="avatars/w2.png" /><img src="avatars/w2.png" />
+      </label>
+      <label class="character-option">
+        <input type="radio" name="character" value="avatars/w3.png" /><img src="avatars/w3.png" />
+      </label>
+      <label class="character-option">
+        <input type="radio" name="character" value="avatars/w4.png" /><img src="avatars/w4.png" />
+      </label>
+      <label class="character-option">
+        <input type="radio" name="character" value="avatars/w5.png" /><img src="avatars/w5.png" />
+      </label>
+    </div>
+
+    <br />
     <button onclick="sendeName()">Beitreten</button>
   </div>
 
@@ -130,6 +185,7 @@
   <script>
     const socket = io();
     let name = "";
+    let character = "";
     let chips = 1000;
     let aktuelleAntwort = "";
     let aktuelleAktion = "";
@@ -139,7 +195,10 @@
 
     function sendeName() {
       name = document.getElementById("name").value.trim();
-      if (!name) return alert("Bitte Namen eingeben.");
+      const selected = document.querySelector('input[name="character"]:checked');
+      if (!name || !selected) return alert("Bitte Namen und Charakter wählen.");
+
+      character = selected.value;
       document.getElementById("name-area").style.display = "none";
       document.getElementById("game-area").style.display = "block";
       aktualisiereChipAnzeige();
@@ -166,7 +225,8 @@
         name: name,
         antwort: aktuelleAntwort,
         aktion: aktuelleAktion,
-        chips: chips
+        chips: chips,
+        avatar: character
       });
     }
 
@@ -195,7 +255,11 @@
         else if (spielerName === blinds.big) blindClass = "big-blind";
 
         div.className = `spieler-box ${blindClass}`;
-        div.innerHTML = `<strong>${spielerName}</strong><br/>🪙 ${info.chips}`;
+        div.innerHTML = `
+          <strong>${spielerName}</strong><br/>
+          <img src="${info.avatar || 'avatars/m1.png'}" width="48" /><br/>
+          🪙 ${info.chips}
+        `;
 
         if (index === 0 || index === 4) links.appendChild(div);
         else if (index === 1 || index === 5) oben.appendChild(div);
@@ -207,7 +271,8 @@
     socket.on("playerData", (data) => {
       spielerStatus.set(data.name, {
         aktion: data.aktion,
-        chips: data.chips
+        chips: data.chips,
+        avatar: data.avatar
       });
       aktualisiereSpielerPositionen();
     });
