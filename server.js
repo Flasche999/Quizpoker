@@ -149,7 +149,7 @@ io.on('connection', (socket) => {
 
   socket.on("schaetzAntwort", (wert) => {
     const s = spieler[socket.id];
-    if (s) {
+    if (s && s.chips > 0) {
       s.antwort = wert;
 
       io.emit("zeigeSchaetzAntwortAdmin", { name: s.name, wert });
