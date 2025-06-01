@@ -113,7 +113,12 @@ io.on('connection', (socket) => {
     const s = spieler[socket.id];
     if (s) {
       s.antwort = wert;
-      io.emit("zeigeSchaetzAntwort", { name: s.name, wert });
+
+      // Admin sieht echte Antwort
+      io.emit("zeigeSchaetzAntwortAdmin", { name: s.name, wert });
+
+      // Spieler sehen nur, dass jemand geantwortet hat
+      socket.broadcast.emit("zeigeSchaetzAntwortVerdeckt", { name: s.name });
     }
   });
 
