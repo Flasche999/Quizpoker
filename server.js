@@ -37,6 +37,11 @@ function setzeBlindsUndStart() {
   io.emit("updateSpieler", big);
   io.emit("potAktualisiert", pot);
 
+  io.emit("blindsMarkieren", {
+    small: small.name,
+    big: big.name
+  });
+
   blindIndex++;
 }
 
