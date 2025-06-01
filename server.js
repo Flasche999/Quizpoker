@@ -146,14 +146,17 @@ io.on('connection', (socket) => {
   });
 
   socket.on("schaetzAntwort", (wert) => {
-    const s = spieler[socket.id];
-    if (s && s.chips > 0) {
-      s.antwort = wert;
+  const s = spieler[socket.id];
+  if (!s) return;
 
-      io.emit("zeigeSchaetzAntwortAdmin", { name: s.name, wert, id: socket.id });
-      socket.broadcast.emit("zeigeSchaetzAntwortVerdeckt", { name: s.name });
-    }
-  });
+  // Spieler, die „Fold“ oder „Ausgeschieden“ sind, dürfen NICHT tippen
+  if (s.aktion === "Fold" || s.aktion === "Ausgeschieden") return;
+
+  s.antwort = wert;
+  io.emit("zeigeSchaetzAntwortAdmin", { name: s.name, wert, id: socket.id });
+  socket.broadcast.emit("zeigeSchaetzAntwortVerdeckt", { name: s.name });
+});
+
 
   socket.on("adminVergibtPot", (gewinnerID) => {
     const s = spieler[gewinnerID];
