@@ -1,9 +1,8 @@
 body {
-  background: #0f0f0f;
-  color: #fff;
-  font-family: sans-serif;
-  text-align: center;
+  background: radial-gradient(circle, #0a3b20 0%, #052e1b 100%);
 }
+
+
 
 button {
   padding: 8px 16px;
@@ -102,13 +101,12 @@ input {
 }
 
 .spieler-box {
-  background: #1a1a1a;
-  border-radius: 6px;
-  padding: 8px;
-  min-width: 120px;
-  text-align: center;
-  color: white;
+  background: rgba(0, 0, 0, 0.6);
+  border: 2px solid gold;
+  border-radius: 12px;
+  box-shadow: 0 0 10px gold;
 }
+
 
 .center-area {
   position: absolute;
@@ -121,7 +119,11 @@ input {
 
 .frage-box,
 .hinweis-box,
-.antwort-box,
+.antwort-box {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid #ffd700;
+}
+
 .pot-box {
   margin: 10px 0;
   padding: 10px;
