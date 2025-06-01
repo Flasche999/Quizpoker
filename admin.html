@@ -80,7 +80,7 @@
     function startFrage() {
       const frage = fragen[frageIndex];
       document.getElementById('frage').innerHTML = "Frage: " + frage.frage;
-      document.getElementById("schaetz-liste").innerHTML = ""; // 🧹 Reset der Liste bei neuer Frage
+      document.getElementById("schaetz-liste").innerHTML = "";
       socket.emit('frageStart', frage);
     }
 
@@ -187,9 +187,13 @@
       const body = document.getElementById("spielerbody");
       body.innerHTML = '';
       Object.values(spielerDaten).forEach(spieler => {
+        let blindKlasse = '';
+        if (spieler.blind === 'small') blindKlasse = 'small-blind';
+        if (spieler.blind === 'big') blindKlasse = 'big-blind';
+
         const row = document.createElement("tr");
         row.innerHTML = `
-          <td style="padding:8px;">${spieler.name}</td>
+          <td class="${blindKlasse}" style="padding:8px;">${spieler.name}</td>
           <td>${spieler.antwort || '-'}</td>
           <td>${spieler.aktion || '-'}</td>
           <td>${spieler.chips}</td>
@@ -198,7 +202,6 @@
       });
     }
 
-    // 🔁 NEU: Empfang von Schätzantworten
     socket.on("zeigeSchaetzAntwort", (data) => {
       const ul = document.getElementById("schaetz-liste");
       const li = document.createElement("li");
