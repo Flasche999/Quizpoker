@@ -9,6 +9,10 @@
 <body>
   <h1>QuizPoker – Admin-Panel</h1>
 
+  <div id="fragen-zaehler" style="margin-top: 10px; font-size: 18px; font-weight: bold;">
+    Frage: – / –
+  </div>
+
   <div id="frage">Frage: <span style="color:#fff">–</span></div>
   <div id="richtige-loesung" style="margin-top: 10px; font-weight: bold; color: #4caf50;"></div>
   <div id="sieger-anzeige" style="margin-top: 10px; font-weight: bold; color: #ffd700;"></div>
@@ -69,19 +73,33 @@
     let spielerDaten = {};
     let ausgewaehlteSpieler = [];
 
+    let frageNummer = 0;
+    let gesamtFragenAnzahl = 0;
+
     fetch("fragen.json")
       .then(res => res.json())
       .then(data => {
         fragen = data;
+        gesamtFragenAnzahl = data.length;
       });
 
     function startFrage() {
       const frage = fragen[frageIndex];
+      frageNummer++;
+      aktualisiereFragenZaehler();
+
       document.getElementById('frage').innerHTML = "Frage: " + frage.frage;
       document.getElementById("richtige-loesung").textContent = "";
       document.getElementById("sieger-anzeige").textContent = "";
       document.getElementById("schaetz-liste").innerHTML = "";
       socket.emit('frageStart', frage);
+    }
+
+    function aktualisiereFragenZaehler() {
+      const zaehlerEl = document.getElementById("fragen-zaehler");
+      if (zaehlerEl) {
+        zaehlerEl.textContent = `Frage: ${frageNummer} / ${gesamtFragenAnzahl}`;
+      }
     }
 
     function zeigeHinweis(num) {
@@ -183,9 +201,9 @@
         if (spieler.blind === 'big') blindKlasse = 'big-blind';
 
         let status = spieler.aktion || '-';
-if (spieler.chips <= 0 && status !== "All In") {
-  status = "❌ Ausgeschieden";
-}
+        if (spieler.chips <= 0 && status !== "All In") {
+          status = "❌ Ausgeschieden";
+        }
 
         const row = document.createElement("tr");
         row.innerHTML = `
