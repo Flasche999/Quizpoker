@@ -57,3 +57,74 @@ input {
   border-left: 5px solid #f44336;
   padding-left: 6px;
 }
+
+/* Positionierung für Spieleranzeige */
+.game-wrapper {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+}
+
+.player-row,
+.player-column {
+  display: flex;
+  gap: 10px;
+  position: absolute;
+  z-index: 5;
+}
+
+.player-row.top {
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  flex-direction: row;
+}
+
+.player-row.bottom {
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  flex-direction: row;
+}
+
+.player-column.left {
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  flex-direction: column;
+}
+
+.player-column.right {
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  flex-direction: column;
+}
+
+.spieler-box {
+  background: #1a1a1a;
+  border-radius: 6px;
+  padding: 8px;
+  min-width: 120px;
+  text-align: center;
+  color: white;
+}
+
+.center-area {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+}
+
+.frage-box,
+.hinweis-box,
+.antwort-box,
+.pot-box {
+  margin: 10px 0;
+  padding: 10px;
+  background: #222;
+  border-radius: 8px;
+}
