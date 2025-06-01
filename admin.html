@@ -75,6 +75,8 @@
   <h3 style="margin-top:40px;">🏆 Pot an Gewinner auszahlen</h3>
   <div id="gewinner-auswahl" style="margin-bottom: 10px;"></div>
   <button onclick="potAuszahlen()">✅ Pot an ausgewählte Spieler</button>
+  <button onclick="zeigeGewinnerAnimation()">🎉 Gewinner anzeigen</button>
+
 
   <script>
     const socket = io();
@@ -248,6 +250,10 @@
     socket.on("schaetzSieger", (name) => {
       document.getElementById("sieger-anzeige").textContent = "🏆 " + name + " war am nächsten dran!";
     });
+    // GEWINNER-ANIMATION manuell auslösen
+function zeigeGewinnerAnimation() {
+  socket.emit("gewinnerAnimation");
+}
   </script>
 </body>
 </html>
