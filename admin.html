@@ -182,11 +182,13 @@
         if (spieler.blind === 'small') blindKlasse = 'small-blind';
         if (spieler.blind === 'big') blindKlasse = 'big-blind';
 
+        const status = spieler.chips <= 0 ? "❌ Ausgeschieden" : (spieler.aktion || '-');
+
         const row = document.createElement("tr");
         row.innerHTML = `
           <td class="${blindKlasse}" style="padding:8px;">${spieler.name}</td>
           <td>${spieler.antwort || '-'}</td>
-          <td>${spieler.aktion || '-'}</td>
+          <td>${status}</td>
           <td>${spieler.chips}</td>
         `;
         body.appendChild(row);
