@@ -136,10 +136,12 @@ io.on('connection', (socket) => {
 
     io.emit('updateSpieler', spieler[socket.id]);
     io.emit('playerData', {
-      name: data.name,
-      aktion: data.aktion,
-      chips: data.chips
-    });
+  name: data.name,
+  aktion: data.aktion,
+  chips: data.chips,
+  avatar: data.avatar // ✅ Avatar hinzufügen
+});
+
 
     io.emit('updateAlleSpieler', spieler);
     prüfeObAlleGesendetHaben();
@@ -173,10 +175,14 @@ io.on('connection', (socket) => {
     if (!s) return;
 
     if (s.chips <= 0 && s.aktion !== "All In") {
-  s.aktion = "Ausgeschieden";
-  io.emit("updateSpieler", s);
-  return;
+  // Nur als ausgeschieden markieren, wenn Spieler aktiv gefoldet oder kein Einsatz gemacht hat
+  if (!s.imPot || s.imPot === 0) {
+    s.aktion = "Ausgeschieden";
+    io.emit("updateSpieler", s);
+    return;
+  }
 }
+
 
 
     if (aktion === "fold") {
