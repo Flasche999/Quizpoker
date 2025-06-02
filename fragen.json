@@ -1,41 +1,5 @@
 [
   {
-    "frage": "Wie viele Farben hat ein Regenbogen?",
-    "hinweis1": "Mehr als die Grundfarben.",
-    "hinweis2": "Er enthält auch Indigo und Violett.",
-    "antwort": "7"
-  },
-  {
-    "frage": "Wie viele Karten sind in einem normalen Skatblatt?",
-    "hinweis1": "Weniger als beim Pokerdeck.",
-    "hinweis2": "Es gibt 4 Farben mit je 8 Karten.",
-    "antwort": "32"
-  },
-  {
-    "frage": "Wie viele Stunden hat eine Woche?",
-    "hinweis1": "Ein Tag hat immer gleich viele.",
-    "hinweis2": "Multipliziere das mit den Tagen der Woche.",
-    "antwort": "168"
-  },
-  {
-    "frage": "Wie viele Beine hat ein Insekt?",
-    "hinweis1": "Mehr als ein Mensch, weniger als eine Spinne.",
-    "hinweis2": "Typisch für Käfer und Bienen.",
-    "antwort": "6"
-  },
-  {
-    "frage": "Wie viele Tasten hat ein klassisches Klavier?",
-    "hinweis1": "Es sind mehr als 70.",
-    "hinweis2": "Die schwarzen und weißen Tasten zusammen ergeben diese Zahl.",
-    "antwort": "88"
-  },
-  {
-    "frage": "Wie viele Tage dauert der Februar in einem Nicht-Schaltjahr?",
-    "hinweis1": "Kürzester Monat des Jahres.",
-    "hinweis2": "Nur einmal pro Jahr mit dieser Länge.",
-    "antwort": "28"
-  },
-  {
     "frage": "Wie viele Level hat Super Mario Bros. (NES)?",
     "hinweis1": "Es gibt mehrere Welten mit gleich vielen Abschnitten.",
     "hinweis2": "Die Zahl ist durch 4 teilbar.",
