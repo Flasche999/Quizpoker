@@ -111,12 +111,17 @@
     <source src="sounds/background.mp3" type="audio/mpeg" />
     Dein Browser unterstützt kein Audio.
   </audio>
-  <script>
-    document.addEventListener("DOMContentLoaded", () => {
-      const bgm = document.getElementById("bgm");
-      if (bgm) bgm.volume = 0.2;
-    });
-  </script>
+<script>
+  document.addEventListener("DOMContentLoaded", () => {
+    const bgm = document.getElementById("bgm");
+    if (bgm) bgm.volume = 0.2;
+
+    // ⬇️ Aktionsbereich beim Laden ausblenden
+    const aktionen = document.getElementById("aktionen");
+    if (aktionen) aktionen.style.display = "none";
+  });
+</script>
+
   <h1>QuizPoker – Spieler</h1>
 
   <div id="name-area">
