@@ -301,27 +301,28 @@
       aktualisiereSpielerPositionen();
     });
 
-    socket.on("frageStart", (frage) => {
-      document.getElementById("frage").textContent = frage.frage;
-      document.getElementById("antwort").value = "";
+   socket.on("frageStart", (frage) => {
+  document.getElementById("frage").textContent = frage.frage;
+  document.getElementById("antwort").value = "";
 
-      if (chips > 0) {
-        document.getElementById("antwort-bereich").style.display = "block";
-      } else {
-        document.getElementById("antwort-bereich").style.display = "none";
-      }
+  if (chips > 0) {
+    document.getElementById("antwort-bereich").style.display = "block";
+  } else {
+    document.getElementById("antwort-bereich").style.display = "none";
+  }
 
-      document.getElementById("aktionen").style.display = "none";
-      document.getElementById("hinweis").textContent = "";
-      document.getElementById("ergebnis").textContent = "";
-      aktuelleAntwort = "";
-      aktuelleAktion = "";
+  document.getElementById("aktionen").style.display = "none";
+  document.getElementById("hinweis").textContent = "";
+  document.getElementById("ergebnis").textContent = "";
+  aktuelleAntwort = "";
+  aktuelleAktion = "";
 
-      spielerStatus.forEach((info, spielerName) => {
-        info.aktion = "";
-      });
-      aktualisiereSpielerPositionen();
-    });
+  spielerStatus.forEach((info, spielerName) => {
+    info.aktion = "";
+  });
+  aktualisiereSpielerPositionen();
+});
+
 
     socket.on("hinweis", ({ num, text }) => {
       const hinweisDiv = document.getElementById("hinweis");
