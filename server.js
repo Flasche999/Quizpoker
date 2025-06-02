@@ -94,7 +94,7 @@ io.emit("updateAlleSpieler", spielerListe); // ✅ nur EINMAL nach der Schleife
   // 👉 Spielreihenfolge: Start beim Spieler nach dem Big Blind
   const indexBB = spielerListe.findIndex(s => s.id === big.id);
   const vorne = spielerListe.slice(indexBB + 1);
-  const hinten = spielerListe.slice(0, indexBB + 1);
+  const hinten = spielerListe.slice(0, indexBB); // 👈 ohne den Big Blind selbst
   const richtigeReihenfolge = vorne.concat(hinten).filter(s => s.chips > 0);
 
   spielReihenfolge = richtigeReihenfolge.map(s => s.id);
