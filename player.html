@@ -388,10 +388,25 @@ socket.on("updateSpieler", (data) => {
       document.getElementById("pot-anzahl").textContent = potWert;
     });
 
-    socket.on("aktionErlaubt", ({ aktuellerEinsatz }) => {
-      document.getElementById("aktionen").style.display = "block";
-      document.getElementById("raise-betrag").value = aktuellerEinsatz + 20;
-    });
+socket.on("aktionErlaubt", ({ aktuellerEinsatz }) => {
+  const aktionen = document.getElementById("aktionen");
+  const raiseInput = document.getElementById("raise-betrag");
+
+  if (aktionen) {
+    // Zeige Aktionsbereich
+    aktionen.style.display = "block";
+
+    // Lege Raise-Wert sinnvoll fest
+    if (raiseInput) raiseInput.value = aktuellerEinsatz + 20;
+
+    // ✨ Kurzes optisches Feedback (aufblinken)
+    aktionen.style.animation = "blinken 0.8s ease";
+    setTimeout(() => {
+      aktionen.style.animation = ""; // Reset nach Effekt
+    }, 800);
+  }
+});
+
 
     socket.on("zeigeSchaetzAntwortVerdeckt", ({ name }) => {
       const hinweisDiv = document.getElementById("hinweis");
