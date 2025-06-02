@@ -109,30 +109,9 @@ io.emit("updateAlleSpieler", spielerListe); // ✅ nur EINMAL nach der Schleife
 }
 
 
-function prüfeObAlleGesendetHaben() {
-  const alleFertig = Object.values(spieler).length > 0 && Object.values(spieler).every(s => s.antwort !== "");
-  if (alleFertig) {
-    const aktuelleReihenfolge = Object.values(spieler).map(s => s.id);
-    if (spielReihenfolge.length > 0) {
-      const letzterStart = spielReihenfolge[0];
-      const index = aktuelleReihenfolge.indexOf(letzterStart);
-      if (index !== -1) {
-        const vorne = aktuelleReihenfolge.slice(index + 1);
-        const hinten = aktuelleReihenfolge.slice(0, index + 1);
-        spielReihenfolge = vorne.concat(hinten);
-      } else {
-        spielReihenfolge = aktuelleReihenfolge;
-      }
-    } else {
-      spielReihenfolge = aktuelleReihenfolge;
-    }
-
-    aktuellerSpielerIndex = 0;
-    const erster = spielReihenfolge[0];
-    if (erster) {
-      io.to(erster).emit("aktionErlaubt", { aktuellerEinsatz, pot });
-    }
-  }
+function sindAlleAntwortenAbgegeben() {
+  const aktiveSpieler = Object.values(spieler).filter(s => s.aktion !== "Fold" && s.chips > 0);
+  return aktiveSpieler.every(s => typeof s.antwort === "number");
 }
 
 function starteSetzrunde() {
@@ -172,30 +151,30 @@ io.on('connection', (socket) => {
     sendeNaechsteFrage();
   });
 
-  socket.on("zeigeHinweis", (num) => {
+  ssocket.on("zeigeHinweis", (num) => {
   const aktuelleFrage = fragen[globalQuestionIndex - 1]; // aktuelle Frage holen
   if (!aktuelleFrage) return;
 
   const text = num === 1 ? aktuelleFrage.hinweis1 : aktuelleFrage.hinweis2;
   io.emit("hinweis", { num, text });
 
-  setTimeout(() => {
-    starteSetzrunde();
-  }, 500);
+  if (num === 1 || num === 2) {
+    setTimeout(() => starteSetzrunde(), 500); // 1. oder 2. Setzrunde starten
+  }
 });
 
 socket.on("zeigeAufloesung", () => {
   const aktuelleFrage = fragen[globalQuestionIndex - 1];
   if (!aktuelleFrage) return;
 
- const antwort = Number(aktuelleFrage.antwort);
-if (isNaN(antwort)) {
-  console.warn("❌ Antwort konnte nicht gelesen werden:", aktuelleFrage.antwort);
-  io.emit("aufloesung", "Keine gültige Antwort.");
-  return;
-}
-io.emit("aufloesung", antwort);
+  const antwort = Number(aktuelleFrage.antwort);
+  if (isNaN(antwort)) {
+    console.warn("❌ Antwort konnte nicht gelesen werden:", aktuelleFrage.antwort);
+    io.emit("aufloesung", "Keine gültige Antwort.");
+    return;
+  }
 
+  io.emit("aufloesung", antwort);
 
   const gültigeSpieler = Object.values(spieler).filter(s => typeof s.antwort === 'number');
   if (gültigeSpieler.length > 0) {
@@ -213,10 +192,9 @@ io.emit("aufloesung", antwort);
     io.emit("schaetzSieger", nächster.name);
   }
 
-  setTimeout(() => {
-    starteSetzrunde();
-  }, 500);
+  setTimeout(() => starteSetzrunde(), 500); // Letzte Setzrunde starten
 });
+
 
 socket.on("playerData", (data) => {
   if (
@@ -249,7 +227,7 @@ socket.on("playerData", (data) => {
 
 
 
-  socket.on("schaetzAntwort", (wert) => {
+socket.on("schaetzAntwort", (wert) => {
   const s = spieler[socket.id];
   if (!s) return;
 
@@ -257,8 +235,13 @@ socket.on("playerData", (data) => {
   if (s.aktion === "Fold" || s.aktion === "Ausgeschieden") return;
 
   s.antwort = wert;
+
   io.emit("zeigeSchaetzAntwortAdmin", { name: s.name, wert, id: socket.id });
   socket.broadcast.emit("zeigeSchaetzAntwortVerdeckt", { name: s.name });
+
+  if (sindAlleAntwortenAbgegeben()) {
+    io.emit("alleAntwortenAbgegeben"); // Optional für UI-Freigabe
+  }
 });
 
 
