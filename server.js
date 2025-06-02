@@ -162,6 +162,8 @@ function starteSetzrunde() {
   }
 }
 
+
+
 io.on('connection', (socket) => {
   console.log('🔌 Spieler verbunden:', socket.id);
 
