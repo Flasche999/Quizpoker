@@ -31,15 +31,18 @@
   <h3 style="margin-top: 30px;">📏 Schätzantworten</h3>
   <ul id="schaetz-liste" style="list-style: none; padding: 0;"></ul>
 
-  <div style="margin-top: 30px;">
-    <button class="admin" onclick="startFrage()">🎯 Frage starten</button>
-    <br /><br />
-    <button class="admin" onclick="zeigeHinweis(1)">💡 Hinweis 1</button>
-    <br /><br />
-    <button class="admin" onclick="zeigeHinweis(2)">💡 Hinweis 2</button>
-    <br /><br />
-    <button class="admin" onclick="zeigeAufloesung()">✅ Auflösung</button>
-  </div>
+<div style="margin-top: 30px;">
+  <button class="admin" onclick="startFrage()">🎯 Frage starten (manuell)</button>
+  <br /><br />
+  <button class="admin" onclick="socket.emit('naechsteFrage')">➡️ Nächste Frage vom Server</button>
+  <br /><br />
+  <button class="admin" onclick="zeigeHinweis(1)">💡 Hinweis 1</button>
+  <br /><br />
+  <button class="admin" onclick="zeigeHinweis(2)">💡 Hinweis 2</button>
+  <br /><br />
+  <button class="admin" onclick="zeigeAufloesung()">✅ Auflösung</button>
+</div>
+
 
   <div style="margin-top: 30px;">
     <input type="number" id="chipsFeld" placeholder="Chips für alle Spieler" />
