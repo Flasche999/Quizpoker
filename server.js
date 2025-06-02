@@ -363,7 +363,6 @@ socket.on('spielerAktion', ({ aktion, raiseBetrag }) => {
 
     spielReihenfolge = [];
     aktuellerSpielerIndex = -1;
-    setzeBlindsUndStart();
   });
 
  socket.on('setAllChips', (betrag) => {
