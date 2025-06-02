@@ -3,43 +3,43 @@
     "frage": "Wie viele Menschen leben in Tokio (Metropolregion, ca. Stand 2023)?",
     "hinweis1": "Eine der größten Metropolregionen der Welt.",
     "hinweis2": "Die Zahl liegt über 30 Millionen.",
-    "loesung": "37400000"
+    "antwort": 37400000
   },
   {
     "frage": "Wie viele Stunden dauert ein Jahr (nicht Schaltjahr)?",
     "hinweis1": "Multipliziere 365 mit 24.",
     "hinweis2": "Die Zahl ist über 8000.",
-    "loesung": "8760"
+    "antwort": 8760
   },
   {
     "frage": "Wie viele Meter hoch ist der Mount Everest?",
     "hinweis1": "Der höchste Punkt der Erde.",
     "hinweis2": "Mehr als 8000 Meter.",
-    "loesung": "8848"
+    "antwort": 8848
   },
   {
     "frage": "Wie viele Stufen hat der Eiffelturm bis zur Spitze?",
     "hinweis1": "Mehr als 1500, wenn man alles zu Fuß geht.",
     "hinweis2": "Die genaue Zahl liegt unter 1800.",
-    "loesung": "1665"
+    "antwort": 1665
   },
   {
     "frage": "Wie viele Minuten beträgt der aktuelle Weltrekord im Marathonlauf?",
     "hinweis1": "Es sind unter 130 Minuten.",
     "hinweis2": "Ein historischer Lauf dauerte knapp über zwei Stunden.",
-    "loesung": "121"
+    "antwort": 121
   },
   {
     "frage": "Wie viele Kilometer lang ist die Donau?",
     "hinweis1": "Sie fließt durch viele europäische Länder.",
     "hinweis2": "Weniger als 3.000, aber deutlich mehr als 1.000 Kilometer.",
-    "loesung": "2850"
+    "antwort": 2850
   },
   {
     "frage": "Wie viele Knochen hat der menschliche Körper im Erwachsenenalter?",
     "hinweis1": "Im Kindesalter sind es noch mehr.",
     "hinweis2": "Die Zahl liegt knapp über 200.",
-    "loesung": "206"
+    "antwort": 206
   },
   {
     "frage": "Wie viele Sprachen gibt es weltweit ungefähr?",
