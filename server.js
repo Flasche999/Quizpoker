@@ -172,19 +172,17 @@ function starteSetzrunde() {
 }
 
 io.on('connection', (socket) => {
-  console.log('🔌 Spieler verbunden:', socket.id);
+  console.log("🔌 Spieler verbunden:", socket.id);
 
-  // 👉 Frage starten
-  socket.on('naechsteFrage', () => {
-    sendeNaechsteFrage();
+  socket.on("zeigeHinweis", (num) => {
+    console.log("Hinweis erhalten:", num);
   });
 
-  // 👉 Setzrunde starten, wenn alle geschätzt haben
-  socket.on("starteSetzrunde", () => {
+  socket.on("starteSetzrunde1", () => {
     starteSetzrunde();
   });
+});
 
-}); // ✅ ← das schließt die Klammer für io.on('connection')
 
 
 
