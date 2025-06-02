@@ -30,6 +30,15 @@ let blindIndex = 0;
 let spielReihenfolge = [];
 let aktuellerSpielerIndex = -1;
 let letzterBigBlindId = null;
+function pruefeObAlleSchaetzungenAbgegeben() {
+  const alleAbgegeben = Object.values(spieler).length > 0 &&
+    Object.values(spieler).every(s => typeof s.antwort === 'number' && s.antwort !== "");
+
+  if (alleAbgegeben) {
+    io.emit("alleSchaetzungenAbgegeben"); // ⚡ Clients können Buttons anzeigen
+  }
+}
+
 
 function setzeBlindsUndStart() {
   const spielerListe = Object.values(spieler)
@@ -165,10 +174,19 @@ function starteSetzrunde() {
 io.on('connection', (socket) => {
   console.log('🔌 Spieler verbunden:', socket.id);
 
-  // ✅ Hier direkt einfügen:
+  // 👉 Frage starten
   socket.on('naechsteFrage', () => {
     sendeNaechsteFrage();
   });
+
+  // 👉 Setzrunde starten, wenn alle geschätzt haben
+  socket.on("starteSetzrunde", () => {
+    starteSetzrunde();
+  });
+
+}); // ✅ ← das schließt die Klammer für io.on('connection')
+
+
 
   socket.on("zeigeHinweis", (num) => {
   const aktuelleFrage = fragen[globalQuestionIndex - 1]; // aktuelle Frage holen
@@ -247,17 +265,20 @@ socket.on("playerData", (data) => {
 
 
 
-  socket.on("schaetzAntwort", (wert) => {
-  const s = spieler[socket.id];
-  if (!s) return;
+    socket.on("schaetzAntwort", (wert) => {
+    const s = spieler[socket.id];
+    if (!s) return;
 
-  // Spieler, die „Fold“ oder „Ausgeschieden“ sind, dürfen NICHT tippen
-  if (s.aktion === "Fold" || s.aktion === "Ausgeschieden") return;
+    if (s.aktion === "Fold" || s.aktion === "Ausgeschieden") return;
 
-  s.antwort = wert;
-  io.emit("zeigeSchaetzAntwortAdmin", { name: s.name, wert, id: socket.id });
-  socket.broadcast.emit("zeigeSchaetzAntwortVerdeckt", { name: s.name });
-});
+    s.antwort = wert;
+    io.emit("zeigeSchaetzAntwortAdmin", { name: s.name, wert, id: socket.id });
+    socket.broadcast.emit("zeigeSchaetzAntwortVerdeckt", { name: s.name });
+
+    // 🔁 NEU:
+    pruefeObAlleSchaetzungenAbgegeben();
+  });
+
 
 
   socket.on("adminVergibtPot", (gewinnerID) => {
@@ -433,7 +454,6 @@ socket.on('spielerAktion', ({ aktion, raiseBetrag }) => {
     io.emit('updateAlleSpieler', Object.values(spieler));
 
   });
-});
 
 function verteilePot(gewinnerNamen) {
   if (gewinnerNamen.length === 0) return;
