@@ -136,15 +136,18 @@ function starteSetzrunde() {
 
   aktuellerSpielerIndex = 0;
   const erster = spielReihenfolge[0];
-  if (erster) {
+  if (erster && typeof spieler[erster]?.antwort === "number") {
     io.to(erster).emit("aktionErlaubt", { aktuellerEinsatz, pot });
+  } else {
+    console.log("⛔ Spieler darf noch nicht setzen – Antwort fehlt:", spieler[erster]?.name);
   }
-}
+} // ✅ Diese Klammer war bei dir **nicht vorhanden**!
 
 
-
+// Jetzt ist das gültig:
 io.on('connection', (socket) => {
   console.log('🔌 Spieler verbunden:', socket.id);
+
 
   // ✅ Hier direkt einfügen:
   socket.on('naechsteFrage', () => {
