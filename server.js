@@ -389,9 +389,17 @@ function sendeNaechsteFrage() {
     return;
   }
 
-  const frage = fragen[globalQuestionIndex];
-  io.emit("frageStart", frage);
-  globalQuestionIndex++;
+const frage = fragen[globalQuestionIndex];
+io.emit("frageStart", {
+  frage: frage.frage,
+  hinweis1: frage.hinweis1,
+  hinweis2: frage.hinweis2,
+  antwort: frage.antwort,
+  nummer: globalQuestionIndex + 1,
+  gesamt: fragen.length
+});
+globalQuestionIndex++;
+
 
   Object.values(spieler).forEach(s => {
     s.antwort = "";
