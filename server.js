@@ -217,29 +217,23 @@ io.emit("aufloesung", antwort);
 });
 
  socket.on('playerData', (data) => {
-    if (!spieler[socket.id]) {
-      spieler[socket.id] = { id: socket.id, imPot: 0 };
-    }
+  if (!data.name || !data.avatar) return; // Schutz gegen leere Daten
 
-   spieler[socket.id] = {
-      ...spieler[socket.id],
-      ...data
-    };
+  spieler[socket.id] = {
+    id: socket.id,
+    name: data.name,
+    avatar: data.avatar,
+    chips: data.chips || 1000,
+    aktion: "",
+    imPot: 0,
+    blind: null
+  };
 
-    io.emit('updateSpieler', spieler[socket.id]);
-   io.emit('playerData', {
-  name: data.name,
-  aktion: data.aktion,
-  chips: data.chips,
-  avatar: data.avatar,
-  blind: spieler[socket.id].blind || null  // 👈 Blind hinzufügen
+  io.emit('updateSpieler', spieler[socket.id]);
+  io.emit('updateAlleSpieler', Object.values(spieler));
+  prüfeObAlleGesendetHaben();
 });
 
-
-
-    io.emit('updateAlleSpieler', Object.values(spieler));
-    prüfeObAlleGesendetHaben();
-  });
 
   socket.on("schaetzAntwort", (wert) => {
   const s = spieler[socket.id];
@@ -341,15 +335,13 @@ socket.on('spielerAktion', ({ aktion, raiseBetrag }) => {
     io.emit('frageStart', frage);
 
     Object.values(spieler).forEach(s => {
-      s.aktion = "";
-      s.antwort = "";
-      s.imPot = 0;
-      io.emit("playerData", {
-        name: s.name,
-        aktion: "",
-        chips: s.chips
-      });
-    });
+  s.aktion = "";
+  s.antwort = "";
+  s.imPot = 0;
+  io.emit("updateSpieler", s);
+});
+
+ 
 
     spielReihenfolge = [];
     aktuellerSpielerIndex = -1;
@@ -466,16 +458,21 @@ function sendeNaechsteFrage() {
 
   globalQuestionIndex++;
 
-  setzeBlindsUndStart(); // 👈 DAS IST DIE ENTSCHEIDENDE ZEILE
+  // 👉 Neue Blinds setzen + Startspieler definieren
+  setzeBlindsUndStart(); // ✅ DAS IST DER KERN
 
-Object.values(spieler).forEach(s => {
-  s.antwort = "";
-  io.emit("updateSpieler", s);
-});
-io.emit("updateAlleSpieler", Object.values(spieler)); // ✅ EINMAL am Ende
+  // 👉 Spielerwerte zurücksetzen
+  Object.values(spieler).forEach(s => {
+    s.antwort = "";
+    s.aktion = "";
+    s.imPot = 0;
+    io.emit("updateSpieler", s); // Einzelnes Update
+  });
 
-
+  // 👉 ALLE Spielerinfos senden (z. B. Chips & Potanzeige aktualisieren)
+  io.emit("updateAlleSpieler", Object.values(spieler)); // ✅ HIER GENAU!
 }
+
 
 
 
