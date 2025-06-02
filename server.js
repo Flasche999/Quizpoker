@@ -158,8 +158,14 @@ socket.on("zeigeAufloesung", () => {
   const aktuelleFrage = fragen[globalQuestionIndex - 1];
   if (!aktuelleFrage) return;
 
-  const antwort = parseInt(aktuelleFrage.antwort);
-  io.emit("aufloesung", antwort);
+ const antwort = Number(aktuelleFrage.antwort);
+if (isNaN(antwort)) {
+  console.warn("❌ Antwort konnte nicht gelesen werden:", aktuelleFrage.antwort);
+  io.emit("aufloesung", "Keine gültige Antwort.");
+  return;
+}
+io.emit("aufloesung", antwort);
+
 
   const gültigeSpieler = Object.values(spieler).filter(s => typeof s.antwort === 'number');
   if (gültigeSpieler.length > 0) {
@@ -400,12 +406,10 @@ function sendeNaechsteFrage() {
 const frage = fragen[globalQuestionIndex];
 io.emit("frageStart", {
   frage: frage.frage,
-  hinweis1: frage.hinweis1,
-  hinweis2: frage.hinweis2,
-  antwort: frage.antwort,
   nummer: globalQuestionIndex + 1,
   gesamt: fragen.length
 });
+
 globalQuestionIndex++;
 
 
