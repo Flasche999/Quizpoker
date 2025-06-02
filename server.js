@@ -151,7 +151,7 @@ io.on('connection', (socket) => {
     sendeNaechsteFrage();
   });
 
-  ssocket.on("zeigeHinweis", (num) => {
+  socket.on("zeigeHinweis", (num) => {
   const aktuelleFrage = fragen[globalQuestionIndex - 1]; // aktuelle Frage holen
   if (!aktuelleFrage) return;
 
