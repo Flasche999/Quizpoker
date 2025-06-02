@@ -217,7 +217,8 @@ io.emit("aufloesung", antwort);
 });
 
 socket.on("playerData", (data) => {
-  if (!data.name || !data.avatar) return; // Verhindert Geisterspieler!
+  if (!data || typeof data.name !== 'string' || !data.name.trim() || !data.avatar) return;
+
 
   spieler[socket.id] = {
     id: socket.id,
