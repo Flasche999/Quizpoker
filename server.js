@@ -24,20 +24,24 @@ app.use(express.static(__dirname));
 let spieler = {};
 let pot = 0;
 let aktuellerEinsatz = 0;
-let smallBlind = 10;
-let bigBlind = 20;
+let smallBlind = 200;
+let bigBlind = 250;
 let blindIndex = 0;
 let spielReihenfolge = [];
 let aktuellerSpielerIndex = -1;
 let letzterBigBlindId = null;
 
 function setzeBlindsUndStart() {
+  smallBlind = vorbereiteterSmallBlind;
+  bigBlind = vorbereiteterBigBlind;
+
   const spielerListe = Object.values(spieler)
-  .filter(s => s.chips > 0)
-  .sort((a, b) => a.name.localeCompare(b.name)); // feste Reihenfolge nach Namen
+    .filter(s => s.chips > 0)
+    .sort((a, b) => a.name.localeCompare(b.name)); // feste Reihenfolge
+
   if (spielerListe.length < 2) return;
 
-  // Reset
+  // Reset Spielerstatus
   spielerListe.forEach(s => {
     s.blind = null;
     s.antwort = "";
@@ -51,24 +55,24 @@ function setzeBlindsUndStart() {
   // Small Blind zahlen
   if (small.chips <= smallBlind) {
     pot += small.chips;
-    small.imPot = (small.imPot || 0) + small.chips;
+    small.imPot += small.chips;
     small.chips = 0;
     small.aktion = "All In";
   } else {
     small.chips -= smallBlind;
-    small.imPot = (small.imPot || 0) + smallBlind;
+    small.imPot += smallBlind;
     pot += smallBlind;
   }
 
   // Big Blind zahlen
   if (big.chips <= bigBlind) {
     pot += big.chips;
-    big.imPot = (big.imPot || 0) + big.chips;
+    big.imPot += big.chips;
     big.chips = 0;
     big.aktion = "All In";
   } else {
     big.chips -= bigBlind;
-    big.imPot = (big.imPot || 0) + bigBlind;
+    big.imPot += bigBlind;
     pot += bigBlind;
   }
 
@@ -78,23 +82,21 @@ function setzeBlindsUndStart() {
 
   aktuellerEinsatz = Math.max(small.imPot, big.imPot);
 
-  // Update Spieler-UI
-spielerListe.forEach(s => {
-  io.emit("updateSpieler", s);
-});
-io.emit("updateAlleSpieler", spielerListe); // ✅ nur EINMAL nach der Schleife
-
-
+  // Spieler aktualisieren
+  spielerListe.forEach(s => {
+    io.emit("updateSpieler", s);
+  });
+  io.emit("updateAlleSpieler", spielerListe);
   io.emit("potAktualisiert", pot);
   io.emit("blindsMarkieren", {
     small: small.name,
     big: big.name
   });
 
-  // 👉 Spielreihenfolge: Start beim Spieler nach dem Big Blind
+  // Spielreihenfolge setzen
   const indexBB = spielerListe.findIndex(s => s.id === big.id);
   const vorne = spielerListe.slice(indexBB + 1);
-  const hinten = spielerListe.slice(0, indexBB); // 👈 ohne den Big Blind selbst
+  const hinten = spielerListe.slice(0, indexBB);
   const richtigeReihenfolge = vorne.concat(hinten).filter(s => s.chips > 0);
 
   spielReihenfolge = richtigeReihenfolge.map(s => s.id);
@@ -106,7 +108,8 @@ io.emit("updateAlleSpieler", spielerListe); // ✅ nur EINMAL nach der Schleife
   }
 
   blindIndex++;
-}
+} // ✅ Diese Klammer schließt die Funktion korrekt!
+
 
 
 function sindAlleAntwortenAbgegeben() {
@@ -358,10 +361,12 @@ socket.on('spielerAktion', ({ aktion, raiseBetrag }) => {
     });
   });
 
-  socket.on('setEinsatz', (betrag) => {
-    aktuellerEinsatz = betrag;
-    io.emit("einsatzAktualisiert", aktuellerEinsatz);
-  });
+socket.on("setzeNaechsteBlinds", ({ small, big }) => {
+  vorbereiteterSmallBlind = small;
+  vorbereiteterBigBlind = big;
+  console.log(`📢 Blinds für nächste Runde gesetzt: SB=${small}, BB=${big}`);
+});
+
 
   socket.on("setBlinds", ({ small, big }) => {
   smallBlind = small;
