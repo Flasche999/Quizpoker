@@ -136,33 +136,33 @@ function zeigeAufloesung() {
       aktualisiereTabelle();
     });
 
-    socket.on("updateAlleSpieler", (alleSpieler) => {
-      const container = document.getElementById("gewinner-auswahl");
-      container.innerHTML = "";
-      ausgewaehlteSpieler = [];
+socket.on("updateAlleSpieler", (alleSpieler) => {
+  const container = document.getElementById("gewinner-auswahl");
+  container.innerHTML = "";
+  ausgewaehlteSpieler = [];
 
-      for (const id in alleSpieler) {
-        const spieler = alleSpieler[id];
-        const label = document.createElement("label");
-        label.style.display = "block";
-        label.style.cursor = "pointer";
+  alleSpieler.forEach(spieler => {
+    const label = document.createElement("label");
+    label.style.display = "block";
+    label.style.cursor = "pointer";
 
-        const checkbox = document.createElement("input");
-        checkbox.type = "checkbox";
-        checkbox.value = spieler.name;
-        checkbox.onchange = (e) => {
-          if (e.target.checked) {
-            ausgewaehlteSpieler.push(spieler.name);
-          } else {
-            ausgewaehlteSpieler = ausgewaehlteSpieler.filter(n => n !== spieler.name);
-          }
-        };
-
-        label.appendChild(checkbox);
-        label.append(` ${spieler.name}`);
-        container.appendChild(label);
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.value = spieler.name;
+    checkbox.onchange = (e) => {
+      if (e.target.checked) {
+        ausgewaehlteSpieler.push(spieler.name);
+      } else {
+        ausgewaehlteSpieler = ausgewaehlteSpieler.filter(n => n !== spieler.name);
       }
-    });
+    };
+
+    label.appendChild(checkbox);
+    label.append(` ${spieler.name}`);
+    container.appendChild(label);
+  });
+});
+
 
     function potAuszahlen() {
       if (ausgewaehlteSpieler.length > 0) {
