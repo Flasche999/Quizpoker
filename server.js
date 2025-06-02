@@ -216,23 +216,24 @@ io.emit("aufloesung", antwort);
   }, 500);
 });
 
- socket.on('playerData', (data) => {
-  if (!data.name || !data.avatar) return; // Schutz gegen leere Daten
+socket.on("playerData", (data) => {
+  if (!data.name || !data.avatar) return; // Verhindert Geisterspieler!
 
   spieler[socket.id] = {
     id: socket.id,
     name: data.name,
     avatar: data.avatar,
     chips: data.chips || 1000,
+    antwort: "",
     aktion: "",
     imPot: 0,
     blind: null
   };
 
-  io.emit('updateSpieler', spieler[socket.id]);
-  io.emit('updateAlleSpieler', Object.values(spieler));
-  prüfeObAlleGesendetHaben();
+  io.emit("updateSpieler", spieler[socket.id]);
+  io.emit("updateAlleSpieler", Object.values(spieler));
 });
+
 
 
   socket.on("schaetzAntwort", (wert) => {
