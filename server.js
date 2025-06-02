@@ -298,29 +298,31 @@ socket.on('spielerAktion', ({ aktion, raiseBetrag }) => {
     }, 500);
   });
 
-  socket.on('aufloesung', (antwort) => {
-    io.emit('aufloesung', antwort);
+socket.on('aufloesung', (antwort) => {
+  const loesung = parseInt(antwort);
+  io.emit('aufloesung', antwort);
 
-    const gültigeSpieler = Object.values(spieler).filter(s => typeof s.antwort === 'number');
-    if (gültigeSpieler.length > 0) {
-      let nächster = gültigeSpieler[0];
-      let diff = Math.abs(nächster.antwort - antwort);
+  const gültigeSpieler = Object.values(spieler).filter(s => typeof s.antwort === 'number');
+  if (gültigeSpieler.length > 0) {
+    let nächster = gültigeSpieler[0];
+    let diff = Math.abs(nächster.antwort - loesung);
 
-      gültigeSpieler.forEach(s => {
-        const abweichung = Math.abs(s.antwort - antwort);
-        if (abweichung < diff) {
-          nächster = s;
-          diff = abweichung;
-        }
-      });
+    gültigeSpieler.forEach(s => {
+      const abweichung = Math.abs(s.antwort - loesung);
+      if (abweichung < diff) {
+        nächster = s;
+        diff = abweichung;
+      }
+    });
 
-      io.emit("schaetzSieger", nächster.name);
-    }
+    io.emit("schaetzSieger", nächster.name);
+  }
 
-    setTimeout(() => {
-      starteSetzrunde();
-    }, 500);
-  });
+  setTimeout(() => {
+    starteSetzrunde();
+  }, 500);
+});
+
 
   socket.on('setAllChips', (betrag) => {
     Object.values(spieler).forEach(s => {
