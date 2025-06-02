@@ -170,77 +170,75 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('spielerAktion', ({ aktion, raiseBetrag }) => {
-    const s = spieler[socket.id];
-    if (!s) return;
+socket.on('spielerAktion', ({ aktion, raiseBetrag }) => {
+  const s = spieler[socket.id];
+  if (!s) return;
 
-    if (s.chips <= 0 && s.aktion !== "All In") {
-  // Nur als ausgeschieden markieren, wenn Spieler aktiv gefoldet oder kein Einsatz gemacht hat
-  if (!s.imPot || s.imPot === 0) {
-    s.aktion = "Ausgeschieden";
-    io.emit("updateSpieler", s);
-    return;
-  }
-}
-
-
-
-    if (aktion === "fold") {
-      s.aktion = "Fold";
+  if (s.chips <= 0 && s.aktion !== "All In") {
+    if (!s.imPot || s.imPot === 0) {
+      s.aktion = "Ausgeschieden";
+      io.emit("updateSpieler", s);
+      return;
     }
-
-    if (aktion === "call") {
-  const toCall = aktuellerEinsatz - (s.imPot || 0);
-  const callBetrag = Math.min(toCall, s.chips);
-  s.imPot = (s.imPot || 0) + callBetrag;
-  pot += callBetrag;
-  s.chips -= callBetrag;
-
-  if (s.chips === 0) {
-    s.aktion = "All In";
-  } else {
-    s.aktion = "Call";
   }
-}
 
-
-    if (aktion === "raise") {
-  const raiseGesamt = parseInt(raiseBetrag);
-  if (raiseGesamt >= s.chips) {
-    // Spieler hat nicht genug zum Raisen → All In
-    aktuellerEinsatz = s.chips;
-    pot += s.chips;
-    s.imPot = (s.imPot || 0) + s.chips;
-    s.aktion = "All In";
-    s.chips = 0;
-  } else {
-    aktuellerEinsatz = raiseGesamt;
-    s.chips -= raiseGesamt;
-    s.imPot = (s.imPot || 0) + raiseGesamt;
-    pot += raiseGesamt;
-    s.aktion = "Raise";
+  if (aktion === "fold") {
+    s.aktion = "Fold";
   }
-}
 
+  if (aktion === "call") {
+    const toCall = aktuellerEinsatz - (s.imPot || 0);
+    const callBetrag = Math.min(toCall, s.chips);
+    s.imPot = (s.imPot || 0) + callBetrag;
+    pot += callBetrag;
+    s.chips -= callBetrag;
 
-    if (aktion === "allin") {
+    s.aktion = (s.chips === 0) ? "All In" : "Call";
+  }
+
+  if (aktion === "raise") {
+    const raiseGesamt = parseInt(raiseBetrag);
+    if (raiseGesamt >= s.chips) {
+      aktuellerEinsatz = s.chips;
       pot += s.chips;
-      s.aktion = "All In";
       s.imPot = (s.imPot || 0) + s.chips;
+      s.aktion = "All In";
       s.chips = 0;
-    }
-
-    io.emit("updateSpieler", s);
-    io.emit("potAktualisiert", pot);
-
-    aktuellerSpielerIndex++;
-    if (aktuellerSpielerIndex < spielReihenfolge.length) {
-      const nextID = spielReihenfolge[aktuellerSpielerIndex];
-      io.to(nextID).emit("aktionErlaubt", { aktuellerEinsatz, pot });
     } else {
-      console.log("✅ Alle Spieler haben gesetzt.");
+      aktuellerEinsatz = raiseGesamt;
+      s.chips -= raiseGesamt;
+      s.imPot = (s.imPot || 0) + raiseGesamt;
+      pot += raiseGesamt;
+      s.aktion = "Raise";
     }
+  }
+
+  if (aktion === "allin") {
+    pot += s.chips;
+    s.aktion = "All In";
+    s.imPot = (s.imPot || 0) + s.chips;
+    s.chips = 0;
+  }
+
+  // ✅ NEU: Aktion an alle Spieler senden
+  io.emit("spielerAktion", {
+    name: s.name,
+    action: s.aktion === "Raise" ? `Raise ${raiseBetrag}` : s.aktion,
+    bet: s.imPot || 0
   });
+
+  io.emit("updateSpieler", s);
+  io.emit("potAktualisiert", pot);
+
+  aktuellerSpielerIndex++;
+  if (aktuellerSpielerIndex < spielReihenfolge.length) {
+    const nextID = spielReihenfolge[aktuellerSpielerIndex];
+    io.to(nextID).emit("aktionErlaubt", { aktuellerEinsatz, pot });
+  } else {
+    console.log("✅ Alle Spieler haben gesetzt.");
+  }
+});
+
 
   socket.on('frageStart', (frage) => {
     io.emit('frageStart', frage);
