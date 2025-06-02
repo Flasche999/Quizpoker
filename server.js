@@ -209,12 +209,14 @@ io.emit("aufloesung", antwort);
     };
 
     io.emit('updateSpieler', spieler[socket.id]);
-    io.emit('playerData', {
+   io.emit('playerData', {
   name: data.name,
   aktion: data.aktion,
   chips: data.chips,
-  avatar: data.avatar // ✅ Avatar hinzufügen
+  avatar: data.avatar,
+  blind: spieler[socket.id].blind || null  // 👈 Blind hinzufügen
 });
+
 
 
     io.emit('updateAlleSpieler', Object.values(spieler));
