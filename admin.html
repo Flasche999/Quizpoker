@@ -32,9 +32,8 @@
   <ul id="schaetz-liste" style="list-style: none; padding: 0;"></ul>
 
 <div style="margin-top: 30px;">
-  <button class="admin" onclick="startFrage()">🎯 Frage starten (manuell)</button>
   <br /><br />
-  <button class="admin" onclick="socket.emit('naechsteFrage')">➡️ Nächste Frage vom Server</button>
+  <button class="admin" onclick="naechsteFrage()">➡️ Nächste Frage vom Server</button>
   <br /><br />
   <button class="admin" onclick="zeigeHinweis(1)">💡 Hinweis 1</button>
   <br /><br />
@@ -83,32 +82,12 @@
 
   <script>
     const socket = io();
-    let frageIndex = 0;
-    let fragen = [];
     let spielerDaten = {};
     let ausgewaehlteSpieler = [];
 
     let frageNummer = 0;
     let gesamtFragenAnzahl = 0;
 
-    fetch("fragen.json")
-      .then(res => res.json())
-      .then(data => {
-        fragen = data;
-        gesamtFragenAnzahl = data.length;
-      });
-
-    function startFrage() {
-      const frage = fragen[frageIndex];
-      frageNummer++;
-      aktualisiereFragenZaehler();
-
-      document.getElementById('frage').innerHTML = "Frage: " + frage.frage;
-      document.getElementById("richtige-loesung").textContent = "";
-      document.getElementById("sieger-anzeige").textContent = "";
-      document.getElementById("schaetz-liste").innerHTML = "";
-      socket.emit('frageStart', frage);
-    }
 
     function aktualisiereFragenZaehler() {
       const zaehlerEl = document.getElementById("fragen-zaehler");
@@ -118,24 +97,14 @@
     }
 
     function zeigeHinweis(num) {
-      const frage = fragen[frageIndex];
-      const hinweisText = num === 1 ? frage.hinweis1 : frage.hinweis2;
+  socket.emit("zeigeHinweis", num); // Server kümmert sich um Hinweis und sendet ihn an alle
+}
 
-      if (!hinweisText) {
-        alert("Hinweis nicht vorhanden.");
-        return;
-      }
 
-      const frageDiv = document.getElementById("frage");
-      frageDiv.innerHTML += `<br>💡 Hinweis ${num}: ${hinweisText}`;
-      socket.emit('hinweis', { num: num, text: hinweisText });
-    }
+function zeigeAufloesung() {
+  socket.emit("zeigeAufloesung"); // Der Server kennt die richtige Antwort und sendet sie an alle
+}
 
-    function zeigeAufloesung() {
-      const frage = fragen[frageIndex];
-      socket.emit('aufloesung', frage.antwort);
-      frageIndex = (frageIndex + 1) % fragen.length;
-    }
 
     function setzeChipsFürAlle() {
       const betrag = parseInt(document.getElementById("chipsFeld").value);
@@ -250,6 +219,24 @@
       document.getElementById("richtige-loesung").textContent = "✅ Richtige Antwort: " + antwort;
     });
 
+    socket.on("hinweis", ({ num, text }) => {
+  const frageDiv = document.getElementById("frage");
+  frageDiv.innerHTML += `<br>💡 Hinweis ${num}: ${text}`;
+});
+
+socket.on("frageStart", frage => {
+  frageNummer = frage.nummer;
+  gesamtFragenAnzahl = frage.gesamt;
+  aktualisiereFragenZaehler();
+
+  document.getElementById('frage').innerHTML = "Frage: " + frage.frage;
+  document.getElementById("richtige-loesung").textContent = "";
+  document.getElementById("sieger-anzeige").textContent = "";
+  document.getElementById("schaetz-liste").innerHTML = "";
+});
+
+
+
     socket.on("schaetzSieger", (name) => {
       document.getElementById("sieger-anzeige").textContent = "🏆 " + name + " war am nächsten dran!";
     });
@@ -257,6 +244,10 @@
 function zeigeGewinnerAnimation() {
   socket.emit("gewinnerAnimation");
 }
+function naechsteFrage() {
+  socket.emit('naechsteFrage'); // Server bestimmt die nächste Frage und sendet sie an alle
+}
+
   </script>
 </body>
 </html>
