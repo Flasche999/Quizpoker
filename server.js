@@ -172,272 +172,162 @@ function starteSetzrunde() {
 }
 
 io.on('connection', (socket) => {
-  console.log("🔌 Spieler verbunden:", socket.id);
+  console.log('🔌 Spieler verbunden:', socket.id);
 
   socket.on("zeigeHinweis", (num) => {
-    console.log("Hinweis erhalten:", num);
+    const aktuelleFrage = fragen[globalQuestionIndex - 1];
+    if (!aktuelleFrage) return;
+    const text = num === 1 ? aktuelleFrage.hinweis1 : aktuelleFrage.hinweis2;
+    io.emit("hinweis", { num, text });
   });
 
-  socket.on("starteSetzrunde1", () => {
-    starteSetzrunde();
+  socket.on("zeigeAufloesung", () => {
+    const aktuelleFrage = fragen[globalQuestionIndex - 1];
+    if (!aktuelleFrage) return;
+    const antwort = Number(aktuelleFrage.antwort);
+    if (isNaN(antwort)) {
+      io.emit("aufloesung", "Keine gültige Antwort.");
+      return;
+    }
+    io.emit("aufloesung", antwort);
+
+    const gültigeSpieler = Object.values(spieler).filter(s => typeof s.antwort === 'number');
+    if (gültigeSpieler.length > 0) {
+      let nächster = gültigeSpieler[0];
+      let diff = Math.abs(nächster.antwort - antwort);
+      gültigeSpieler.forEach(s => {
+        const abweichung = Math.abs(s.antwort - antwort);
+        if (abweichung < diff) {
+          nächster = s;
+          diff = abweichung;
+        }
+      });
+      io.emit("schaetzSieger", nächster.name);
+    }
   });
-});
 
+  socket.on("playerData", (data) => {
+    if (!data || !data.name?.trim() || !data.avatar?.trim()) return;
+    spieler[socket.id] = {
+      id: socket.id,
+      name: data.name,
+      avatar: data.avatar,
+      chips: data.chips || 1000,
+      antwort: "",
+      aktion: "",
+      imPot: 0,
+      blind: null
+    };
+    io.emit("updateSpieler", spieler[socket.id]);
+    io.emit("updateAlleSpieler", Object.values(spieler));
+  });
 
-
-
-  socket.on("zeigeHinweis", (num) => {
-  const aktuelleFrage = fragen[globalQuestionIndex - 1]; // aktuelle Frage holen
-  if (!aktuelleFrage) return;
-
-  const text = num === 1 ? aktuelleFrage.hinweis1 : aktuelleFrage.hinweis2;
-  io.emit("hinweis", { num, text });
-
-  setTimeout(() => {
-    starteSetzrunde();
-  }, 500);
-});
-
-socket.on("zeigeAufloesung", () => {
-  const aktuelleFrage = fragen[globalQuestionIndex - 1];
-  if (!aktuelleFrage) return;
-
- const antwort = Number(aktuelleFrage.antwort);
-if (isNaN(antwort)) {
-  console.warn("❌ Antwort konnte nicht gelesen werden:", aktuelleFrage.antwort);
-  io.emit("aufloesung", "Keine gültige Antwort.");
-  return;
-}
-io.emit("aufloesung", antwort);
-
-
-  const gültigeSpieler = Object.values(spieler).filter(s => typeof s.antwort === 'number');
-  if (gültigeSpieler.length > 0) {
-    let nächster = gültigeSpieler[0];
-    let diff = Math.abs(nächster.antwort - antwort);
-
-    gültigeSpieler.forEach(s => {
-      const abweichung = Math.abs(s.antwort - antwort);
-      if (abweichung < diff) {
-        nächster = s;
-        diff = abweichung;
-      }
-    });
-
-    io.emit("schaetzSieger", nächster.name);
-  }
-
-  setTimeout(() => {
-    starteSetzrunde();
-  }, 500);
-});
-
-socket.on("playerData", (data) => {
-  if (
-    !data ||
-    typeof data.name !== "string" ||
-    data.name.trim() === "" ||
-    typeof data.avatar !== "string" ||
-    data.avatar.trim() === ""
-  ) {
-    console.warn("⛔ Ungültiger Spieler abgewiesen:", data);
-    return;
-  }
-
-
-
-  spieler[socket.id] = {
-    id: socket.id,
-    name: data.name,
-    avatar: data.avatar,
-    chips: data.chips || 1000,
-    antwort: "",
-    aktion: "",
-    imPot: 0,
-    blind: null
-  };
-
-  io.emit("updateSpieler", spieler[socket.id]);
-  io.emit("updateAlleSpieler", Object.values(spieler));
-});
-
-
-
-    socket.on("schaetzAntwort", (wert) => {
+  socket.on("schaetzAntwort", (wert) => {
     const s = spieler[socket.id];
     if (!s) return;
-
-    if (s.aktion === "Fold" || s.aktion === "Ausgeschieden") return;
-
     s.antwort = wert;
     io.emit("zeigeSchaetzAntwortAdmin", { name: s.name, wert, id: socket.id });
     socket.broadcast.emit("zeigeSchaetzAntwortVerdeckt", { name: s.name });
-
-    // 🔁 NEU:
     pruefeObAlleSchaetzungenAbgegeben();
   });
 
-
-
-  socket.on("adminVergibtPot", (gewinnerID) => {
-    const s = spieler[gewinnerID];
-    if (s) {
-      s.chips += pot;
-      io.emit("updateSpieler", s);
-      io.emit("potAktualisiert", 0);
-      pot = 0;
+  socket.on("spielerAktion", ({ aktion, raiseBetrag }) => {
+    const s = spieler[socket.id];
+    if (!s) return;
+    if (s.chips <= 0 && s.aktion !== "All In") {
+      if (!s.imPot || s.imPot === 0) {
+        s.aktion = "Ausgeschieden";
+        io.emit("updateSpieler", s);
+        return;
+      }
     }
-  });
-
-socket.on('spielerAktion', ({ aktion, raiseBetrag }) => {
-  const s = spieler[socket.id];
-  if (!s) return;
-
-  if (s.chips <= 0 && s.aktion !== "All In") {
-    if (!s.imPot || s.imPot === 0) {
-      s.aktion = "Ausgeschieden";
-      io.emit("updateSpieler", s);
-      return;
+    if (aktion === "fold") s.aktion = "Fold";
+    if (aktion === "call") {
+      const toCall = aktuellerEinsatz - (s.imPot || 0);
+      const callBetrag = Math.min(toCall, s.chips);
+      s.imPot += callBetrag;
+      pot += callBetrag;
+      s.chips -= callBetrag;
+      s.aktion = (s.chips === 0) ? "All In" : "Call";
     }
-  }
-
-  if (aktion === "fold") {
-    s.aktion = "Fold";
-  }
-
-  if (aktion === "call") {
-    const toCall = aktuellerEinsatz - (s.imPot || 0);
-    const callBetrag = Math.min(toCall, s.chips);
-    s.imPot = (s.imPot || 0) + callBetrag;
-    pot += callBetrag;
-    s.chips -= callBetrag;
-
-    s.aktion = (s.chips === 0) ? "All In" : "Call";
-  }
-
-  if (aktion === "raise") {
-    const raiseGesamt = parseInt(raiseBetrag);
-    if (raiseGesamt >= s.chips) {
-      aktuellerEinsatz = s.chips;
+    if (aktion === "raise") {
+      const raiseGesamt = parseInt(raiseBetrag);
+      if (raiseGesamt >= s.chips) {
+        aktuellerEinsatz = s.chips;
+        pot += s.chips;
+        s.imPot += s.chips;
+        s.aktion = "All In";
+        s.chips = 0;
+      } else {
+        aktuellerEinsatz = raiseGesamt;
+        s.chips -= raiseGesamt;
+        s.imPot += raiseGesamt;
+        pot += raiseGesamt;
+        s.aktion = "Raise";
+      }
+    }
+    if (aktion === "allin") {
       pot += s.chips;
-      s.imPot = (s.imPot || 0) + s.chips;
+      s.imPot += s.chips;
       s.aktion = "All In";
       s.chips = 0;
-    } else {
-      aktuellerEinsatz = raiseGesamt;
-      s.chips -= raiseGesamt;
-      s.imPot = (s.imPot || 0) + raiseGesamt;
-      pot += raiseGesamt;
-      s.aktion = "Raise";
     }
-  }
 
-  if (aktion === "allin") {
-    pot += s.chips;
-    s.aktion = "All In";
-    s.imPot = (s.imPot || 0) + s.chips;
-    s.chips = 0;
-  }
+    io.emit("spielerAktion", {
+      name: s.name,
+      action: s.aktion === "Raise" ? `Raise ${raiseBetrag}` : s.aktion,
+      bet: s.imPot || 0
+    });
 
-  // ✅ NEU: Aktion an alle Spieler senden
-  io.emit("spielerAktion", {
-    name: s.name,
-    action: s.aktion === "Raise" ? `Raise ${raiseBetrag}` : s.aktion,
-    bet: s.imPot || 0
+    io.emit("updateSpieler", s);
+    io.emit("updateAlleSpieler", Object.values(spieler));
+    io.emit("potAktualisiert", pot);
+
+    aktuellerSpielerIndex++;
+    if (aktuellerSpielerIndex < spielReihenfolge.length) {
+      const nextID = spielReihenfolge[aktuellerSpielerIndex];
+      io.to(nextID).emit("aktionErlaubt", { aktuellerEinsatz, pot });
+    }
   });
 
-  io.emit("updateAlleSpieler", Object.values(spieler)); // ✅ damit neue Chips/Pots auch übertragen werden
-
-
-  io.emit("updateSpieler", s);
-  io.emit("potAktualisiert", pot);
-
-  aktuellerSpielerIndex++;
-  if (aktuellerSpielerIndex < spielReihenfolge.length) {
-    const nextID = spielReihenfolge[aktuellerSpielerIndex];
-    io.to(nextID).emit("aktionErlaubt", { aktuellerEinsatz, pot });
-  } else {
-    console.log("✅ Alle Spieler haben gesetzt.");
-  }
-});
-
-
-  socket.on('frageStart', (frage) => {
-    io.emit('frageStart', frage);
-
+  socket.on("frageStart", (frage) => {
+    io.emit("frageStart", frage);
     Object.values(spieler).forEach(s => {
-  s.aktion = "";
-  s.antwort = "";
-  s.imPot = 0;
-  io.emit("updateSpieler", s);
-});
-
- 
-
+      s.aktion = "";
+      s.antwort = "";
+      s.imPot = 0;
+      io.emit("updateSpieler", s);
+    });
     spielReihenfolge = [];
     aktuellerSpielerIndex = -1;
   });
 
- socket.on('setAllChips', (betrag) => {
+  socket.on("setAllChips", (betrag) => {
     Object.values(spieler).forEach(s => {
       s.chips = betrag;
       s.imPot = 0;
     });
-
-    Object.values(spieler).forEach(s => {
-      io.emit("updateSpieler", s);
-    });
+    io.emit("updateAlleSpieler", Object.values(spieler));
   });
 
-  socket.on('setEinsatz', (betrag) => {
+  socket.on("setEinsatz", (betrag) => {
     aktuellerEinsatz = betrag;
     io.emit("einsatzAktualisiert", aktuellerEinsatz);
   });
 
   socket.on("setBlinds", ({ small, big }) => {
-  smallBlind = small;
-  bigBlind = big;
-
-  const aktiveSpieler = Object.values(spieler).filter(s => s.chips > 0);
-  if (aktiveSpieler.length < 2) return;
-
-  // Reset blinds vorher
-  aktiveSpieler.forEach(s => s.blind = null);
-
-  const smallSpieler = aktiveSpieler[blindIndex % aktiveSpieler.length];
-  const bigSpieler = aktiveSpieler[(blindIndex + 1) % aktiveSpieler.length];
-
-  smallSpieler.chips -= smallBlind;
-  bigSpieler.chips -= bigBlind;
-
-  smallSpieler.imPot = smallBlind;
-  bigSpieler.imPot = bigBlind;
-
-  smallSpieler.blind = 'small';
-  bigSpieler.blind = 'big';
-
-  aktuellerEinsatz = bigBlind;
-  pot = smallBlind + bigBlind;
-
-  // 👉 Broadcast an alle Clients
-  io.emit("updateSpieler", smallSpieler);
-  io.emit("updateSpieler", bigSpieler);
-
-  // 👉 Markierung für Spieler-HTML
-  io.emit("blindsMarkieren", {
-    small: smallSpieler.name,
-    big: bigSpieler.name
+    smallBlind = small;
+    bigBlind = big;
   });
 
-  blindIndex++; // für nächste Runde vorbereiten
-});
+  socket.on("starteSetzrunde1", () => starteSetzrunde());
+  socket.on("starteSetzrunde2", () => starteSetzrunde());
+  socket.on("starteSetzrunde3", () => starteSetzrunde());
 
-
-  socket.on('potAuszahlen', (gewinnerListe) => {
+  socket.on("potAuszahlen", (gewinnerListe) => {
     verteilePot(gewinnerListe);
   });
 
-  
   socket.on("gewinnerAnimation", () => {
     const nochDrin = Object.values(spieler).filter(s => s.chips > 0);
     if (nochDrin.length === 1) {
@@ -446,65 +336,12 @@ socket.on('spielerAktion', ({ aktion, raiseBetrag }) => {
     }
   });
 
-  socket.on('disconnect', () => {
+  socket.on("disconnect", () => {
     delete spieler[socket.id];
-    io.emit('updateSpieler', { id: socket.id, disconnect: true });
-    io.emit('updateAlleSpieler', Object.values(spieler));
-
+    io.emit("updateSpieler", { id: socket.id, disconnect: true });
+    io.emit("updateAlleSpieler", Object.values(spieler));
   });
-
-function verteilePot(gewinnerNamen) {
-  if (gewinnerNamen.length === 0) return;
-
-  const anteil = Math.floor(pot / gewinnerNamen.length);
-  const rest = pot % gewinnerNamen.length;
-
-  gewinnerNamen.forEach((name, index) => {
-    const spielerObj = Object.values(spieler).find(s => s.name === name);
-    if (spielerObj) {
-      spielerObj.chips += anteil + (index < rest ? 1 : 0);
-      io.emit("updateSpieler", spielerObj);
-    }
-  });
-
-  pot = 0;
-  io.emit("potAktualisiert", pot);
-  io.emit("updateAlleSpieler", Object.values(spieler)); // ✅ Chips-Update für alle
-
-}
-
-function sendeNaechsteFrage() {
-  if (globalQuestionIndex >= fragen.length) {
-    io.emit("frageStart", { frage: "🎉 Keine Fragen mehr!" });
-    return;
-  }
-
-  const frage = fragen[globalQuestionIndex];
-  io.emit("frageStart", {
-    frage: frage.frage,
-    nummer: globalQuestionIndex + 1,
-    gesamt: fragen.length
-  });
-
-  globalQuestionIndex++;
-
-  // 👉 Neue Blinds setzen + Startspieler definieren
-  setzeBlindsUndStart(); // ✅ DAS IST DER KERN
-
-  // 👉 Spielerwerte zurücksetzen
-  Object.values(spieler).forEach(s => {
-    s.antwort = "";
-    s.aktion = "";
-    s.imPot = 0;
-    io.emit("updateSpieler", s); // Einzelnes Update
-  });
-
-  // 👉 ALLE Spielerinfos senden (z. B. Chips & Potanzeige aktualisieren)
-  io.emit("updateAlleSpieler", Object.values(spieler)); // ✅ HIER GENAU!
-}
-
-
-
+});
 
 server.listen(3000, () => {
   console.log('✅ Server läuft auf http://localhost:3000');
