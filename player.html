@@ -362,6 +362,16 @@
       aktualisiereSpielerPositionen();
     });
 
+    socket.on("spielerAktion", ({ name: spielerName, action, bet }) => {
+  if (spielerStatus.has(spielerName)) {
+    const info = spielerStatus.get(spielerName);
+    info.aktion = action;
+    info.imPot = bet;
+    aktualisiereSpielerPositionen();
+  }
+});
+
+
     // Gewinner-Animation starten
     socket.on("starteGewinnerAnimation", () => {
       const anim = document.getElementById("gewinner-animation");
