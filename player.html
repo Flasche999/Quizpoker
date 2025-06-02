@@ -338,12 +338,35 @@ spielerStatus.set(data.name, {
       document.getElementById("ergebnis").textContent = "✅ Richtige Antwort: " + antwort;
     });
 
-    socket.on("updateSpieler", (data) => {
-      if (data.name === name) {
-        chips = data.chips;
-        aktualisiereChipAnzeige();
-      }
+socket.on("updateSpieler", (data) => {
+  // Speichere den Status
+  if (spielerStatus.has(data.name)) {
+    const info = spielerStatus.get(data.name);
+    info.chips = data.chips;
+    info.aktion = data.aktion;
+    info.imPot = data.imPot;
+    info.blind = data.blind;
+  } else {
+    // Neuen Spieler hinzufügen, falls nicht vorhanden
+    spielerStatus.set(data.name, {
+      chips: data.chips,
+      aktion: data.aktion,
+      imPot: data.imPot,
+      blind: data.blind,
+      avatar: data.avatar
     });
+  }
+
+  // Wenn du selbst bist, speichere auch lokal deine Chips
+  if (data.name === name) {
+    chips = data.chips;
+    aktualisiereChipAnzeige();
+  }
+
+  // Spieler-Positionen neu rendern (zeigt Chips usw.)
+  aktualisiereSpielerPositionen();
+});
+
 
     socket.on("einsatzAktualisiert", (betrag) => {
       document.getElementById("einsatz-anzahl").textContent = betrag;
