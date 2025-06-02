@@ -402,23 +402,27 @@ socket.on("updateSpieler", (data) => {
     });
 
 socket.on("aktionErlaubt", ({ aktuellerEinsatz }) => {
+  if (!hatGeschaetzt) {
+    console.log("⛔ Aktion nicht erlaubt – Spieler hat noch nicht geschätzt");
+    return; // Blockieren, falls keine Schätzung
+  }
+
   const aktionen = document.getElementById("aktionen");
   const raiseInput = document.getElementById("raise-betrag");
 
   if (aktionen) {
-    // Zeige Aktionsbereich
     aktionen.style.display = "block";
 
-    // Lege Raise-Wert sinnvoll fest
     if (raiseInput) raiseInput.value = aktuellerEinsatz + 20;
 
-    // ✨ Kurzes optisches Feedback (aufblinken)
+    // ✨ Optionales optisches Feedback
     aktionen.style.animation = "blinken 0.8s ease";
     setTimeout(() => {
-      aktionen.style.animation = ""; // Reset nach Effekt
+      aktionen.style.animation = "";
     }, 800);
   }
 });
+
 
 
     socket.on("zeigeSchaetzAntwortVerdeckt", ({ name }) => {
