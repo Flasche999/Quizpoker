@@ -438,15 +438,16 @@ function sendeNaechsteFrage() {
     return;
   }
 
-const frage = fragen[globalQuestionIndex];
-io.emit("frageStart", {
-  frage: frage.frage,
-  nummer: globalQuestionIndex + 1,
-  gesamt: fragen.length
-});
+  const frage = fragen[globalQuestionIndex];
+  io.emit("frageStart", {
+    frage: frage.frage,
+    nummer: globalQuestionIndex + 1,
+    gesamt: fragen.length
+  });
 
-globalQuestionIndex++;
+  globalQuestionIndex++;
 
+  setzeBlindsUndStart(); // 👈 DAS IST DIE ENTSCHEIDENDE ZEILE
 
   Object.values(spieler).forEach(s => {
     s.antwort = "";
@@ -455,6 +456,7 @@ globalQuestionIndex++;
     io.emit("updateSpieler", s);
   });
 }
+
 
 
 server.listen(3000, () => {
