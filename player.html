@@ -277,10 +277,13 @@
 
         div.className = `spieler-box ${blindClass}`;
         div.innerHTML = `
-          <strong>${spielerName}</strong><br/>
-          <img src="${info.avatar || 'avatars/m1.png'}" width="48" /><br/>
-          🪙 ${info.chips}
-        `;
+  <strong>${spielerName}</strong><br/>
+  <img src="${info.avatar || 'avatars/m1.png'}" width="48" /><br/>
+  🪙 ${info.chips}<br/>
+  <div class="aktion">🗨️ ${info.aktion || '–'}</div>
+  <div class="pot">💰 Im Pot: ${info.imPot || 0}</div>
+`;
+
 
         if (index === 0 || index === 4) links.appendChild(div);
         else if (index === 1 || index === 5) oben.appendChild(div);
