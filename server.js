@@ -124,6 +124,10 @@ function starteSetzrunde() {
 io.on('connection', (socket) => {
   console.log('🔌 Spieler verbunden:', socket.id);
 
+  // Sende aktuelle Spielerliste nur an diesen neuen Client
+  socket.emit("updateAlleSpieler", Object.values(spieler));
+
+
   socket.on('playerData', (data) => {
     if (!spieler[socket.id]) {
       spieler[socket.id] = { id: socket.id, imPot: 0 };
