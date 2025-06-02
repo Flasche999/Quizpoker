@@ -217,7 +217,17 @@ io.emit("aufloesung", antwort);
 });
 
 socket.on("playerData", (data) => {
-  if (!data || typeof data.name !== 'string' || !data.name.trim() || !data.avatar) return;
+  if (
+    !data ||
+    typeof data.name !== "string" ||
+    data.name.trim() === "" ||
+    typeof data.avatar !== "string" ||
+    data.avatar.trim() === ""
+  ) {
+    console.warn("⛔ Ungültiger Spieler abgewiesen:", data);
+    return;
+  }
+
 
 
   spieler[socket.id] = {
