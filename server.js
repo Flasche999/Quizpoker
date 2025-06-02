@@ -142,6 +142,47 @@ io.on('connection', (socket) => {
     sendeNaechsteFrage();
   });
 
+  socket.on("zeigeHinweis", (num) => {
+  const aktuelleFrage = fragen[globalQuestionIndex - 1]; // aktuelle Frage holen
+  if (!aktuelleFrage) return;
+
+  const text = num === 1 ? aktuelleFrage.hinweis1 : aktuelleFrage.hinweis2;
+  io.emit("hinweis", { num, text });
+
+  setTimeout(() => {
+    starteSetzrunde();
+  }, 500);
+});
+
+socket.on("zeigeAufloesung", () => {
+  const aktuelleFrage = fragen[globalQuestionIndex - 1];
+  if (!aktuelleFrage) return;
+
+  const antwort = parseInt(aktuelleFrage.antwort);
+  io.emit("aufloesung", antwort);
+
+  const gültigeSpieler = Object.values(spieler).filter(s => typeof s.antwort === 'number');
+  if (gültigeSpieler.length > 0) {
+    let nächster = gültigeSpieler[0];
+    let diff = Math.abs(nächster.antwort - antwort);
+
+    gültigeSpieler.forEach(s => {
+      const abweichung = Math.abs(s.antwort - antwort);
+      if (abweichung < diff) {
+        nächster = s;
+        diff = abweichung;
+      }
+    });
+
+    io.emit("schaetzSieger", nächster.name);
+  }
+
+  setTimeout(() => {
+    starteSetzrunde();
+  }, 500);
+});
+
+
   // Danach: 
   socket.emit("updateAlleSpieler", Object.values(spieler));
 
@@ -289,42 +330,7 @@ socket.on('spielerAktion', ({ aktion, raiseBetrag }) => {
     setzeBlindsUndStart();
   });
 
-  socket.on('hinweis', ({ num, text }) => {
-    console.log(`📢 Hinweis ${num}: ${text}`);
-    io.emit('hinweis', { num, text });
-
-    setTimeout(() => {
-      starteSetzrunde();
-    }, 500);
-  });
-
-socket.on('aufloesung', (antwort) => {
-  const loesung = parseInt(antwort);
-  io.emit('aufloesung', antwort);
-
-  const gültigeSpieler = Object.values(spieler).filter(s => typeof s.antwort === 'number');
-  if (gültigeSpieler.length > 0) {
-    let nächster = gültigeSpieler[0];
-    let diff = Math.abs(nächster.antwort - loesung);
-
-    gültigeSpieler.forEach(s => {
-      const abweichung = Math.abs(s.antwort - loesung);
-      if (abweichung < diff) {
-        nächster = s;
-        diff = abweichung;
-      }
-    });
-
-    io.emit("schaetzSieger", nächster.name);
-  }
-
-  setTimeout(() => {
-    starteSetzrunde();
-  }, 500);
-});
-
-
-  socket.on('setAllChips', (betrag) => {
+ socket.on('setAllChips', (betrag) => {
     Object.values(spieler).forEach(s => {
       s.chips = betrag;
       s.imPot = 0;
