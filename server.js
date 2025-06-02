@@ -35,11 +35,18 @@ function setzeBlindsUndStart() {
   const spielerListe = Object.values(spieler).filter(s => s.chips > 0);
   if (spielerListe.length < 2) return;
 
-  spielerListe.forEach(s => s.blind = null);
+  // Reset
+  spielerListe.forEach(s => {
+    s.blind = null;
+    s.antwort = "";
+    s.imPot = 0;
+    s.aktion = "";
+  });
 
   const small = spielerListe[blindIndex % spielerListe.length];
   const big = spielerListe[(blindIndex + 1) % spielerListe.length];
 
+  // Small Blind zahlen
   if (small.chips <= smallBlind) {
     pot += small.chips;
     small.imPot = (small.imPot || 0) + small.chips;
@@ -51,6 +58,7 @@ function setzeBlindsUndStart() {
     pot += smallBlind;
   }
 
+  // Big Blind zahlen
   if (big.chips <= bigBlind) {
     pot += big.chips;
     big.imPot = (big.imPot || 0) + big.chips;
@@ -68,6 +76,7 @@ function setzeBlindsUndStart() {
 
   aktuellerEinsatz = Math.max(small.imPot, big.imPot);
 
+  // Update Spieler-UI
   spielerListe.forEach(s => {
     io.emit("updateSpieler", s);
   });
@@ -78,8 +87,23 @@ function setzeBlindsUndStart() {
     big: big.name
   });
 
+  // 👉 Spielreihenfolge: Start beim Spieler nach dem Big Blind
+  const indexBB = spielerListe.findIndex(s => s.id === big.id);
+  const vorne = spielerListe.slice(indexBB + 1);
+  const hinten = spielerListe.slice(0, indexBB + 1);
+  const richtigeReihenfolge = vorne.concat(hinten).filter(s => s.chips > 0);
+
+  spielReihenfolge = richtigeReihenfolge.map(s => s.id);
+  aktuellerSpielerIndex = 0;
+
+  const erster = spielReihenfolge[0];
+  if (erster) {
+    io.to(erster).emit("aktionErlaubt", { aktuellerEinsatz, pot });
+  }
+
   blindIndex++;
 }
+
 
 function prüfeObAlleGesendetHaben() {
   const alleFertig = Object.values(spieler).length > 0 && Object.values(spieler).every(s => s.antwort !== "");
