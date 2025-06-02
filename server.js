@@ -32,7 +32,9 @@ let aktuellerSpielerIndex = -1;
 let letzterBigBlindId = null;
 
 function setzeBlindsUndStart() {
-  const spielerListe = Object.values(spieler).filter(s => s.chips > 0);
+  const spielerListe = Object.values(spieler)
+  .filter(s => s.chips > 0)
+  .sort((a, b) => a.name.localeCompare(b.name)); // feste Reihenfolge nach Namen
   if (spielerListe.length < 2) return;
 
   // Reset
@@ -77,9 +79,11 @@ function setzeBlindsUndStart() {
   aktuellerEinsatz = Math.max(small.imPot, big.imPot);
 
   // Update Spieler-UI
-  spielerListe.forEach(s => {
-    io.emit("updateSpieler", s);
-  });
+spielerListe.forEach(s => {
+  io.emit("updateSpieler", s);
+});
+io.emit("updateAlleSpieler", spielerListe); // ✅ nur EINMAL nach der Schleife
+
 
   io.emit("potAktualisiert", pot);
   io.emit("blindsMarkieren", {
@@ -454,6 +458,8 @@ function verteilePot(gewinnerNamen) {
 
   pot = 0;
   io.emit("potAktualisiert", pot);
+  io.emit("updateAlleSpieler", Object.values(spieler)); // ✅ Chips-Update für alle
+
 }
 
 function sendeNaechsteFrage() {
@@ -473,12 +479,13 @@ function sendeNaechsteFrage() {
 
   setzeBlindsUndStart(); // 👈 DAS IST DIE ENTSCHEIDENDE ZEILE
 
-  Object.values(spieler).forEach(s => {
-    s.antwort = "";
-    s.imPot = 0;
-    s.aktion = "";
-    io.emit("updateSpieler", s);
-  });
+Object.values(spieler).forEach(s => {
+  s.antwort = "";
+  io.emit("updateSpieler", s);
+});
+io.emit("updateAlleSpieler", Object.values(spieler)); // ✅ EINMAL am Ende
+
+
 }
 
 
