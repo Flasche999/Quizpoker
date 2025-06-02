@@ -1,5 +1,85 @@
 [
   {
+  "frage": "Wie viele Monde hat der Planet Saturn (Stand: 2025)?",
+  "hinweis1": "Saturn hat mehr Monde als jeder andere Planet im Sonnensystem.",
+  "hinweis2": "Im März 2025 wurden 128 neue Monde entdeckt.",
+  "antwort": 274
+},
+
+  {
+  "frage": "Wie viele Jahre verbringt Elias durchschnittlicher in seinem Leben auf der Toilette?",
+  "hinweis1": "Mehr Zeit als man im Kino verbringt.",
+  "hinweis2": "Genug Zeit, um über 1.000 Bücher zu lesen – theoretisch.",
+  "antwort": 3
+},
+  {
+  "frage": "Wann wurde das erste Patent für perforiertes Toilettenpapier eingereicht?",
+  "hinweis1": "Es war im 19. Jahrhundert.",
+  "hinweis2": "Es geschah lange bevor es Smartphones gab – oder überhaupt Telefone in Haushalten.",
+  "antwort": 1891
+},
+
+  {
+  "frage": "Wie lange dauerte das längste dokumentierte Bad in einer Badewanne?",
+  "hinweis1": "Es war länger als ein normaler Urlaub.",
+  "hinweis2": "Über 300 Stunden lang!",
+  "antwort": 336
+},
+  {
+  "frage": "In welchem Jahr ereignete sich der letzte schwere Tornado in Deutschland (STAND 2025)?",
+  "hinweis1": "Er traf besonders die Städte Paderborn und Lippstadt.",
+  "hinweis2": "Das Ereignis führte zu über 40 Verletzten und großem Sachschaden.",
+  "antwort": 2022
+},
+
+  {
+  "frage": "Wann wurde Netflix gegründet(JAHR)?",
+  "hinweis1": "Es war kurz bevor Google gegründet wurde.",
+  "hinweis2": "Das Unternehmen begann ursprünglich als DVD-Versandservice.",
+  "antwort": 1997
+},
+  {
+  "frage": "Wie oft wurde Bocholt zur fahrradfreundlichsten Mittelstadt Deutschlands gekürt?",
+  "hinweis1": "Bocholt ist eine echte Fahrradhochburg im Münsterland.",
+  "hinweis2": "Die Stadt gewann den ADFC-Fahrradklima-Test mehrfach zwischen 2005 und 2018.",
+  "antwort": 6
+},
+
+  {
+  "frage": "Wie alt wurde die älteste bekannte Raucherin, Jeanne Calment, die das Rauchen aufgab?",
+  "hinweis1": "Sie starb 1997.",
+  "hinweis2": "Sie hörte mit 117 Jahren auf zu Rauchen.",
+  "antwort": 122
+},
+  {
+  "frage": "Wie viele Menschen sind im Jahr 2024 in Deutschland aus der evangelischen und katholischen Kirche ausgetreten?",
+  "hinweis1": "Die Zahl liegt deutlich unter einer Million.",
+  "hinweis2": "Es waren mehr als 650.000 – ein Rückgang im Vergleich zu 2023.",
+  "antwort": 666600
+},
+
+  {
+  "frage": "Wie viel Euro kostet das teuerste Spiel auf Steam (Stand: 2025)?",
+  "hinweis1": "Es handelt sich um ein VR-Spiel namens 'Ascent Free-Roaming VR Experience'.",
+  "hinweis2": "Der Preis liegt knapp unter 1.000 Euro.",
+  "antwort": 999
+},
+
+  {
+  "frage": "Wie viele Minuten Verspätung haben Züge der Deutschen Bahn im Durchschnitt pro Fahrt (Stand 2023)?",
+  "hinweis1": "Es sind im Schnitt weniger als eine Viertelstunde.",
+  "hinweis2": "Die Zahl liegt knapp unter 13 Minuten.",
+  "antwort": 12
+},
+
+  {
+  "frage": "Auf welchem Platz befindet sich die deutsche Fußballnationalmannschaft (Stand: April 2025)?",
+  "hinweis1": "Deutschland liegt aktuell knapp hinter Italien.",
+  "hinweis2": "Die Mannschaft befindet sich noch in den Top 10.",
+  "antwort": 10
+},
+
+  {
   "frage": "Wie viele Zeitzonen hat Frankreich (inklusive Überseegebiete)?",
   "hinweis1": "Frankreich besitzt zahlreiche Überseegebiete weltweit.",
   "hinweis2": "Es sind deutlich mehr als in den meisten europäischen Ländern.",
