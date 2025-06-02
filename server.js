@@ -216,17 +216,7 @@ io.emit("aufloesung", antwort);
   }, 500);
 });
 
-
-  // Danach: 
-  socket.emit("updateAlleSpieler", Object.values(spieler));
-
-  
-
-  // Sende aktuelle Spielerliste nur an diesen neuen Client
-  socket.emit("updateAlleSpieler", Object.values(spieler));
-
-
-  socket.on('playerData', (data) => {
+ socket.on('playerData', (data) => {
     if (!spieler[socket.id]) {
       spieler[socket.id] = { id: socket.id, imPot: 0 };
     }
