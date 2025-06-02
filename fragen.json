@@ -45,308 +45,272 @@
     "frage": "Wie viele Sprachen gibt es weltweit ungefähr?",
     "hinweis1": "Sehr viele, auch seltene Dialekte eingeschlossen.",
     "hinweis2": "Die Zahl liegt über 5000.",
-    "loesung": "7100"
+    "antwort": 7100
   },
   {
     "frage": "Wie viele Inseln hat Griechenland ungefähr?",
     "hinweis1": "Nur ein Bruchteil davon ist bewohnt.",
     "hinweis2": "Die Zahl liegt über 1.000.",
-    "loesung": "3054"
+    "antwort": 3054
   },
   {
     "frage": "Wie viele Brücken gibt es ungefähr in Hamburg?",
     "hinweis1": "Mehr als in Venedig und Amsterdam zusammen.",
     "hinweis2": "Die Zahl liegt im hohen dreistelligen Bereich.",
-    "loesung": "2500"
+    "antwort": 2500
   },
   {
     "frage": "Wie viele Sterne braucht man in 'Super Mario Galaxy', um das Spiel zu 100 % zu beenden?",
     "hinweis1": "Es sind mehr als im N64-Vorgänger.",
     "hinweis2": "Zahl liegt unter 250.",
-    "loesung": "242"
+    "antwort": 242
   },
   {
     "frage": "Wie viele Spielstunden dauert es durchschnittlich, 'Red Dead Redemption 2' zu 100 % abzuschließen?",
     "hinweis1": "Mehr als ein normales Storyspiel.",
     "hinweis2": "Die Zahl liegt über 100.",
-    "loesung": "165"
+    "antwort": 165
   },
   {
     "frage": "Wie viele Pokémon lassen sich in 'Pokémon GO' (Stand 2024) fangen?",
     "hinweis1": "Nicht alle Generationen sind vollständig integriert.",
     "hinweis2": "Die Zahl liegt bei knapp über 800.",
-    "loesung": "820"
+    "antwort": 820
   },
   {
     "frage": "Wie viele Kilometer beträgt der Erdumfang am Äquator?",
     "hinweis1": "Eine Zahl über 30.000 km.",
     "hinweis2": "Etwa so weit, wie einmal um die ganze Welt.",
-    "loesung": "40075"
+    "antwort": 40075
   },
   {
     "frage": "Wie viele aktive Satelliten umkreisen derzeit die Erde (Stand 2024)?",
     "hinweis1": "Es werden jedes Jahr mehr.",
     "hinweis2": "Die Zahl liegt im mittleren vierstelligen Bereich.",
-    "loesung": "7500"
+    "antwort": 7500
   },
   {
     "frage": "Wie viele Tage dauert ein Merkur-Jahr?",
     "hinweis1": "Merkur ist der sonnennächste Planet.",
     "hinweis2": "Ein Jahr dort dauert weniger als 100 Erdentage.",
-    "loesung": "88"
+    "antwort": 88
   },
   {
     "frage": "Wie viele Kalorien enthält 1 Kilogramm reines Fett?",
     "hinweis1": "Ein hoher Wert.",
     "hinweis2": "Mehr als 8000 Kilokalorien.",
-    "loesung": "9000"
+    "antwort": 9000
   },
   {
     "frage": "Wie viele Meter ist der längste jemals gemessene Blauwal?",
     "hinweis1": "Es ist das größte bekannte Tier der Erde.",
     "hinweis2": "Die Länge übertrifft 25 Meter.",
-    "loesung": "33"
+    "antwort": 33
   },
   {
     "frage": "Wie viele Blöcke kann man maximal in Minecraft mit einem Diamantspitzhacke abbauen (ohne Verzauberungen)?",
     "hinweis1": "Länger haltbar als Holz oder Stein.",
     "hinweis2": "Die Haltbarkeit liegt knapp unter 1600.",
-    "loesung": "1561"
+    "antwort": 1561
   },
   {
     "frage": "Wie viele Kilometer ist die Strecke Berlin–München per Auto?",
     "hinweis1": "Mehr als 500 km.",
     "hinweis2": "Weniger als 700 km.",
-    "loesung": "585"
+    "antwort": 585
   },
    {
     "frage": "Wie viele Waffenarten gab es in der ersten Version von Fortnite Battle Royale?",
     "hinweis1": "Bevor viele neue hinzugefügt wurden.",
     "hinweis2": "Die Zahl war zweistellig.",
-    "loesung": "11"
+    "antwort": 11
   },
   {
     "frage": "Wie viele Tage dauerte die längste dokumentierte Schachpartie?",
     "hinweis1": "Sie ging über viele Stunden pro Tag.",
     "hinweis2": "Die Anzahl liegt knapp unter 3 Tagen.",
-    "loesung": "20"
+    "antwort": 20
   },
   {
     "frage": "Wie viele Sterne kann man in Super Mario 64 sammeln?",
     "hinweis1": "Klassiker mit vielen Levels.",
     "hinweis2": "Zahl ist ein Vielfaches von 10.",
-    "loesung": "120"
+    "antwort": 120
   },
   {
     "frage": "Wie viele Meter tief ist der Marianengraben an seiner tiefsten Stelle?",
     "hinweis1": "Der tiefste bekannte Punkt der Erde.",
     "hinweis2": "Die Tiefe liegt knapp unter 11.000 Metern.",
-    "loesung": "10984"
+    "antwort": 10984
   },
   {
     "frage": "Wie viele Hauptbosse gibt es in 'Elden Ring'?",
     "hinweis1": "Nicht alle muss man besiegen.",
     "hinweis2": "Zahl liegt über 80.",
-    "loesung": "83"
+    "antwort": 83
   },
   {
     "frage": "Wie viele Wörter enthält der Roman 'Krieg und Frieden'?",
     "hinweis1": "Ein sehr umfangreiches Werk.",
     "hinweis2": "Mehr als 500.000 Wörter.",
-    "loesung": "587287"
+    "antwort": 587287
   },
   {
     "frage": "Wie viele Missionen hat GTA V im Story-Modus?",
     "hinweis1": "Dreistellige Gesamtspielzeit für viele Spieler.",
     "hinweis2": "Mehr als 60, aber unter 80.",
-    "loesung": "69"
+    "antwort": 69
   },
   {
     "frage": "Wie viele Herzen kann Link in 'Breath of the Wild' maximal erreichen?",
     "hinweis1": "Erfordert viele Schreine oder Orbs.",
     "hinweis2": "Mehr als 25.",
-    "loesung": "30"
+    "antwort": 30
   },
   {
     "frage": "Wie viele Spieler können in 'Among Us' (mit Update) maximal teilnehmen?",
     "hinweis1": "War früher einstellig.",
     "hinweis2": "Seit Update ist es zweistellig.",
-    "loesung": "15"
+    "antwort": 15
   },
   {
     "frage": "Wie viele Kämpfer gibt es in 'Super Smash Bros. Ultimate' inklusive DLC?",
     "hinweis1": "Enthält viele Nintendo- und Gastcharaktere.",
     "hinweis2": "Die Zahl liegt zwischen 80 und 100.",
-    "loesung": "89"
+    "antwort": 89
   },
   {
     "frage": "Wie viele Level gibt es in 'Candy Crush Saga' (offiziell, Stand 2024)?",
     "hinweis1": "Es kommen wöchentlich neue hinzu.",
     "hinweis2": "Die Zahl liegt im fünfstelligen Bereich.",
-    "loesung": "14000"
+    "antwort": 14000
   },
   {
     "frage": "Wie viele Kalorien sind in einem Liter Cola enthalten (ca.)?",
     "hinweis1": "Weniger als 500, aber deutlich mehr als Wasser.",
     "hinweis2": "Schaut man oft auf der Flasche nach.",
-    "loesung": "430"
+    "antwort": 430
   },
   {
     "frage": "Wie viele Schritte werden für 10 km im Durchschnitt benötigt?",
     "hinweis1": "Ein Schrittzähler kann das schätzen.",
     "hinweis2": "Die Zahl liegt über 10.000.",
-    "loesung": "12500"
+    "antwort": 12500
   },
   {
     "frage": "Wie viele Seiten hat die Originalausgabe der deutschen Bibel von Luther?",
     "hinweis1": "Ein umfangreiches Werk.",
     "hinweis2": "Die Zahl liegt über 1000.",
-    "loesung": "1536"
+    "antwort": 1536
   },
   {
     "frage": "Wie viele Runden dauert ein Formel-1-Rennen auf dem Nürburgring (GP-Strecke)?",
     "hinweis1": "Weniger als 80 Runden.",
     "hinweis2": "Es sind deutlich mehr als 30.",
-    "loesung": "60"
+    "antwort": 60
   },
   {
     "frage": "Wie viele Tonnen wiegt die Titanic beim Auslaufen?",
     "hinweis1": "Ein echtes Schwergewicht der damaligen Zeit.",
     "hinweis2": "Weniger als 60000 Tonnen.",
-    "loesung": "52310"
+    "antwort": 52310
   },
   {
     "frage": "Wie viele Wörter spricht ein durchschnittlicher Mensch pro Tag?",
     "hinweis1": "Über 10000, aber unter 20000.",
     "hinweis2": "Zahl liegt im mittleren vierstelligen Bereich.",
-    "loesung": "16000"
+    "antwort": 16000
   },
   {
     "frage": "Wie viele Länderspiele hat Miroslav Klose für Deutschland gemacht?",
     "hinweis1": "Er ist Rekordtorschütze.",
     "hinweis2": "Die Zahl liegt zwischen 120 und 140.",
-    "loesung": "137"
+    "antwort": 137
   },
   {
     "frage": "Wie viele Treppenstufen hat das Empire State Building (bis zur Spitze)?",
     "hinweis1": "Ein echter Kraftakt.",
     "hinweis2": "Die Zahl liegt bei über 1500.",
-    "loesung": "1860"
+    "antwort": 1860
   },
   {
     "frage": "Wie viele Liter Bier werden in Deutschland pro Kopf jährlich getrunken (Stand ca. 2023)?",
     "hinweis1": "Deutschland gehört weltweit zu den Spitzenreitern.",
     "hinweis2": "Weniger als 120 Liter.",
-    "loesung": "92"
+    "antwort": 92
   },
-  {
-    "frage": "Wie viele Weihnachtsbäume werden in Deutschland pro Jahr verkauft?",
-    "hinweis1": "Es sind Millionen – jedes Jahr.",
-    "hinweis2": "Die Zahl liegt unter 35 Millionen.",
-    "loesung": "28"
-  },
-  {
-    "frage": "Wie viele Menschen leben weltweit (Stand 2024)?",
-    "hinweis1": "Mehr als 7 Milliarden.",
-    "hinweis2": "Die Zahl liegt knapp über 8 Milliarden.",
-    "loesung": "8100000000"
-  },
+
+
   {
     "frage": "Wie viele Bundeskanzler hatte Deutschland seit 1949?",
     "hinweis1": "Die Zahl ist einstellig, aber nahe an 10.",
     "hinweis2": "Angela Merkel war die erste Frau unter ihnen.",
-    "loesung": "9"
+    "antwort": 9
   },
   {
     "frage": "Wie viele Knochen hat ein menschliches Baby bei der Geburt?",
     "hinweis1": "Mehr als ein Erwachsener, da vieles noch nicht zusammengewachsen ist.",
     "hinweis2": "Die Zahl liegt über 300.",
-    "loesung": "306"
+    "antwort": 306
   },
   {
     "frage": "Wie viele Meter ist der Kölner Dom hoch?",
     "hinweis1": "Ein Wahrzeichen mit zwei Türmen.",
     "hinweis2": "Die Zahl liegt unter 160 Metern.",
-    "loesung": "157"
+    "antwort": 157
   },
   {
     "frage": "Wie viele Zähne hat ein erwachsener Mensch normalerweise?",
     "hinweis1": "Weisheitszähne eingerechnet.",
     "hinweis2": "Die Zahl ist unter 40.",
-    "loesung": "32"
+    "antwort": 32
   },
   {
     "frage": "Wie viele Kalorien verbrennt man bei 1 Stunde Joggen (Durchschnitt)?",
     "hinweis1": "Kommt auf Tempo und Gewicht an, aber es ist dreistellig.",
     "hinweis2": "Mehr als 400, weniger als 1000.",
-    "loesung": "600"
+    "antwort": 600
   },
 
   {
     "frage": "Wie viele Meter ist ein olympisches Schwimmbecken lang?",
     "hinweis1": "Die Zahl ist rund und zweistellig.",
     "hinweis2": "Wird oft in Bahnen gezählt.",
-    "loesung": "50"
+    "antwort": 50
   },
   {
     "frage": "Wie viele Tage hat ein Schaltjahr?",
     "hinweis1": "Es kommt alle 4 Jahre vor.",
     "hinweis2": "Ein Tag mehr als sonst.",
-    "loesung": "366"
+    "antwort": 366
   },
-  {
-    "frage": "Wie viele Farben enthält ein Regenbogen typischerweise?",
-    "hinweis1": "Die Farben des sichtbaren Spektrums.",
-    "hinweis2": "Eine magische Zahl.",
-    "loesung": "7"
-  },
+
   {
     "frage": "Wie viele Minuten dauert eine Fußball-Halbzeit (regulär)?",
     "hinweis1": "Vor der Nachspielzeit.",
     "hinweis2": "Wird in zwei Hälften gespielt.",
-    "loesung": "45"
+    "antwort": 45
   },
-  {
-    "frage": "Wie viele Zentimeter sind ein Zoll (inch ohne komma)?",
-    "hinweis1": "Wird oft bei Monitorgrößen verwendet.",
-    "hinweis2": "Weniger als 3 cm.",
-    "loesung": "2,54"
-  },
+
   {
     "frage": "Wie viele Sterne zeigt die Flagge der Europäischen Union?",
     "hinweis1": "Die Zahl bleibt konstant, auch wenn Länder austreten oder dazukommen.",
     "hinweis2": "Zwölf als Symbol für Vollkommenheit.",
-    "loesung": "12"
+    "antwort": 12
   },
   {
     "frage": "Wie viele Spieler stehen bei einem Volleyballteam gleichzeitig auf dem Feld?",
     "hinweis1": "Nur eine Hälfte des Teams.",
     "hinweis2": "Weniger als beim Fußball.",
-    "loesung": "6"
+    "antwort": 6
   },
-  {
-    "frage": "Wie viele Beine hat ein Insekt?",
-    "hinweis1": "Käfer, Fliegen und Co.",
-    "hinweis2": "Mehr als vier, weniger als acht.",
-    "loesung": "6"
-  },
+
   {
     "frage": "Wie viele Monate haben genau 30 Tage?",
     "hinweis1": "Knapp die Hälfte des Jahres nicht.",
     "hinweis2": "Es sind vier.",
-    "loesung": "4"
-  },
-  {
-    "frage": "Wie viele Karten enthält ein vollständiges Skatspiel?",
-    "hinweis1": "Es ist weniger als ein Pokerdeck.",
-    "hinweis2": "Genau 32 Karten.",
-    "loesung": "32"
-  },
-  {
-    "frage": "Wie viele Sekunden sind eine Stunde?",
-    "hinweis1": "Multipliziere Minuten mit Sekunden.",
-    "hinweis2": "Die Zahl ist vierstellig.",
-    "loesung": "3600"
+    "antwort": 4
   }
+  
  ]
 
