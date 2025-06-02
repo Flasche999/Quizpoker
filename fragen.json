@@ -1,5 +1,11 @@
 [
   {
+  "frage": "Wie viele Zeitzonen hat Frankreich (inklusive Überseegebiete)?",
+  "hinweis1": "Frankreich besitzt zahlreiche Überseegebiete weltweit.",
+  "hinweis2": "Es sind deutlich mehr als in den meisten europäischen Ländern.",
+  "antwort": 12
+},
+  {
     "frage": "Wie viele Menschen leben in Tokio (Metropolregion, ca. Stand 2023)?",
     "hinweis1": "Eine der größten Metropolregionen der Welt.",
     "hinweis2": "Die Zahl liegt über 30 Millionen.",
