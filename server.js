@@ -5,6 +5,19 @@ const { Server } = require('socket.io');
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
+const fs = require('fs');
+const path = require('path');
+
+let fragen = [];
+let globalQuestionIndex = 0;
+
+try {
+  fragen = JSON.parse(fs.readFileSync(path.join(__dirname, 'fragen.json')));
+  console.log(`✅ ${fragen.length} Fragen geladen.`);
+} catch (err) {
+  console.error("❌ Fehler beim Laden der Fragen:", err);
+}
+
 
 app.use(express.static(__dirname));
 
@@ -124,6 +137,16 @@ function starteSetzrunde() {
 io.on('connection', (socket) => {
   console.log('🔌 Spieler verbunden:', socket.id);
 
+  // ✅ Hier direkt einfügen:
+  socket.on('naechsteFrage', () => {
+    sendeNaechsteFrage();
+  });
+
+  // Danach: 
+  socket.emit("updateAlleSpieler", Object.values(spieler));
+
+  
+
   // Sende aktuelle Spielerliste nur an diesen neuen Client
   socket.emit("updateAlleSpieler", Object.values(spieler));
 
@@ -133,7 +156,7 @@ io.on('connection', (socket) => {
       spieler[socket.id] = { id: socket.id, imPot: 0 };
     }
 
-    spieler[socket.id] = {
+   spieler[socket.id] = {
       ...spieler[socket.id],
       ...data
     };
@@ -359,6 +382,25 @@ function verteilePot(gewinnerNamen) {
   pot = 0;
   io.emit("potAktualisiert", pot);
 }
+
+function sendeNaechsteFrage() {
+  if (globalQuestionIndex >= fragen.length) {
+    io.emit("frageStart", { frage: "🎉 Keine Fragen mehr!" });
+    return;
+  }
+
+  const frage = fragen[globalQuestionIndex];
+  io.emit("frageStart", frage);
+  globalQuestionIndex++;
+
+  Object.values(spieler).forEach(s => {
+    s.antwort = "";
+    s.imPot = 0;
+    s.aktion = "";
+    io.emit("updateSpieler", s);
+  });
+}
+
 
 server.listen(3000, () => {
   console.log('✅ Server läuft auf http://localhost:3000');
