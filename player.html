@@ -271,19 +271,21 @@
 
       alleSpieler.forEach((spielerName, index) => {
         const info = spielerStatus.get(spielerName);
-        const div = document.createElement("div");
-        let blindClass = "";
-        if (spielerName === blinds.small) blindClass = "small-blind";
-        else if (spielerName === blinds.big) blindClass = "big-blind";
+const div = document.createElement("div");
+div.setAttribute("data-name", spielerName); // ⬅️ notwendig für Blinds
+let blindClass = "";
+if (spielerName === blinds.small) blindClass = "small-blind";
+else if (spielerName === blinds.big) blindClass = "big-blind";
 
-        div.className = `spieler-box ${blindClass}`;
-        div.innerHTML = `
+div.className = `spieler-box ${blindClass}`;
+div.innerHTML = `
   <strong>${spielerName}</strong><br/>
   <img src="${info.avatar || 'avatars/m1.png'}" width="48" /><br/>
   🪙 ${info.chips}<br/>
   <div class="aktion">🗨️ ${info.aktion || '–'}</div>
   <div class="pot">💰 Im Pot: ${info.imPot || 0}</div>
 `;
+
 
 
         if (index === 0 || index === 4) links.appendChild(div);
@@ -294,11 +296,13 @@
     }
 
     socket.on("playerData", (data) => {
-      spielerStatus.set(data.name, {
-        aktion: data.aktion,
-        chips: data.chips,
-        avatar: data.avatar
-      });
+spielerStatus.set(data.name, {
+  aktion: data.aktion,
+  chips: data.chips,
+  avatar: data.avatar,
+  blind: data.blind // ✅ Blind-Zuweisung mitnehmen, wenn vorhanden
+});
+
       aktualisiereSpielerPositionen();
     });
 
