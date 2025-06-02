@@ -242,15 +242,17 @@
       document.getElementById("aktionen").style.display = "none";
     }
 
-    function sendePlayerData() {
-      socket.emit("playerData", {
-        name: name,
-        antwort: aktuelleAntwort,
-        aktion: aktuelleAktion,
-        chips: chips,
-        avatar: character
-      });
-    }
+function sendePlayerData() {
+  if (!name || !character) return; // ⛔ Sicherheit
+  socket.emit("playerData", {
+    name: name,
+    antwort: aktuelleAntwort,
+    aktion: aktuelleAktion,
+    chips: chips,
+    avatar: character
+  });
+}
+
 
     function aktualisiereChipAnzeige() {
       document.getElementById("chip-anzahl").textContent = chips;
