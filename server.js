@@ -354,11 +354,44 @@ socket.on('spielerAktion', ({ aktion, raiseBetrag }) => {
     io.emit("einsatzAktualisiert", aktuellerEinsatz);
   });
 
-  socket.on('setBlinds', ({ small, big }) => {
-    smallBlind = small;
-    bigBlind = big;
-    console.log(`⚙️ Neue Blinds gesetzt: Small = ${small}, Big = ${big}`);
+  socket.on("setBlinds", ({ small, big }) => {
+  smallBlind = small;
+  bigBlind = big;
+
+  const aktiveSpieler = Object.values(spieler).filter(s => s.chips > 0);
+  if (aktiveSpieler.length < 2) return;
+
+  // Reset blinds vorher
+  aktiveSpieler.forEach(s => s.blind = null);
+
+  const smallSpieler = aktiveSpieler[blindIndex % aktiveSpieler.length];
+  const bigSpieler = aktiveSpieler[(blindIndex + 1) % aktiveSpieler.length];
+
+  smallSpieler.chips -= smallBlind;
+  bigSpieler.chips -= bigBlind;
+
+  smallSpieler.imPot = smallBlind;
+  bigSpieler.imPot = bigBlind;
+
+  smallSpieler.blind = 'small';
+  bigSpieler.blind = 'big';
+
+  aktuellerEinsatz = bigBlind;
+  pot = smallBlind + bigBlind;
+
+  // 👉 Broadcast an alle Clients
+  io.emit("updateSpieler", smallSpieler);
+  io.emit("updateSpieler", bigSpieler);
+
+  // 👉 Markierung für Spieler-HTML
+  io.emit("blindsMarkieren", {
+    small: smallSpieler.name,
+    big: bigSpieler.name
   });
+
+  blindIndex++; // für nächste Runde vorbereiten
+});
+
 
   socket.on('potAuszahlen', (gewinnerListe) => {
     verteilePot(gewinnerListe);
