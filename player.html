@@ -216,6 +216,8 @@
     let chips = 1000;
     let aktuelleAntwort = "";
     let aktuelleAktion = "";
+    let hatGeschaetzt = false;
+
 
     const spielerStatus = new Map();
     let blinds = { small: "", big: "" };
@@ -232,20 +234,30 @@
       sendePlayerData();
     }
 
-    function sendeAntwort() {
-      aktuelleAntwort = document.getElementById("antwort").value;
-      document.getElementById("antwort-bereich").style.display = "none";
-      socket.emit("schaetzAntwort", parseInt(aktuelleAntwort));
-    }
+function sendeAntwort() {
+  aktuelleAntwort = document.getElementById("antwort").value;
+  if (aktuelleAntwort.trim() === "") return;
+
+  hatGeschaetzt = true; // ✅ Spieler darf jetzt Aktionen durchführen
+  document.getElementById("antwort-bereich").style.display = "none";
+  socket.emit("schaetzAntwort", parseInt(aktuelleAntwort));
+}
+
 
     function spielerAktion(aktion) {
-      const raiseBetrag = document.getElementById("raise-betrag").value;
-      socket.emit("spielerAktion", {
-        aktion: aktion,
-        raiseBetrag: raiseBetrag
-      });
-      document.getElementById("aktionen").style.display = "none";
-    }
+  if (!hatGeschaetzt) {
+    alert("⛔ Du musst zuerst deine Schätzantwort abgeben!");
+    return;
+  }
+
+  const raiseBetrag = document.getElementById("raise-betrag").value;
+  socket.emit("spielerAktion", {
+    aktion: aktion,
+    raiseBetrag: raiseBetrag
+  });
+  document.getElementById("aktionen").style.display = "none";
+}
+
 
 function sendePlayerData() {
   if (!name || !character) {
@@ -318,7 +330,7 @@ spielerStatus.set(data.name, {
       aktualisiereSpielerPositionen();
     });
 
-   socket.on("frageStart", (frage) => {
+socket.on("frageStart", (frage) => {
   document.getElementById("frage").textContent = frage.frage;
   document.getElementById("antwort").value = "";
 
@@ -333,13 +345,14 @@ spielerStatus.set(data.name, {
   document.getElementById("ergebnis").textContent = "";
   aktuelleAntwort = "";
   aktuelleAktion = "";
+  hatGeschaetzt = false; // ✅ Spieler müssen erst wieder schätzen
 
   spielerStatus.forEach((info, spielerName) => {
     info.aktion = "";
   });
-  aktualisiereSpielerPositionen();
-});
 
+  aktualisiereSpielerPositionen();
+}); // ✅ Diese Klammer schließt das socket.on("frageStart", ...) komplett
 
     socket.on("hinweis", ({ num, text }) => {
       const hinweisDiv = document.getElementById("hinweis");
