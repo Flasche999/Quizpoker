@@ -143,7 +143,7 @@ io.on('connection', (socket) => {
 });
 
 
-    io.emit('updateAlleSpieler', spieler);
+    io.emit('updateAlleSpieler', Object.values(spieler));
     prüfeObAlleGesendetHaben();
   });
 
@@ -226,6 +226,9 @@ socket.on('spielerAktion', ({ aktion, raiseBetrag }) => {
     action: s.aktion === "Raise" ? `Raise ${raiseBetrag}` : s.aktion,
     bet: s.imPot || 0
   });
+
+  io.emit("updateAlleSpieler", Object.values(spieler)); // ✅ damit neue Chips/Pots auch übertragen werden
+
 
   io.emit("updateSpieler", s);
   io.emit("potAktualisiert", pot);
@@ -330,7 +333,8 @@ socket.on('spielerAktion', ({ aktion, raiseBetrag }) => {
   socket.on('disconnect', () => {
     delete spieler[socket.id];
     io.emit('updateSpieler', { id: socket.id, disconnect: true });
-    io.emit('updateAlleSpieler', spieler);
+    io.emit('updateAlleSpieler', Object.values(spieler));
+
   });
 });
 
