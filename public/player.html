@@ -50,7 +50,7 @@
         <button id="btnFold"  class="err">Passen (Fold)</button>
       </div>
 
-      <!-- Sofort-Schätzen ab Runde 1 -->
+      <!-- Schätzen ab Frage-Start -->
       <h3 class="h" style="margin-top:16px;">Schätzen (ab Frage-Start)</h3>
       <div class="row" style="margin-top:8px;">
         <input id="inpEstimate" type="number" placeholder="Dein Wert">
@@ -58,7 +58,7 @@
       </div>
       <div class="small muted">Hinweis: Du kannst deinen Schätzwert erneut senden; der letzte zählt.</div>
 
-      <!-- Private DM mit Admin -->
+      <!-- Privater DM mit Admin -->
       <h3 class="h" style="margin-top:16px;">Privater Chat mit Admin</h3>
       <div id="dmLog" class="chatlog"></div>
       <div class="row" style="margin-top:6px;">
@@ -66,7 +66,7 @@
         <button id="dmSend" class="primary">Senden</button>
       </div>
 
-      <!-- (Optional) alte Einweg-Nachricht -->
+      <!-- (optional) alte Einweg-Nachricht -->
       <div class="row" style="margin-top:8px;">
         <input id="inpAnswer" placeholder="Kurze Nachricht (optional)" style="flex:1;">
         <button id="btnSend">Senden</button>
@@ -89,7 +89,7 @@
         </div>
       </div>
 
-      <!-- NEU: Frage & Hinweise groß unter dem Tisch -->
+      <!-- Große Frage & Hinweise direkt unter dem Tisch -->
       <section id="qaPanel" class="item" style="margin-top:12px;">
         <h3 class="h">Frage & Hinweise</h3>
         <div class="list">
@@ -110,7 +110,13 @@
   <script>
     const socket = io({ path:'/socket.io', transports:['websocket','polling'] });
     const $ = (s)=>document.querySelector(s);
-    let UID = localStorage.getItem('qp_uid'); if(!UID){ UID=(crypto?.randomUUID?.()|| (Date.now()+Math.random().toString(16).slice(2))); localStorage.setItem('qp_uid',UID); }
+
+    // stabile UID pro Gerät
+    let UID = localStorage.getItem('qp_uid');
+    if(!UID){
+      UID = (crypto?.randomUUID?.() || (Date.now()+Math.random().toString(16).slice(2)));
+      localStorage.setItem('qp_uid', UID);
+    }
     $('#uidLbl').textContent = UID;
 
     const inpCode=$('#inpCode'), inpName=$('#inpName'), btnJoin=$('#btnJoin'), btnReset=$('#btnReset');
@@ -120,7 +126,10 @@
 
     // DM UI
     const dmLog = $('#dmLog'), dmInput = $('#dmInput'), dmSend = $('#dmSend');
-    const dmAppend = (html)=>{ const d=document.createElement('div'); d.className='chatrow'; d.innerHTML=html; dmLog.appendChild(d); dmLog.scrollTop = dmLog.scrollHeight; };
+    const dmAppend = (html)=>{
+      const d=document.createElement('div'); d.className='chatrow'; d.innerHTML=html;
+      dmLog.appendChild(d); dmLog.scrollTop = dmLog.scrollHeight;
+    };
     const escapeHtml = (s)=>String(s||'').replace(/[&<>"]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[m]));
 
     let myName = localStorage.getItem('qp_name')||''; if (myName) inpName.value=myName;
@@ -135,6 +144,7 @@
 
     [inpCode, inpName].forEach(el=>el.addEventListener('keydown', e=>{ if(e.key==='Enter') btnJoin.click(); }));
 
+    // Join/Reset
     btnJoin.onclick = ()=>{
       const code=currentInputCode(); const name=(inpName.value||'').trim()||'Spieler';
       if (joinedOnce) { $('#pStatus').textContent='Du bist bereits in der Lobby.'; return; }
@@ -149,13 +159,15 @@
       try{ socket.disconnect(); }catch{} socket.connect(); setTimeout(()=>$('#pStatus').textContent='', 1000);
     };
 
-    // (Legacy) einfache Nachricht
+    // (legacy) Einweg-Nachricht
     btnSend.onclick = ()=>{
       const a=inpAnswer.value.trim(); if(!a) return;
-      socket.emit('player:answer', { answer:a }); inpAnswer.value=''; $('#pStatus').textContent='Gesendet.'; setTimeout(()=>$('#pStatus').textContent='',800);
+      socket.emit('player:answer', { answer:a });
+      inpAnswer.value='';
+      $('#pStatus').textContent='Gesendet.'; setTimeout(()=>$('#pStatus').textContent='',800);
     };
 
-    // DM: Spieler → Admin
+    // Private DM: Spieler -> Admin
     const sendDM = ()=>{
       const msg = dmInput.value.trim(); if(!msg) return;
       socket.emit('player:dm', { message: msg });
@@ -165,13 +177,13 @@
     dmSend.onclick = sendDM;
     dmInput.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); sendDM(); }});
 
-    // Betting-Buttons (Turn wird serverseitig geprüft)
+    // Betting
     btnBet.onclick   = ()=>{ const amt=Math.max(1,parseInt(betAmount.value||'0',10)||0); socket.emit('player:bet',{ amount:amt }); };
     btnCall.onclick  = ()=> socket.emit('player:call');
     btnAllin.onclick = ()=> socket.emit('player:allin');
     btnFold.onclick  = ()=> socket.emit('player:fold');
 
-    // Estimate: ab Runde 1 erlaubt (Server validiert Frage/Runde)
+    // Estimate (ab Frage-Start; Server prüft)
     btnEstimate.onclick = ()=>{
       const v = inpEstimate.value;
       if (v==='' || v===null) socket.emit('player:estimate',{ value:null });
@@ -179,6 +191,7 @@
       $('#pStatus').textContent='Schätzwert gesendet.'; setTimeout(()=>$('#pStatus').textContent='',800);
     };
 
+    // Helfer
     function badge(p){
       const isSB = (p.seat === (current.blinds?.small ?? null));
       const isBB = (p.seat === (current.blinds?.big ?? null));
@@ -196,12 +209,16 @@
       arr.forEach(p=>{
         if (typeof p.seat!=='number') return;
         const slot=document.querySelector(`.seat[data-seat="${p.seat}"]`); if(!slot) return;
-        slot.innerHTML = `<div class="avatar">🙂</div><div class="name">${p.name} ${badge(p)}</div><div class="chips">🪙 ${p.chips??0}</div><div class="betline">Runde: 🪙 ${p.betRound||0} · Gesamt: 🪙 ${p.betTotal||0} ${p.status==='allin'?' · (All-in)':''}${p.status==='folded'?' · (Fold)':''}</div>`;
+        slot.innerHTML = `<div class="avatar">🙂</div>
+          <div class="name">${p.name} ${badge(p)}</div>
+          <div class="chips">🪙 ${p.chips??0}</div>
+          <div class="betline">Runde: 🪙 ${p.betRound||0} · Gesamt: 🪙 ${p.betTotal||0} ${p.status==='allin'?' · (All-in)':''}${p.status==='folded'?' · (Fold)':''}</div>`;
         if (!p.connected) slot.classList.add('disconnected');
         if (p.status==='folded') slot.classList.add('folded');
         if (p.uid===current.turnUid) slot.classList.add('turn');
       });
     }
+
     function renderList(){
       const list=$('#playerList'); list.innerHTML='';
       const arr=Array.from(playersByUid.values()).sort((a,b)=>(a.seat??99)-(b.seat??99));
@@ -212,12 +229,13 @@
         list.appendChild(div);
       });
     }
+
     function renderAll(st){
       $('#roomCode').textContent = st.code || '—';
       if (typeof st.pot==='number') $('#pot').textContent = st.pot;
       $('#currentBet').textContent = st.currentBetRound || 0;
 
-      // NEU: große Frage/Hinweise unter dem Tisch
+      // große Frage/Hinweise unter dem Tisch
       $('#qTextMain').textContent = st.question?.text || '–';
       $('#qH1Main').textContent   = st.question?.hint1 ?? 'verdeckt';
       $('#qH2Main').textContent   = st.question?.hint2 ?? 'verdeckt';
@@ -228,6 +246,7 @@
       const me = playersByUid.get(UID); if (me) $('#chips').textContent = me.chips ?? 0;
     }
 
+    // Sockets
     socket.on('connect', ()=>{
       $('#pStatus').textContent='Verbunden.'; setTimeout(()=>$('#pStatus').textContent='',800);
       if (myRoom && (currentInputCode()==='' || currentInputCode()===myRoom)) socket.emit('hello', { uid:UID, room:myRoom });
@@ -254,12 +273,14 @@
       current.currentBetRound = st.currentBetRound || 0;
       renderAll(st);
     });
+
     socket.on('players:update',(msg)=>{
       const ver=(msg.version??-1); if (ver<=lastVersion) return; lastVersion=ver;
       (msg.players||[]).forEach(p=>playersByUid.set(p.uid,p));
       renderSeats(); renderList();
       const me = playersByUid.get(UID); if (me) $('#chips').textContent = me.chips ?? 0;
     });
+
     socket.on('state:partial',(patch)=>{
       const ver=(patch.version??-1); if (ver<=lastVersion) return; lastVersion=ver;
       if (patch.blinds) current.blinds = patch.blinds;
@@ -268,17 +289,15 @@
       if ('currentBetRound' in patch) { current.currentBetRound = patch.currentBetRound; $('#currentBet').textContent = current.currentBetRound; }
       if (typeof patch.pot==='number') $('#pot').textContent = patch.pot;
       if (patch.question) {
-        // NEU: große Frage/Hinweise unter dem Tisch
         $('#qTextMain').textContent = patch.question?.text || '–';
         $('#qH1Main').textContent   = patch.question?.hint1 ?? 'verdeckt';
         $('#qH2Main').textContent   = patch.question?.hint2 ?? 'verdeckt';
         $('#qSolMain').textContent  = patch.question?.solution ?? 'verdeckt';
       }
-      // Frisches full für komplette Liste
-      socket.emit('mod:sync-all');
+      // KEIN mod:sync-all hier!
     });
+
     socket.on('question:show',(q)=>{
-      // NEU
       $('#qTextMain').textContent = q.text || '–';
       $('#qH1Main').textContent='verdeckt'; $('#qH2Main').textContent='verdeckt'; $('#qSolMain').textContent='verdeckt';
     });
