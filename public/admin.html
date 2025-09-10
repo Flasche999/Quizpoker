@@ -4,20 +4,18 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>QuizPoker – Admin</title>
-  <!-- Wichtig: deine globale style.css enthält die runde Tisch-Ansicht -->
-  <link rel="stylesheet" href="/style.css?v=5" />
+  <link rel="stylesheet" href="/style.css?v=6" />
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
   <style>
-    /* ——— Basis-UI (ohne Tisch-Styles, damit style.css greift) ——— */
-    :root{--bg:#0e0f12;--card:#151821;--line:#262b36;--ok:#2a5e3b;--err:#5b2730;--pri:#1363ff}
+    :root{--bg:#0e0f12;--card:#151821;--line:#262b36;--ok:#2a5e3b;--err:#5b2730;}
     body{background:var(--bg);color:#e7e9ee;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;margin:0}
-    .layout{display:grid;grid-template-columns:320px 1fr 360px;gap:12px;padding:12px;min-height:100vh}
+    .layout{display:grid;grid-template-columns:340px 1fr 420px;gap:12px;padding:12px}
     .sidebar,.main,.right{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px}
     .h{margin:0 0 8px;font-size:16px}
     .list{display:flex;flex-direction:column;gap:8px}
     .item{border:1px solid var(--line);border-radius:10px;padding:8px;background:#0f1118}
-    .row{display:flex;gap:8px;align-items:center}
-    .row > input, .row > button, .row > select, .row > textarea{border:1px solid var(--line);background:#0f1118;color:#e7e9ee;border-radius:8px;padding:8px}
+    .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+    .row > input, .row > button, .row > select{border:1px solid var(--line);background:#0f1118;color:#e7e9ee;border-radius:8px;padding:8px}
     .row > button{cursor:pointer}
     .row > button.primary{background:#0f1627;border-color:#1e3a8a}
     .row > button.ok{border-color:var(--ok)}
@@ -25,26 +23,16 @@
     .status{border:1px dashed var(--line);border-radius:10px;padding:8px}
     .small{font-size:12px;opacity:.85}
     .muted{opacity:.7}
-    .score .player{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:10px;padding:8px;margin-bottom:8px;background:#0f1118}
-    .score .player.turn{border:3px solid gold!important;box-shadow:0 0 10px rgba(255,215,0,.7)}
-    .score .player.folded{opacity:.55;filter:saturate(.6)}
-    .betline{font-size:12px;opacity:.9}
-    .badge{display:inline-block;font-weight:700;color:#000;background:#fff;border-radius:50%;width:20px;height:20px;line-height:20px;text-align:center;margin-left:6px;font-size:12px}
-    .badge-s{border:2px solid #1363ff}
-    .badge-b{border:2px solid #ff2b2b}
-
-    /* ——— WICHTIG: KEINE lokalen .table-* oder .seat-* Styles mehr hier!
-       Wir nutzen die runde Tisch-Ansicht aus /public/style.css (s0..s7, --ring, --seat) ——— */
-
-    /* Platz nach oben rechts schön machen */
-    .right { display:flex; flex-direction:column; gap:12px; }
-    .table-wrap { display:flex; justify-content:center; } /* nur leichte Hülle */
-    #table-center2 .small { display:block; margin-top:4px; }
+    .chatlog{height:220px;overflow:auto;border:1px solid var(--line);border-radius:10px;background:#0f1118;padding:8px}
+    .chatrow{margin-bottom:6px}
+    .pill{display:inline-block;border:1px solid var(--line);border-radius:999px;padding:2px 8px;font-size:12px;margin-right:6px}
+    .pill.admin{background:#3b2a5e}
+    .pill.player{background:#283046}
+    .two-col{display:grid;grid-template-columns:1fr 1fr;gap:8px}
   </style>
 </head>
 <body>
   <div class="layout">
-    <!-- Linke Spalte: Raum/Steuerung -->
     <aside class="sidebar">
       <h3 class="h">Raum</h3>
       <div class="list">
@@ -62,18 +50,31 @@
         <button id="btnNextQ">🆕 Frage starten</button>
       </div>
 
-      <!-- Blinds (Sitze + Werte + Rotation) -->
       <div class="status" style="margin-top:12px;">
-        <div>Small Blind (Seat #): <input id="inpSB" placeholder="0–7" style="width:100%;margin-top:6px;"></div>
-        <div>Big Blind (Seat #): <input id="inpBB" placeholder="0–7" style="width:100%;margin-top:6px;"></div>
-        <div>Small Blind Betrag: <input id="inpSBVal" type="number" min="0" placeholder="z. B. 10" style="width:100%;margin-top:6px;"></div>
-        <div>Big Blind Betrag: <input id="inpBBVal" type="number" min="0" placeholder="z. B. 20" style="width:100%;margin-top:6px;"></div>
-        <label class="small" style="display:flex;align-items:center;gap:8px;margin-top:6px;">
-          <input id="chkAutoRotate" type="checkbox" checked>
-          Blinds pro Frage im Uhrzeigersinn rotieren
-        </label>
-        <button id="btnSetBlinds" style="margin-top:6px;">Blinds speichern</button>
-        <div class="small muted" id="blindInfo" style="margin-top:6px;">Aktuell: SB Seat – / BB Seat – · SB 0 / BB 0 · Rotation AN</div>
+        <div class="two-col">
+          <div>
+            <div>Small Blind (Seat #):</div>
+            <input id="inpSB" placeholder="0–7" style="width:100%;margin-top:6px;">
+          </div>
+          <div>
+            <div>Big Blind (Seat #):</div>
+            <input id="inpBB" placeholder="0–7" style="width:100%;margin-top:6px;">
+          </div>
+        </div>
+        <div class="two-col" style="margin-top:6px;">
+          <div>
+            <div>SB-Wert:</div>
+            <input id="inpSBv" type="number" placeholder="z. B. 50" style="width:100%;margin-top:6px;">
+          </div>
+          <div>
+            <div>BB-Wert:</div>
+            <input id="inpBBv" type="number" placeholder="z. B. 100" style="width:100%;margin-top:6px;">
+          </div>
+        </div>
+        <div class="row" style="margin-top:6px;">
+          <label><input type="checkbox" id="inpRotate" checked> Auto-Rotation</label>
+          <button id="btnSetBlinds" style="margin-left:auto;">Blinds setzen</button>
+        </div>
       </div>
 
       <div class="status" style="margin-top:12px;">
@@ -97,23 +98,6 @@
         </div>
       </div>
 
-      <!-- Chips Mgmt (belässt du, wenn du es nutzt) -->
-      <div class="status" style="margin-top:12px;">
-        <div class="row">
-          <input id="chipsSetAll" type="number" placeholder="Startchips (z. B. 1000)" style="flex:1;">
-          <button id="btnChipsSetAll" class="ok">Allen setzen</button>
-        </div>
-        <div class="row" style="margin-top:6px;">
-          <input id="chipsDeltaAll" type="number" placeholder="+/− für alle (z. B. 100)" style="flex:1;">
-          <button id="btnChipsAddAll">Allen +/−</button>
-        </div>
-        <div class="row" style="margin-top:6px;">
-          <select id="chipsOneUid" style="flex:1;"><option value="">Spieler wählen…</option></select>
-          <input id="chipsDeltaOne" type="number" placeholder="+/− für einen" style="width:150px;">
-          <button id="btnChipsAddOne">Einzeln +/−</button>
-        </div>
-      </div>
-
       <div class="status" style="margin-top:12px;">
         <div class="row">
           <input id="inpWinnerUid" placeholder="Gewinner-UID (manuell)" style="flex:1;">
@@ -130,7 +114,6 @@
       </div>
     </aside>
 
-    <!-- Mitte: Frage/DMs -->
     <main class="main">
       <h3 class="h">Frage & Hinweise</h3>
       <div class="list">
@@ -159,66 +142,61 @@
       <div id="answers" class="list" style="max-height:160px;overflow:auto;"></div>
     </main>
 
-    <!-- RECHTS: Oben Virtueller Tisch, darunter Lobby -->
     <aside class="right">
-      <div>
-        <h3 class="h">Virtueller Tisch</h3>
-        <!-- runde Tisch-Ansicht: nutzt Klassen/Variablen aus style.css -->
-        <div class="table-wrap">
-          <div class="table-circle">
-            <div class="seat s0" data-seat="0"></div>
-            <div class="seat s1" data-seat="1"></div>
-            <div class="seat s2" data-seat="2"></div>
-            <div class="seat s3" data-seat="3"></div>
-            <div class="seat s4" data-seat="4"></div>
-            <div class="seat s5" data-seat="5"></div>
-            <div class="seat s6" data-seat="6"></div>
-            <div class="seat s7" data-seat="7"></div>
-            <div id="table-center2">
-              💰 Pot: <strong id="pot2">0</strong>
-              <span class="small muted" id="blindVals">SB — / BB —</span>
-            </div>
-          </div>
+      <h3 class="h">Virtueller Tisch</h3>
+      <div class="table-wrap">
+        <div class="table-circle">
+          <div class="seat s0" data-seat="0"></div>
+          <div class="seat s1" data-seat="1"></div>
+          <div class="seat s2" data-seat="2"></div>
+          <div class="seat s3" data-seat="3"></div>
+          <div class="seat s4" data-seat="4"></div>
+          <div class="seat s5" data-seat="5"></div>
+          <div class="seat s6" data-seat="6"></div>
+          <div class="seat s7" data-seat="7"></div>
+          <div id="table-center2">💰 Pot: <strong id="pot2">0</strong></div>
         </div>
-      </div>
-
-      <div>
-        <h3 class="h" style="margin-top:8px;">Lobby – Spieler</h3>
-        <div id="players" class="score"></div>
       </div>
     </aside>
   </div>
 
   <script>
-    const socket = io({ path:'/socket.io', transports:['websocket','polling'] });
+    // robustere Socket-Init
+    const socket = io({
+      path:'/socket.io',
+      transports:['polling','websocket'],
+      upgrade:true,
+      reconnection:true,
+      reconnectionAttempts: Infinity,
+      reconnectionDelay:500,
+      reconnectionDelayMax:3000,
+      timeout:20000
+    });
+
     const el = (s)=>document.querySelector(s);
-    const state = { blinds:{small:null,big:null,sbValue:0,bbValue:0,autoRotate:true}, turnUid:null, roundIndex:0, chats:new Map(), players:[] };
+    const state = { blinds:{small:null,big:null}, turnUid:null, roundIndex:0, chats:new Map(), players:[] };
 
     const emitOk = (evt, payload)=>{ if(!socket.connected){ el('#adminStatus').textContent='Nicht verbunden.'; return false; } socket.emit(evt,payload); return true; };
 
-    // Connect / Restore
     socket.on('connect', ()=>{
       el('#adminStatus').textContent = 'Verbunden: '+socket.id;
       const last = localStorage.getItem('qp_admin_room'); if (last) socket.emit('mod:claim-room', { code:last });
     });
     socket.on('disconnect', ()=>{ el('#adminStatus').textContent='Getrennt.'; });
 
-    // Buttons
+    // Grundfunktionen
     el('#btnCreate').onclick=()=>emitOk('mod:create-room');
     el('#btnNextQ').onclick =()=>emitOk('mod:next-question');
 
-    // Blinds speichern (Seats + Werte + Rotation)
     el('#btnSetBlinds').onclick = ()=>{
-      const sbSeatStr=el('#inpSB').value.trim();
-      const bbSeatStr=el('#inpBB').value.trim();
-      const sbVal=Number(el('#inpSBVal').value.trim()||0);
-      const bbVal=Number(el('#inpBBVal').value.trim()||0);
-      const autoRotate = !!el('#chkAutoRotate').checked;
-
-      const small = sbSeatStr===''?null:Number(sbSeatStr);
-      const big   = bbSeatStr===''?null:Number(bbSeatStr);
-
-      emitOk('mod:set-blinds',{ small, big, sbValue:sbVal, bbValue:bbVal, autoRotate });
+      const sb=el('#inpSB').value.trim(), bb=el('#inpBB').value.trim();
+      const sbv=Number(el('#inpSBv').value||0), bbv=Number(el('#inpBBv').value||0);
+      const rot=el('#inpRotate').checked;
+      emitOk('mod:set-blinds',{
+        small: sb===''?null:Number(sb),
+        big:   bb===''?null:Number(bb),
+        sbValue: sbv, bbValue: bbv, autoRotate: rot
+      });
     };
 
     el('#btnRevealH1').onclick=()=>emitOk('mod:reveal-hint1');
@@ -239,24 +217,11 @@
     el('#btnAwardNearest').onclick=()=>emitOk('mod:award-nearest');
     el('#btnSyncAll').onclick=()=>emitOk('mod:sync-all');
 
-    // Chips Mgmt
-    el('#btnChipsSetAll').onclick=()=>emitOk('mod:chips-set-all', { amount: Number(el('#chipsSetAll').value || 0) });
-    el('#btnChipsAddAll').onclick=()=>emitOk('mod:chips-add-all', { delta: Number(el('#chipsDeltaAll').value || 0) });
-    el('#btnChipsAddOne').onclick=()=>{
-      const uid = el('#chipsOneUid').value;
-      const delta = Number(el('#chipsDeltaOne').value || 0);
-      if (!uid) { el('#adminStatus').textContent='Bitte Spieler wählen.'; return; }
-      emitOk('mod:chips-add-one', { uid, delta });
-    };
-
-    // DMs (Admin-Seite)
+    // DMs
     const dmSelect = el('#dmSelect');
     const dmLog = el('#dmLog');
-    function dmAppend(html){
-      const d=document.createElement('div'); d.className='chatrow'; d.innerHTML=html;
-      dmLog.appendChild(d); dmLog.scrollTop = dmLog.scrollHeight;
-    }
-    function escapeHtml(s){return String(s||'').replace(/[&<>"]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[m]));}
+    const escapeHtml = (s)=>String(s||'').replace(/[&<>"]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[m]}));
+    function dmAppend(html){ const d=document.createElement('div'); d.className='chatrow'; d.innerHTML=html; dmLog.appendChild(d); dmLog.scrollTop = dmLog.scrollHeight; }
     function renderDmFor(uid){
       dmLog.innerHTML='';
       const thread = state.chats.get(uid) || [];
@@ -267,41 +232,26 @@
     }
     dmSelect.onchange = ()=>{ if(dmSelect.value) renderDmFor(dmSelect.value); };
     function ensureChat(uid){ if(!state.chats.has(uid)) state.chats.set(uid,[]); return state.chats.get(uid); }
+
     el('#btnDmSend').onclick = ()=>{
       const uid = dmSelect.value; const msg = el('#dmMessage').value.trim();
       if(!uid || !msg) return;
       emitOk('mod:dm', { uid, message: msg });
-      const thr = ensureChat(uid);
-      thr.push({ from:'admin', message:msg, ts:Date.now() });
+      const thr = ensureChat(uid); thr.push({ from:'admin', message:msg, ts:Date.now() });
       renderDmFor(uid);
       el('#dmMessage').value = '';
     };
     el('#btnDmClearOne').onclick = ()=>{ const uid = dmSelect.value; if(!uid) return; emitOk('mod:chat-clear-one', { uid }); };
     el('#btnDmClearAll').onclick = ()=>emitOk('mod:chat-clear-all');
-    el('#dmMessage').addEventListener('keydown',(e)=>{ if(e.key==='Enter'){ e.preventDefault(); el('#btnDmSend').click(); }});
 
-    // Render-Helfer
+    // Badges
     function badge(p){
       const isSB = (p.seat === (state.blinds?.small ?? null));
-      const isBB = (p.seat === (state.blinds?.big ?? null));
+      const isBB = (p.seat === (state.blinds?.big   ?? null));
       return (isSB?'<span class="badge badge-s">S</span>':'') + (isBB?'<span class="badge badge-b">B</span>':'');
     }
-    function refreshSelects(players){
-      const keeps = new Set();
-      const curDm = dmSelect.value;
-      const curChip = el('#chipsOneUid').value;
-      dmSelect.innerHTML = '<option value="">Spieler wählen…</option>';
-      el('#chipsOneUid').innerHTML = '<option value="">Spieler wählen…</option>';
-      players.forEach(p=>{
-        const opt1=document.createElement('option'); opt1.value=p.uid; opt1.textContent=`${p.name} (${p.uid.slice(0,6)}…)`;
-        const opt2=opt1.cloneNode(true);
-        dmSelect.appendChild(opt1);
-        el('#chipsOneUid').appendChild(opt2);
-        keeps.add(p.uid);
-      });
-      if (keeps.has(curDm)) dmSelect.value = curDm;
-      if (keeps.has(curChip)) el('#chipsOneUid').value = curChip;
-    }
+
+    // Render
     function renderTop(st){
       el('#roomCode').textContent = st.code || '—';
       el('#qIndex').textContent = st.qIndex>=0 ? (st.qIndex+1) : '–';
@@ -317,85 +267,63 @@
       el('#qH2').textContent   = st.question?.hint2 ?? 'verdeckt';
       el('#qSol').textContent  = st.question?.solution ?? 'verdeckt';
 
-      state.blinds = st.blinds||{small:null,big:null,sbValue:0,bbValue:0,autoRotate:true};
+      state.blinds = st.blinds||{small:null,big:null};
       state.turnUid = st.turnUid || null;
       state.roundIndex = st.roundIndex||0;
-
-      // Blind-Werte im Tischzentrum
-      el('#blindVals').textContent = `SB ${state.blinds.sbValue ?? 0} / BB ${state.blinds.bbValue ?? 0}`;
-
-      // Panel-Felder
-      if (st.blinds){
-        el('#inpSB').value = Number.isInteger(st.blinds.small) ? st.blinds.small : '';
-        el('#inpBB').value = Number.isInteger(st.blinds.big) ? st.blinds.big : '';
-        el('#inpSBVal').value = st.blinds.sbValue ?? 0;
-        el('#inpBBVal').value = st.blinds.bbValue ?? 0;
-        el('#chkAutoRotate').checked = !!st.blinds.autoRotate;
-        el('#blindInfo').textContent = `Aktuell: SB Seat ${st.blinds.small ?? '–'} / BB Seat ${st.blinds.big ?? '–'} · SB ${st.blinds.sbValue ?? 0} / BB ${st.blinds.bbValue ?? 0} · Rotation ${st.blinds.autoRotate?'AN':'AUS'}`;
-      }
-    }
-    function renderPlayers(st){
       state.players = (st.players||[]).slice();
-      const wrap = el('#players'); wrap.innerHTML='';
-      const arr = state.players.slice().sort((a,b)=>(a.seat??99)-(b.seat??99));
-      arr.forEach(p=>{
-        const div=document.createElement('div');
-        div.className='player'+(p.uid===state.turnUid?' turn':'')+(p.status==='folded'?' folded':'');
-        const est = (p.estimate===null || typeof p.estimate==='number') ? (p.estimate===null?'—':p.estimate) : '—';
-        div.innerHTML=`
-          <div class="row" style="justify-content:space-between;">
-            <span title="UID: ${p.uid}">${p.name} ${p.connected?'🟢':'🔴'} ${badge(p)}</span>
-            <strong>🪙 ${p.chips||0}</strong>
-          </div>
-          <div class="small betline">Runde: 🪙 ${p.betRound||0} · Gesamt: 🪙 ${p.betTotal||0} ${p.status==='allin'?' · (All-in)':''}${p.status==='folded'?' · (Fold)':''}</div>
-          <div class="small">Schätzwert: <strong>${est}</strong></div>
-        `;
-        wrap.appendChild(div);
-      });
-      refreshSelects(arr);
+      renderSeats({ players: state.players, blinds: state.blinds, turnUid: state.turnUid });
+      refreshSelects(state.players);
     }
+
+    function refreshSelects(players){
+      const keeps = new Set();
+      const curDm = dmSelect.value;
+      dmSelect.innerHTML = '<option value="">Spieler wählen…</option>';
+      players.forEach(p=>{
+        const opt=document.createElement('option'); opt.value=p.uid; opt.textContent=`${p.name} (${p.uid.slice(0,6)}…)`;
+        dmSelect.appendChild(opt);
+        keeps.add(p.uid);
+      });
+      if (keeps.has(curDm)) dmSelect.value = curDm;
+    }
+
     function renderSeats(st){
-      // setzt die Sitzkarten in die runde Tisch-UI (nutzt CSS aus style.css)
-      for(let i=0;i<8;i++){
-        const slot = document.querySelector(`.seat[data-seat="${i}"]`);
-        if(!slot) continue;
-        slot.className = `seat s${i}`;
+      const wrap = document.querySelector('.table-circle');
+      // Plätze leeren
+      wrap.querySelectorAll('.seat').forEach(slot=>{
+        slot.className = slot.className.replace(/\bturn\b|\bfolded\b|\bdisconnected\b/g,'').trim();
         slot.innerHTML = '<div class="avatar">🙂</div><div class="name">Frei</div><div class="chips">🪙 0</div><div class="betline">Runde: 🪙 0 · Gesamt: 🪙 0</div>';
-      }
+      });
       (st.players||[]).forEach(p=>{
         if(typeof p.seat!=='number') return;
-        const slot=document.querySelector(`.seat[data-seat="${p.seat}"]`); if(!slot) return;
+        const slot=wrap.querySelector(`.seat[data-seat="${p.seat}"]`); if(!slot) return;
         const est = (p.estimate===null || typeof p.estimate==='number') ? (p.estimate===null?'—':p.estimate) : '—';
         slot.innerHTML = `<div class="avatar">🙂</div>
           <div class="name">${p.name} ${badge(p)}</div>
           <div class="chips">🪙 ${p.chips??0}</div>
-          <div class="betline">Runde: 🪙 ${p.betRound||0} · Gesamt: 🪙 ${p.betTotal||0}</div>
-          <div class="small">Schätzwert: <strong>${est}</strong></div>`;
+          <div class="betline">Runde: 🪙 ${p.betRound||0} · Gesamt: 🪙 ${p.betTotal||0}</div>`;
         if(!p.connected) slot.classList.add('disconnected');
         if(p.status==='folded') slot.classList.add('folded');
         if(p.uid===state.turnUid) slot.classList.add('turn');
       });
     }
 
-    // Socket-Events
+    // Socket Events
     socket.on('mod:room-created', ({ code, state:st })=>{
       localStorage.setItem('qp_admin_room', code);
-      renderTop(st); renderPlayers(st); renderSeats(st);
+      renderTop(st);
       el('#adminStatus').textContent = 'Raum erstellt: '+code;
     });
-    socket.on('state:full', (st)=>{ renderTop(st); renderPlayers(st); renderSeats(st); });
-    socket.on('players:update', (msg)=>{ if(!msg?.players) return; renderPlayers({players:msg.players, blinds:state.blinds, turnUid:state.turnUid}); renderSeats({players:msg.players, blinds:state.blinds, turnUid:state.turnUid}); });
+
+    socket.on('state:full', (st)=>{ renderTop(st); });
+    socket.on('players:update', (msg)=>{
+      if(!msg?.players) return;
+      state.players = msg.players;
+      renderSeats({players:msg.players, blinds: state.blinds, turnUid: state.turnUid});
+      refreshSelects(state.players);
+    });
     socket.on('state:partial', (patch)=>{
-      if (patch.blinds) {
-        state.blinds = patch.blinds;
-        el('#inpSB').value = Number.isInteger(patch.blinds.small) ? patch.blinds.small : '';
-        el('#inpBB').value = Number.isInteger(patch.blinds.big) ? patch.blinds.big : '';
-        el('#inpSBVal').value = patch.blinds.sbValue ?? 0;
-        el('#inpBBVal').value = patch.blinds.bbValue ?? 0;
-        el('#chkAutoRotate').checked = !!patch.blinds.autoRotate;
-        el('#blindVals').textContent = `SB ${patch.blinds.sbValue ?? 0} / BB ${patch.blinds.bbValue ?? 0}`;
-        el('#blindInfo').textContent = `Aktuell: SB Seat ${patch.blinds.small ?? '–'} / BB Seat ${patch.blinds.big ?? '–'} · SB ${patch.blinds.sbValue ?? 0} / BB ${patch.blinds.bbValue ?? 0} · Rotation ${patch.blinds.autoRotate?'AN':'AUS'}`;
-      }
+      if (patch.blinds) state.blinds = patch.blinds;
       if ('turnUid' in patch) state.turnUid = patch.turnUid;
       if ('roundIndex' in patch) state.roundIndex = patch.roundIndex;
       if ('actedCount' in patch) el('#acted').textContent = patch.actedCount;
@@ -408,19 +336,19 @@
         el('#qH2').textContent   = patch.question?.hint2 ?? 'verdeckt';
         el('#qSol').textContent  = patch.question?.solution ?? 'verdeckt';
       }
-      socket.emit('mod:sync-all');
+      // Liste/Select aktualisieren
+      if (state.players?.length) {
+        renderSeats({players: state.players, blinds: state.blinds, turnUid: state.turnUid});
+        refreshSelects(state.players);
+      }
     });
-    socket.on('question:show', (q)=>{
-      el('#qIndex').textContent = (q.index+1);
-      el('#qText').textContent = q.text || '–';
-      el('#qH1').textContent='verdeckt'; el('#qH2').textContent='verdeckt'; el('#qSol').textContent='verdeckt';
-    });
+
     socket.on('answer:received', ({ uid, name, answer })=>{
       const div=document.createElement('div'); div.className='item'; div.textContent = `${name}: ${answer}`;
       el('#answers').prepend(div);
     });
 
-    // DMs von Spielern
+    // DMs
     socket.on('dm:from-player', ({ uid, name, message, ts })=>{
       const thr = ensureChat(uid); thr.push({ from:'player', message, ts });
       if (dmSelect.value === uid) renderDmFor(uid);
