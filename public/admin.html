@@ -8,7 +8,7 @@
   <!-- Socket.IO-Client über CDN (robust auf Render) -->
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 
-  <!-- Badges + Turn-Highlight (optional in style.css auslagern) -->
+  <!-- Badges + Turn-Highlight -->
   <style>
     .badge {
       display:inline-block;
@@ -118,6 +118,10 @@
     socket.on('connect', () => {
       console.log('[socket] connected', socket.id);
       el('#adminStatus').textContent = 'Verbunden: ' + socket.id;
+
+      // Nach Reconnect: letzten Raum automatisch „claimen“
+      const last = localStorage.getItem('qp_admin_room');
+      if (last) socket.emit('mod:claim-room', { code: last });
     });
     socket.on('connect_error', (err) => {
       console.warn('[socket] connect_error', err?.message || err);
@@ -236,6 +240,9 @@
 
     // ————————————————— Socket Events vom Server
     socket.on('mod:room-created', ({ code, state }) => {
+      // Raumcode merken, damit wir ihn nach Reconnect claimen können
+      localStorage.setItem('qp_admin_room', code);
+
       el('#roomCode').textContent = code;
       el('#adminStatus').textContent = 'Raum erstellt: ' + code;
       lastVersion = -1;
@@ -274,7 +281,7 @@
       renderPlayersPanel(); renderSeats();
     });
 
-    // ——— NEU: Partial-Updates (z. B. geänderte Blinds / Zugwechsel)
+    // Partial-Updates (z. B. geänderte Blinds / Zugwechsel)
     socket.on('state:partial', (patch) => {
       const ver = (patch.version ?? -1);
       if (ver <= lastVersion) return;
