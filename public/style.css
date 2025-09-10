@@ -18,6 +18,7 @@ body {
   font: 15px/1.5 system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, "Helvetica Neue", Arial, "Apple Color Emoji", "Segoe UI Emoji";
 }
 
+/* Layout-Container */
 .layout {
   display:grid;
   grid-template-columns: 260px 1fr 320px;
@@ -25,7 +26,6 @@ body {
   padding: 16px;
   min-height: 100vh;
 }
-
 .sidebar, .main, .right {
   background: linear-gradient(180deg, var(--panel), var(--panel-2));
   border: 1px solid var(--border);
@@ -34,11 +34,12 @@ body {
   box-shadow: 0 10px 24px rgba(0,0,0,.25);
 }
 
+/* Headlines & Text */
 .h { margin: 0 0 10px; font-size: 14px; color: var(--muted); letter-spacing: .08em; text-transform: uppercase; }
-
 .status { margin-top: 8px; color: var(--muted); }
 .small { font-size: 12px; color: var(--muted); }
 
+/* Lists / Items */
 .list .item {
   padding: 10px 12px;
   border: 1px solid var(--border);
@@ -51,6 +52,7 @@ body {
   border-color: #2a4aa1;
 }
 
+/* Controls */
 .row { display:flex; gap:8px; flex-wrap: wrap; }
 button, input {
   background: #0b1224;
@@ -64,6 +66,7 @@ button.ok { background:#103822; border-color:#1e6a42; }
 button.err { background:#3a1420; border-color:#7e2a44; }
 button:disabled { opacity:.6; pointer-events:none; }
 
+/* Score Panel */
 #players { display:flex; flex-direction: column; gap:8px; }
 .player {
   display:flex; align-items:center; justify-content: space-between;
@@ -72,6 +75,9 @@ button:disabled { opacity:.6; pointer-events:none; }
 .player .pm { display:flex; gap:6px; }
 .player .pm .score-btn { width:28px; height:28px; border-radius:8px; padding:0; }
 
+/* ─────────────────────────────────────────────
+   Alte (Grid) Tisch-Ansicht – weiterhin vorhanden
+   ───────────────────────────────────────────── */
 .table {
   display:grid; gap:10px;
   grid-template-areas:
@@ -95,5 +101,55 @@ button:disabled { opacity:.6; pointer-events:none; }
 .small-blind { outline: 2px dashed #6aa6ff; }
 .big-blind   { outline: 2px dashed #ffcf6a; }
 
-/* Buzz/Markierung optional wiederverwendbar */
+/* Buzz/Markierung optional */
 .buzzing { background: #3a1a21; border-color: #8a3b4c; }
+
+/* ─────────────────────────────────────────────
+   NEU: Runde Tisch-Ansicht (player.html/admin.html)
+   ───────────────────────────────────────────── */
+:root { --ring: 460px; --seat: 96px; }
+
+.table-wrap { display:flex; justify-content:center; }
+.table-circle {
+  position:relative; width:var(--ring); height:var(--ring);
+  margin:10px auto; border-radius:50%;
+  background: radial-gradient(closest-side, #11213a 0%, #0d172a 60%, #0b1220 100%);
+  box-shadow: 0 0 0 2px #1d2636 inset, 0 10px 30px rgba(0,0,0,.5);
+}
+.seat {
+  position:absolute; width:var(--seat); height:var(--seat);
+  border-radius:14px; border:1px solid var(--border); background:#0b1220;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  gap:6px; padding:8px; text-align:center;
+  transform: translate(-50%, -50%);
+}
+.seat .avatar {
+  width:48px; height:48px; border-radius:50%; background:#141a2a;
+  display:flex; align-items:center; justify-content:center; border:1px solid #283552;
+  font-weight:700; overflow:hidden;
+}
+.seat .name { font-size:13px; line-height:1.2; }
+.seat .chips { font-size:12px; opacity:.9; }
+.seat.disconnected { opacity:.5; filter:saturate(.5); }
+
+/* Sitzpositionen (0 oben, im Uhrzeigersinn) */
+.s0 { left:50%; top:7%; }
+.s1 { left:82%; top:20%; }
+.s2 { left:93%; top:50%; }
+.s3 { left:82%; top:80%; }
+.s4 { left:50%; top:93%; }
+.s5 { left:18%; top:80%; }
+.s6 { left:7%;  top:50%; }
+.s7 { left:18%; top:20%; }
+
+/* Center des runden Tisches */
+#table-center2 {
+  position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+  padding:10px 14px; border-radius:12px; border:1px solid var(--border); background:#0f1420;
+  text-align:center; font-size:14px;
+}
+
+/* Responsive */
+@media (max-width: 560px) {
+  :root { --ring: 320px; --seat: 84px; }
+}
