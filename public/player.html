@@ -4,62 +4,13 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>QuizPoker – Spieler</title>
-  <link rel="stylesheet" href="/style.css" />
+  <link rel="stylesheet" href="/style.css?v=4" />
   <script src="/socket.io/socket.io.js"></script>
-  <style>
-    /* Zusatz-Stile nur für den runden Tisch */
-    :root { --ring: 460px; --seat: 96px; }
-    .table-wrap { display:flex; justify-content:center; }
-    .table-circle {
-      position:relative; width:var(--ring); height:var(--ring);
-      margin:10px auto; border-radius:50%;
-      background: radial-gradient(closest-side, #11213a 0%, #0d172a 60%, #0b1220 100%);
-      box-shadow: 0 0 0 2px #1d2636 inset, 0 10px 30px rgba(0,0,0,.5);
-    }
-    .seat {
-      position:absolute; width:var(--seat); height:var(--seat);
-      border-radius:14px; border:1px solid #26324a; background:#0b1220;
-      display:flex; flex-direction:column; align-items:center; justify-content:center;
-      gap:6px; padding:8px; text-align:center;
-      transform: translate(-50%, -50%);
-    }
-    .seat .avatar {
-      width:48px; height:48px; border-radius:50%; background:#141a2a;
-      display:flex; align-items:center; justify-content:center; border:1px solid #283552;
-      font-weight:700; overflow:hidden;
-    }
-    .seat .name { font-size:13px; line-height:1.2; }
-    .seat .chips { font-size:12px; opacity:.9; }
-    .seat.disconnected { opacity:.5; filter:saturate(.5); }
-    /* Sitzpositionen (0 oben, dann im Uhrzeigersinn) */
-    .s0 { left:50%; top:7%; }
-    .s1 { left:82%; top:20%; }
-    .s2 { left:93%; top:50%; }
-    .s3 { left:82%; top:80%; }
-    .s4 { left:50%; top:93%; }
-    .s5 { left:18%; top:80%; }
-    .s6 { left:7%;  top:50%; }
-    .s7 { left:18%; top:20%; }
-    /* Center */
-    #table-center2 {
-      position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
-      padding:10px 14px; border-radius:12px; border:1px solid #2a3650; background:#0f1420;
-      text-align:center; font-size:14px;
-    }
-
-    @media (max-width: 560px) {
-      :root { --ring: 320px; --seat: 84px; }
-    }
-
-    /* Kleinere Optik-Angleichung */
-    .status code.small { font-size: 12px; }
-    .primary[disabled] { opacity: .6; cursor: not-allowed; }
-  </style>
 </head>
 <body>
   <div class="layout">
     <aside class="sidebar">
-      <h3 class="h">Beitreten</h3>
+      <h3 class="h">Beitreten (Lobby)</h3>
       <div class="row" style="margin-top:8px;">
         <input id="inpCode" placeholder="Raumcode" />
         <input id="inpName" placeholder="Dein Name" />
@@ -83,10 +34,9 @@
     </aside>
 
     <main class="main">
-      <h3 class="h">Virtueller Tisch</h3>
+      <h3 class="h">Lobby – Virtueller Tisch</h3>
       <div class="table-wrap">
         <div class="table-circle" id="table">
-          <!-- 8 Sitzplätze -->
           <div class="seat s0" data-seat="0"></div>
           <div class="seat s1" data-seat="1"></div>
           <div class="seat s2" data-seat="2"></div>
@@ -95,7 +45,6 @@
           <div class="seat s5" data-seat="5"></div>
           <div class="seat s6" data-seat="6"></div>
           <div class="seat s7" data-seat="7"></div>
-
           <div id="table-center2">💰 Pot: <strong id="pot">0</strong></div>
         </div>
       </div>
@@ -108,25 +57,15 @@
   </div>
 
   <script>
-    // Verbesserte Socket.io-Initialisierung (stabilere Verbindungen + klares Fehlerbild)
-    const socket = io({
-      transports: ['websocket'],
-      path: '/socket.io',
-      reconnectionAttempts: 5,
-      timeout: 15000
-    });
-
+    const socket = io({ transports:['websocket'], path:'/socket.io' });
     const $ = (s) => document.querySelector(s);
 
-    // Stabile UID auf Gerät
+    // Stabile UID
     let UID = localStorage.getItem('qp_uid');
-    if (!UID) {
-      UID = (crypto?.randomUUID?.() || (Date.now() + Math.random().toString(16).slice(2)));
-      localStorage.setItem('qp_uid', UID);
-    }
+    if (!UID) { UID = (crypto?.randomUUID?.() || (Date.now()+Math.random().toString(16).slice(2))); localStorage.setItem('qp_uid', UID); }
     $('#uidLbl').textContent = UID;
 
-    // Felder & Buttons
+    // Inputs
     const inpCode   = $('#inpCode');
     const inpName   = $('#inpName');
     const btnJoin   = $('#btnJoin');
@@ -134,38 +73,26 @@
     const inpAnswer = $('#inpAnswer');
     const btnSend   = $('#btnSend');
 
-    // Lokaler State
+    // State
     let myName      = localStorage.getItem('qp_name') || '';
     let myRoom      = localStorage.getItem('qp_room') || '';
-    let joinedOnce  = false;      // Clientseitige Blockade NUR nach echtem Join
-    let lastVersion = -1;         // wichtig: -1, damit Version 0 gerendert wird
+    let joinedOnce  = false;         // gesperrt erst nach echtem Join
+    let lastVersion = -1;            // damit Version 0 gerendert wird
 
     if (myName) inpName.value = myName;
     if (myRoom) inpCode.value = myRoom;
 
-    function currentInputCode() {
-      return (inpCode.value || '').toUpperCase().trim();
-    }
-
-    function setJoinUI(disabled) {
-      inpCode.disabled = disabled;
-      inpName.disabled = disabled;
-      btnJoin.disabled = disabled;
-    }
+    const currentInputCode = () => (inpCode.value || '').toUpperCase().trim();
+    const setJoinUI = (disabled) => { inpCode.disabled = disabled; inpName.disabled = disabled; btnJoin.disabled = disabled; };
 
     // Enter-Shortcut
-    [inpCode, inpName].forEach(input => {
-      input.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') btnJoin.click();
-      });
-    });
+    ;[inpCode, inpName].forEach(el => el.addEventListener('keydown', e => { if (e.key === 'Enter') btnJoin.click(); }));
 
-    // Join
+    // Join Button
     btnJoin.onclick = () => {
       const code = currentInputCode();
       const name = (inpName.value || '').trim() || 'Spieler';
-      console.log('[UI] join click', { code, UID, name, joinedOnce });
-      if (joinedOnce) { $('#pStatus').textContent = 'Du bist bereits beigetreten.'; return; }
+      if (joinedOnce) { $('#pStatus').textContent = 'Du bist bereits in der Lobby.'; return; }
       if (!code) { $('#pStatus').textContent = 'Bitte Raumcode eingeben.'; return; }
       $('#pStatus').textContent = 'Beitreten...';
       socket.emit('player:join', { code, uid: UID, name });
@@ -178,10 +105,10 @@
       joinedOnce = false;
       setJoinUI(false);
       $('#roomCode').textContent = '—';
-      $('#pStatus').textContent = 'Reset – du kannst einem neuen Raum beitreten.';
+      $('#pStatus').textContent = 'Reset – neuer Raum möglich.';
       try { socket.disconnect(); } catch {}
       socket.connect();
-      setTimeout(()=>$('#pStatus').textContent = '', 1200);
+      setTimeout(()=>$('#pStatus').textContent = '', 1000);
     };
 
     // Antworten senden
@@ -190,15 +117,13 @@
       if (!a) return;
       socket.emit('player:answer', { answer: a });
       inpAnswer.value = '';
-      $('#pStatus').textContent = 'Antwort gesendet.';
-      setTimeout(() => $('#pStatus').textContent = '', 1000);
+      $('#pStatus').textContent = 'Antwort gesendet.'; setTimeout(()=>$('#pStatus').textContent='', 800);
     };
 
-    // Rendering: Seats & Liste
+    // Rendering
     const playersByUid = new Map();
 
     function renderSeats() {
-      // Alle Sitze erst mal "Frei" markieren
       for (let i = 0; i < 8; i++) {
         const slot = document.querySelector(`.seat[data-seat="${i}"]`);
         if (!slot) continue;
@@ -209,135 +134,89 @@
           <div class="chips">🪙 0</div>
         `;
       }
-
-      // Spieler einsetzen
-      const arr = Array.from(playersByUid.values());
+      const arr = Array.from(playersByUid.values()).sort((a,b) => (a.seat??99)-(b.seat??99));
       arr.forEach(p => {
-        const si = (typeof p.seat === 'number') ? p.seat : null;
-        if (si === null || si < 0 || si > 7) return;
-        const slot = document.querySelector(\`.seat[data-seat="\${si}"]\`);
+        if (typeof p.seat !== 'number') return;
+        const slot = document.querySelector(\`.seat[data-seat="\${p.seat}"]\`);
         if (!slot) return;
         slot.innerHTML = `
-          <div class="avatar">${(p.avatar && p.avatar.startsWith('http')) ? `<img src="${p.avatar}" alt="Avatar" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">` : '🙂'}</div>
+          <div class="avatar">🙂</div>
           <div class="name">${p.name}</div>
           <div class="chips">🪙 ${p.chips ?? 0}</div>
         `;
         if (!p.connected) slot.classList.add('disconnected');
       });
     }
-
     function renderList() {
-      const list = $('#playerList');
-      list.innerHTML = '';
-      const arr = Array.from(playersByUid.values()).sort((a,b) => a.seat - b.seat);
+      const list = $('#playerList'); list.innerHTML = '';
+      const arr = Array.from(playersByUid.values()).sort((a,b)=> (a.seat??99)-(b.seat??99));
       arr.forEach(p => {
         const div = document.createElement('div');
         div.className = 'spieler-box' + (p.connected ? '' : ' disconnected');
-        div.innerHTML = \`<strong>Sitz \${(p.seat ?? '-') + 1}:</strong> \${p.name} – 🪙 \${p.chips ?? 0}\`;
+        div.innerHTML = \`<strong>Sitz \${(p.seat??-1)+1}:</strong> \${p.name} – 🪙 \${p.chips ?? 0}\`;
         list.appendChild(div);
       });
     }
-
     function renderAll() {
-      renderSeats();
-      renderList();
-      // eigene Chips anzeigen
-      const me = playersByUid.get(UID);
-      if (me) $('#chips').textContent = me.chips ?? 0;
+      renderSeats(); renderList();
+      const me = playersByUid.get(UID); if (me) $('#chips').textContent = me.chips ?? 0;
     }
 
-    // Socket Events – Status/Fehler sichtbar machen
+    // Socket Events
     socket.on('connect', () => {
-      console.log('[socket] connected', socket.id);
       $('#pStatus').textContent = 'Verbunden.';
-      setTimeout(()=>$('#pStatus').textContent='', 1000);
-
-      // Reconnect nur dann, wenn der gespeicherte Raum dem Eingabecode entspricht (oder leer ist)
+      setTimeout(()=>$('#pStatus').textContent='', 800);
+      // Reconnect nur wenn Eingabecode = gespeicherter Raum oder leer
       if (myRoom && (currentInputCode() === '' || currentInputCode() === myRoom)) {
-        socket.emit('hello', { uid: UID, name: myName, room: myRoom });
+        socket.emit('hello', { uid: UID, room: myRoom });
       }
     });
-    socket.on('disconnect', (reason) => {
-      console.warn('[socket] disconnected', reason);
-      $('#pStatus').textContent = 'Verbindung getrennt.';
-    });
-    socket.on('connect_error', (err) => {
-      console.error('[socket] connect_error', err?.message || err);
-      $('#pStatus').textContent = 'Socket-Fehler: ' + (err?.message || err);
-    });
-    socket.on('error', (err) => {
-      console.error('[socket] error', err);
-      $('#pStatus').textContent = 'Fehler: ' + (err?.message || err);
-    });
+    socket.on('disconnect', (r) => { $('#pStatus').textContent = 'Verbindung getrennt.'; });
 
-    // Join-Ergebnis
     socket.on('player:join-result', (r) => {
-      console.log('[player:join-result]', r);
-      if (!r.ok) {
-        $('#pStatus').textContent = r.error || 'Fehler beim Beitritt.';
-        return;
-      }
-      // Erfolgreich
+      if (!r.ok) { $('#pStatus').textContent = r.error || 'Fehler beim Beitritt.'; return; }
       myRoom = r.code; myName = r.name;
       localStorage.setItem('qp_room', myRoom);
       localStorage.setItem('qp_name', myName);
       $('#roomCode').textContent = myRoom;
       $('#chips').textContent = r.chips ?? 0;
-      $('#pStatus').textContent = `Beigetreten als ${myName}`;
-      joinedOnce = true;
-      setJoinUI(true);
-      setTimeout(() => $('#pStatus').textContent = '', 1200);
+      $('#pStatus').textContent = `In Lobby: ${myName}`;
+      joinedOnce = true; setJoinUI(true);
+      setTimeout(()=>$('#pStatus').textContent='', 1000);
     });
 
-    // Vollständiger State
     socket.on('state:full', (state) => {
       if ((state.version ?? -1) <= lastVersion) return;
       lastVersion = state.version ?? -1;
-
       $('#roomCode').textContent = state.code || '—';
       $('#question').textContent = state.question?.text || '–';
       if (typeof state.pot === 'number') $('#pot').textContent = state.pot;
-
       playersByUid.clear();
       (state.players || []).forEach(p => playersByUid.set(p.uid, p));
       renderAll();
 
-      // UI nur sperren, wenn wir wirklich in DIESEM Raum sind
       const me = playersByUid.get(UID);
       if (me && state.code && state.code === (localStorage.getItem('qp_room') || '')) {
-        joinedOnce = true;
-        setJoinUI(true);
+        joinedOnce = true; setJoinUI(true);
       } else {
         setJoinUI(false);
       }
     });
 
-    // Teil-Update: Spieler
     socket.on('players:update', (msg) => {
       if ((msg.version ?? -1) <= lastVersion) return;
       lastVersion = msg.version ?? -1;
-
       (msg.players || []).forEach(p => playersByUid.set(p.uid, p));
       renderAll();
     });
 
-    // Neue Frage
     socket.on('question:show', (q) => {
       if ((q.version ?? -1) <= lastVersion) return;
       lastVersion = q.version ?? -1;
       $('#question').textContent = q.text || '–';
     });
 
-    // Status-Meldungen
-    socket.on('status', (t) => {
-      $('#pStatus').textContent = t;
-      setTimeout(()=>$('#pStatus').textContent='', 1500);
-    });
-
-    // Sauber abmelden beim Tab-Schließen (optional)
-    window.addEventListener('beforeunload', () => {
-      // kein explizites leave nötig – Server markiert beim disconnect offline
-    });
+    socket.on('status', (t) => { $('#pStatus').textContent = t; setTimeout(()=>$('#pStatus').textContent='', 1500); });
   </script>
 </body>
 </html>
