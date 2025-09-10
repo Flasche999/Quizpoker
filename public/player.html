@@ -5,32 +5,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>QuizPoker – Spieler</title>
   <link rel="stylesheet" href="/style.css?v=4" />
-  <!-- Socket.IO-Client über CDN -->
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
-
-  <!-- Badges + Turn-Highlight (kannst du auch in style.css kopieren) -->
   <style>
-    .badge {
-      display:inline-block;
-      font-weight:700;
-      color:#000;
-      background:#fff;
-      border-radius:50%;
-      width:20px; height:20px;
-      line-height:20px;
-      text-align:center;
-      margin-left:6px;
-      font-size:12px;
-    }
-    .badge-s { border:2px solid #1363ff; } /* blau */
-    .badge-b { border:2px solid #ff2b2b; } /* rot */
-
-    /* Goldener Rahmen für den Spieler, der am Zug ist */
-    .seat.turn, .spieler-box.turn {
-      border:3px solid gold !important;
-      box-shadow:0 0 10px rgba(255,215,0,.7);
-      border-radius:10px;
-    }
+    /* Badges + Turn-Highlight */
+    .badge{display:inline-block;font-weight:700;color:#000;background:#fff;border-radius:50%;width:20px;height:20px;line-height:20px;text-align:center;margin-left:6px;font-size:12px}
+    .badge-s{border:2px solid #6aa6ff}
+    .badge-b{border:2px solid #ff4d4d}
+    .seat.turn,.spieler-box.turn{border:3px solid gold!important;box-shadow:0 0 10px rgba(255,215,0,.7);border-radius:10px}
+    .seat.folded,.spieler-box.folded{opacity:.5;filter:saturate(.5)}
+    .betline{font-size:12px;opacity:.9}
   </style>
 </head>
 <body>
@@ -48,6 +31,7 @@
       <div class="status">Du bist in Raum: <code id="roomCode" class="small">—</code></div>
       <div class="status">UID: <code id="uidLbl" class="small">—</code></div>
       <div class="status">Chips: <strong id="chips">0</strong></div>
+      <div class="status">Aktuelle Bet: <strong id="currentBet">0</strong></div>
       <div class="status" id="pStatus"></div>
 
       <h3 class="h" style="margin-top:16px;">Aktuelle Frage</h3>
@@ -56,6 +40,17 @@
       <div class="row" style="margin-top:10px;">
         <input id="inpAnswer" placeholder="Deine Antwort" style="flex:1;">
         <button id="btnSend">Antwort senden</button>
+      </div>
+
+      <h3 class="h" style="margin-top:16px;">Einsatz</h3>
+      <div class="row" style="margin-top:8px;">
+        <input id="betAmount" type="number" placeholder="Betrag" min="1" style="width:120px;">
+        <button id="btnBet" class="primary">Setzen/Raise</button>
+        <button id="btnCall">Mitgehen</button>
+      </div>
+      <div class="row" style="margin-top:8px;">
+        <button id="btnAllin" class="ok">All-in</button>
+        <button id="btnFold"  class="err">Passen (Fold)</button>
       </div>
     </aside>
 
@@ -83,39 +78,28 @@
   </div>
 
   <script>
-    // Socket.IO robust verbinden
-    const socket = io({
-      path: '/socket.io',
-      transports: ['websocket', 'polling']
-    });
+    const socket = io({ path: '/socket.io', transports: ['websocket','polling'] });
     const $ = (s) => document.querySelector(s);
 
-    // Stabile UID
+    // UID stabil
     let UID = localStorage.getItem('qp_uid');
-    if (!UID) {
-      UID = (crypto?.randomUUID?.() || (Date.now() + Math.random().toString(16).slice(2)));
-      localStorage.setItem('qp_uid', UID);
-    }
+    if (!UID) { UID = (crypto?.randomUUID?.() || (Date.now() + Math.random().toString(16).slice(2))); localStorage.setItem('qp_uid', UID); }
     $('#uidLbl').textContent = UID;
 
     // Inputs
-    const inpCode   = $('#inpCode');
-    const inpName   = $('#inpName');
-    const btnJoin   = $('#btnJoin');
-    const btnReset  = $('#btnReset');
-    const inpAnswer = $('#inpAnswer');
-    const btnSend   = $('#btnSend');
+    const inpCode=$('#inpCode'), inpName=$('#inpName'), btnJoin=$('#btnJoin'), btnReset=$('#btnReset');
+    const inpAnswer=$('#inpAnswer'), btnSend=$('#btnSend');
+    const betAmount=$('#betAmount'), btnBet=$('#btnBet'), btnCall=$('#btnCall'), btnAllin=$('#btnAllin'), btnFold=$('#btnFold');
 
     // State
-    let myName      = localStorage.getItem('qp_name') || '';
-    let myRoom      = localStorage.getItem('qp_room') || '';
-    let joinedOnce  = false;
-    let lastVersion = -1;
+    let myName = localStorage.getItem('qp_name') || '';
+    let myRoom = localStorage.getItem('qp_room') || '';
+    let joinedOnce = false, lastVersion = -1;
 
-    // ——— NEU: globaler State für Blinds + Turn
     const currentState = {
-      blinds: { small: null, big: null }, // seats (Zahlen)
-      turnUid: null                       // UID des Spielers am Zug
+      blinds: { small:null, big:null },
+      turnUid: null,
+      currentBet: 0
     };
 
     if (myName) inpName.value = myName;
@@ -124,10 +108,9 @@
     const currentInputCode = () => (inpCode.value || '').toUpperCase().trim();
     const setJoinUI = (disabled) => { inpCode.disabled = disabled; inpName.disabled = disabled; btnJoin.disabled = disabled; };
 
-    // Enter-Shortcut
-    [inpCode, inpName].forEach(el => el.addEventListener('keydown', e => { if (e.key === 'Enter') btnJoin.click(); }));
+    [inpCode, inpName].forEach(el=>el.addEventListener('keydown', e=>{ if(e.key==='Enter') btnJoin.click(); }));
 
-    // Join Button
+    // Join
     btnJoin.onclick = () => {
       const code = currentInputCode();
       const name = (inpName.value || '').trim() || 'Spieler';
@@ -138,48 +121,46 @@
       socket.emit('player:join', { code, uid: UID, name });
     };
 
-    // Reset / Raum wechseln
     btnReset.onclick = () => {
-      localStorage.removeItem('qp_room');
-      myRoom = '';
-      joinedOnce = false;
-      setJoinUI(false);
-      $('#roomCode').textContent = '—';
-      $('#pStatus').textContent = 'Reset – neuer Raum möglich.';
+      localStorage.removeItem('qp_room'); myRoom=''; joinedOnce=false; setJoinUI(false);
+      $('#roomCode').textContent = '—'; $('#pStatus').textContent = 'Reset – neuer Raum möglich.';
       try { socket.disconnect(); } catch {}
-      socket.connect();
-      setTimeout(() => $('#pStatus').textContent = '', 1000);
+      socket.connect(); setTimeout(()=>$('#pStatus').textContent='', 1000);
     };
 
-    // Antworten senden
+    // Antworten
     btnSend.onclick = () => {
-      const a = inpAnswer.value.trim();
-      if (!a) return;
+      const a = inpAnswer.value.trim(); if (!a) return;
       if (!socket.connected) { $('#pStatus').textContent = 'Nicht verbunden.'; return; }
       socket.emit('player:answer', { answer: a });
-      inpAnswer.value = '';
-      $('#pStatus').textContent = 'Antwort gesendet.'; setTimeout(() => $('#pStatus').textContent = '', 800);
+      inpAnswer.value = ''; $('#pStatus').textContent = 'Antwort gesendet.'; setTimeout(()=>$('#pStatus').textContent='', 800);
     };
+
+    // Betting
+    btnBet.onclick = () => {
+      const amt = Math.max(1, parseInt(betAmount.value || '0', 10) || 0);
+      socket.emit('player:bet', { amount: amt });
+    };
+    btnCall.onclick = () => socket.emit('player:call');
+    btnAllin.onclick = () => socket.emit('player:allin');
+    btnFold.onclick  = () => socket.emit('player:fold');
 
     // Rendering
     const playersByUid = new Map();
 
+    function escapeHtml(s=''){return s.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+
     function renderSeats() {
-      for (let i = 0; i < 8; i++) {
+      for (let i=0;i<8;i++){
         const slot = document.querySelector(`.seat[data-seat="${i}"]`);
         if (!slot) continue;
         slot.className = `seat s${i}`;
-        slot.innerHTML = `
-          <div class="avatar">—</div>
-          <div class="name">Frei</div>
-          <div class="chips">🪙 0</div>
-        `;
+        slot.innerHTML = '<div class="avatar">—</div><div class="name">Frei</div><div class="chips">🪙 0</div>';
       }
-      const arr = Array.from(playersByUid.values()).sort((a,b) => (a.seat ?? 99) - (b.seat ?? 99));
-      arr.forEach(p => {
-        if (typeof p.seat !== 'number') return;
-        const slot = document.querySelector(`.seat[data-seat="${p.seat}"]`);
-        if (!slot) return;
+      const arr = Array.from(playersByUid.values()).sort((a,b)=>(a.seat??99)-(b.seat??99));
+      arr.forEach(p=>{
+        if (typeof p.seat!=='number') return;
+        const slot = document.querySelector(`.seat[data-seat="${p.seat}"]`); if(!slot) return;
 
         const isSB = (p.seat === (currentState.blinds?.small ?? null));
         const isBB = (p.seat === (currentState.blinds?.big ?? null));
@@ -190,26 +171,26 @@
           <div class="avatar">🙂</div>
           <div class="name">${escapeHtml(p.name)} ${sBadge} ${bBadge}</div>
           <div class="chips">🪙 ${p.chips ?? 0}</div>
+          <div class="betline">Bet: 🪙 ${p.bet ?? 0} ${p.status==='folded'?'· (Fold)':''}${p.status==='allin'?' · (All-in)':''}</div>
         `;
         if (!p.connected) slot.classList.add('disconnected');
-        // Goldener Rahmen für den, der am Zug ist
+        if (p.status==='folded') slot.classList.add('folded');
         if (p.uid === currentState.turnUid) slot.classList.add('turn');
       });
     }
 
     function renderList() {
       const list = $('#playerList'); list.innerHTML = '';
-      const arr = Array.from(playersByUid.values()).sort((a,b)=> (a.seat ?? 99) - (b.seat ?? 99));
-      arr.forEach(p => {
+      const arr = Array.from(playersByUid.values()).sort((a,b)=> (a.seat??99)-(b.seat??99));
+      arr.forEach(p=>{
         const isSB = (p.seat === (currentState.blinds?.small ?? null));
         const isBB = (p.seat === (currentState.blinds?.big ?? null));
         const sBadge = isSB ? '<span class="badge badge-s">S</span>' : '';
         const bBadge = isBB ? '<span class="badge badge-b">B</span>' : '';
 
         const div = document.createElement('div');
-        div.className = 'spieler-box' + (p.connected ? '' : ' disconnected');
-        div.innerHTML = `<strong>Sitz ${(p.seat ?? -1) + 1}:</strong> ${escapeHtml(p.name)} ${sBadge} ${bBadge} – 🪙 ${p.chips ?? 0}`;
-        if (p.uid === currentState.turnUid) div.classList.add('turn');
+        div.className = 'spieler-box' + (p.connected ? '' : ' disconnected') + (p.status==='folded'?' folded':'') + (p.uid===currentState.turnUid?' turn':'');
+        div.innerHTML = `<strong>Sitz ${(p.seat??-1)+1}:</strong> ${escapeHtml(p.name)} ${sBadge} ${bBadge} – 🪙 ${p.chips ?? 0} · Bet: 🪙 ${p.bet ?? 0} ${p.status==='folded'?'· (Fold)':''}${p.status==='allin'?' · (All-in)':''}`;
         list.appendChild(div);
       });
     }
@@ -217,86 +198,68 @@
     function renderAll() {
       renderSeats(); renderList();
       const me = playersByUid.get(UID); if (me) $('#chips').textContent = me.chips ?? 0;
+      $('#currentBet').textContent = currentState.currentBet ?? 0;
     }
 
-    function escapeHtml(s='') {
-      return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-    }
-
-    // Socket Events
-    socket.on('connect', () => {
-      $('#pStatus').textContent = 'Verbunden.';
-      setTimeout(() => $('#pStatus').textContent = '', 800);
-      // Reconnect nur wenn Eingabecode = gespeicherter Raum oder leer
-      if (myRoom && (currentInputCode() === '' || currentInputCode() === myRoom)) {
+    // Sockets
+    socket.on('connect', ()=>{
+      $('#pStatus').textContent='Verbunden.'; setTimeout(()=>$('#pStatus').textContent='',800);
+      if (myRoom && (currentInputCode()==='' || currentInputCode()===myRoom)) {
         socket.emit('hello', { uid: UID, room: myRoom });
       }
     });
-    socket.on('disconnect', (r) => { $('#pStatus').textContent = 'Verbindung getrennt.'; });
+    socket.on('disconnect', ()=>{ $('#pStatus').textContent='Verbindung getrennt.'; });
 
-    socket.on('player:join-result', (r) => {
+    socket.on('player:join-result',(r)=>{
       if (!r.ok) { $('#pStatus').textContent = r.error || 'Fehler beim Beitritt.'; return; }
-      myRoom = r.code; myName = r.name;
+      myRoom=r.code; myName=r.name;
       localStorage.setItem('qp_room', myRoom);
       localStorage.setItem('qp_name', myName);
       $('#roomCode').textContent = myRoom;
       $('#chips').textContent = r.chips ?? 0;
       $('#pStatus').textContent = `In Lobby: ${myName}`;
       joinedOnce = true; setJoinUI(true);
-      setTimeout(() => $('#pStatus').textContent = '', 1000);
+      setTimeout(()=>$('#pStatus').textContent='', 1000);
     });
 
-    socket.on('state:full', (state) => {
-      const ver = (state.version ?? -1);
-      if (ver <= lastVersion) return;
-      lastVersion = ver;
-
-      // Blinds + Turn übernehmen
+    socket.on('state:full',(state)=>{
+      const ver=(state.version??-1); if (ver<=lastVersion) return; lastVersion=ver;
+      $('#roomCode').textContent = state.code || '—';
+      $('#question').textContent = state.question?.text || '–';
+      if (typeof state.pot==='number') $('#pot').textContent = state.pot;
+      currentState.currentBet = state.currentBet || 0;
       currentState.blinds = state.blinds || { small:null, big:null };
       currentState.turnUid = state.turnUid || null;
 
-      $('#roomCode').textContent = state.code || '—';
-      $('#question').textContent = state.question?.text || '–';
-      if (typeof state.pot === 'number') $('#pot').textContent = state.pot;
       playersByUid.clear();
-      (state.players || []).forEach(p => playersByUid.set(p.uid, p));
+      (state.players||[]).forEach(p=>playersByUid.set(p.uid,p));
       renderAll();
 
       const me = playersByUid.get(UID);
-      if (me && state.code && state.code === (localStorage.getItem('qp_room') || '')) {
-        joinedOnce = true; setJoinUI(true);
-      } else {
-        setJoinUI(false);
-      }
+      if (me && state.code && state.code===(localStorage.getItem('qp_room')||'')) { joinedOnce=true; setJoinUI(true); } else { setJoinUI(false); }
     });
 
-    socket.on('players:update', (msg) => {
-      const ver = (msg.version ?? -1);
-      if (ver <= lastVersion) return;
-      lastVersion = ver;
-      (msg.players || []).forEach(p => playersByUid.set(p.uid, p));
+    socket.on('players:update',(msg)=>{
+      const ver=(msg.version??-1); if (ver<=lastVersion) return; lastVersion=ver;
+      (msg.players||[]).forEach(p=>playersByUid.set(p.uid,p));
       renderAll();
     });
 
-    // ——— NEU: Partial-Updates (z. B. wenn Admin Blinds/Turn ändert)
-    socket.on('state:partial', (patch) => {
-      const ver = (patch.version ?? -1);
-      if (ver <= lastVersion) return;
-      lastVersion = ver;
-
+    socket.on('state:partial',(patch)=>{
+      const ver=(patch.version??-1); if (ver<=lastVersion) return; lastVersion=ver;
+      if (typeof patch.pot==='number') $('#pot').textContent = patch.pot;
+      if (typeof patch.currentBet==='number') currentState.currentBet = patch.currentBet;
       if (patch.blinds) currentState.blinds = patch.blinds;
       if ('turnUid' in patch) currentState.turnUid = patch.turnUid;
       renderAll();
     });
 
-    socket.on('question:show', (q) => {
-      const ver = (q.version ?? -1);
-      if (ver <= lastVersion) return;
-      lastVersion = ver;
+    socket.on('question:show',(q)=>{
+      const ver=(q.version??-1); if (ver<=lastVersion) return; lastVersion=ver;
       $('#question').textContent = q.text || '–';
     });
 
-    socket.on('status', (t) => { $('#pStatus').textContent = t; setTimeout(() => $('#pStatus').textContent = '', 1500); });
+    socket.on('status',(t)=>{ $('#pStatus').textContent=t; setTimeout(()=>$('#pStatus').textContent='',1500); });
   </script>
 </body>
 </html>
