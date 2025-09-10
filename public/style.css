@@ -1,9 +1,17 @@
-/* ─────────────────────────────────────────────
-   NEU: Stabiler runder Tisch (Admin & Player)
-   ───────────────────────────────────────────── */
 :root {
-  --seat-size: 96px;           /* Sitzgröße Desktop */
-  --seat-gap: 8px;             /* Abstand zum Rand */
+  --bg: #0a0f1a;
+  --panel: #121a2a;
+  --panel-2: #0f1730;
+  --text: #e9eefb;
+  --muted: #98a3b8;
+  --accent: #7aa2ff;
+  --ok: #29c17e;
+  --err: #ff5978;
+  --border: #213055;
+
+  /* Tisch (neu) */
+  --seat-size: 96px;  /* Sitzgröße Desktop */
+  --seat-gap: 8px;    /* Abstand vom Kreisrand */
 }
 
 @media (max-width: 900px) {
@@ -13,6 +21,77 @@
   :root { --seat-size: 80px; }
 }
 
+* { box-sizing: border-box; }
+html, body { margin:0; height:100%; }
+body {
+  background: radial-gradient(1200px 800px at 20% -10%, #1a2644, transparent), var(--bg);
+  color: var(--text);
+  font: 15px/1.5 system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, "Helvetica Neue", Arial, "Apple Color Emoji", "Segoe UI Emoji";
+}
+
+/* Layout-Container */
+.layout {
+  display:grid;
+  grid-template-columns: 260px 1fr 320px;
+  gap: 14px;
+  padding: 16px;
+  min-height: 100vh;
+}
+.sidebar, .main, .right {
+  background: linear-gradient(180deg, var(--panel), var(--panel-2));
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 14px;
+  box-shadow: 0 10px 24px rgba(0,0,0,.25);
+}
+
+/* Headlines & Text */
+.h { margin: 0 0 10px; font-size: 14px; color: var(--muted); letter-spacing: .08em; text-transform: uppercase; }
+.status { margin-top: 8px; color: var(--muted); }
+.small { font-size: 12px; color: var(--muted); }
+.muted { opacity: .7; }
+
+/* Lists / Items */
+.list .item {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  margin-bottom: 8px;
+}
+.list .item.active {
+  background: #17254b;
+  border-color: #2a4aa1;
+}
+
+/* Controls */
+.row { display:flex; gap:8px; flex-wrap: wrap; }
+button, input, select, textarea {
+  background: #0b1224;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+button.primary { background: #1b2d66; border-color:#3353b8; }
+button.ok { background:#103822; border-color:#1e6a42; }
+button.err { background:#3a1420; border-color:#7e2a44; }
+button:disabled { opacity:.6; pointer-events:none; }
+
+/* Score/Spieler-Kacheln (falls verwendet) */
+#players { display:flex; flex-direction: column; gap:8px; }
+.player {
+  display:flex; align-items:center; justify-content: space-between;
+  gap:10px; border:1px solid var(--border); border-radius:10px; padding:10px 12px;
+}
+.player .pm { display:flex; gap:6px; }
+.player .pm .score-btn { width:28px; height:28px; border-radius:8px; padding:0; }
+
+/* Buzz/Markierung optional */
+.buzzing { background: #3a1a21; border-color: #8a3b4c; }
+
+/* ─────────────────────────────────────────────
+   NEU: Stabiler runder Tisch (Admin & Player)
+   ───────────────────────────────────────────── */
 .table-wrap {
   display: flex;
   justify-content: center;
@@ -20,19 +99,17 @@
   width: 100%;
 }
 
-/* Quadratischer, immer runder Bereich durch padding-bottom:100% */
 .table-circle {
   position: relative;
   width: 100%;
-  max-width: 560px;            /* kannst du anpassen */
+  max-width: 560px;            /* anpassbar */
   margin: 6px auto;
   border-radius: 16px;
   background: radial-gradient(closest-side, #11213a 0%, #0d172a 60%, #0b1220 100%);
-  border: 1px solid var(--border, #213055);
+  border: 1px solid var(--border);
   box-shadow: 0 0 0 2px #1d2636 inset, 0 10px 30px rgba(0,0,0,.5);
 }
-
-/* erzeugt die quadratische Fläche */
+/* erzeugt eine quadratische Fläche -> immer runder Bereich */
 .table-circle::before {
   content: "";
   display: block;
@@ -53,7 +130,7 @@
     translate(var(--radius))
     rotate(calc(-1 * var(--angle)));
   border-radius: 14px;
-  border: 1px solid var(--border, #213055);
+  border: 1px solid var(--border);
   background: #0b1220;
   display: flex;
   flex-direction: column;
@@ -63,7 +140,6 @@
   padding: 8px;
   text-align: center;
 }
-
 .seat .avatar {
   width: 44px; height: 44px;
   border-radius: 50%;
@@ -103,7 +179,7 @@
   transform: translate(-50%,-50%);
   padding: 10px 14px;
   border-radius: 12px;
-  border: 1px solid var(--border, #213055);
+  border: 1px solid var(--border);
   background: #0f1420;
   text-align: center;
   font-size: 14px;
@@ -118,5 +194,24 @@
   width:20px; height:20px; line-height:20px;
   text-align:center; margin-left:6px; font-size:12px;
 }
-.badge-s { border:2px solid #6aa6ff; }
+.badge-s { border:2px solid #6aa2ff; } /* leicht angepasst an Akzent */
 .badge-b { border:2px solid #ff4d4d; }
+
+/* (Optional) Chat-Logs */
+.chatlog{
+  height:180px; overflow:auto;
+  border:1px solid #262b36; border-radius:10px;
+  background:#0f1118; padding:8px; margin-top:6px;
+}
+.chatrow{ margin-bottom:6px; }
+.pill{
+  display:inline-block; border:1px solid #262b36;
+  border-radius:999px; padding:2px 8px; font-size:12px; margin-right:6px;
+}
+.pill.admin{ background:#3b2a5e; }
+.pill.me{ background:#2a5e3b; }
+
+/* Responsive Ring-Verkleinerung */
+@media (max-width: 560px) {
+  .table-circle { max-width: 420px; }
+}
