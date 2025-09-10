@@ -5,7 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>QuizPoker – Spieler</title>
   <link rel="stylesheet" href="/style.css?v=4" />
-  <script src="/socket.io/socket.io.js"></script>
+  <!-- Socket.IO-Client über CDN -->
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 </head>
 <body>
   <div class="layout">
@@ -57,12 +58,19 @@
   </div>
 
   <script>
-    const socket = io({ transports:['websocket'], path:'/socket.io' });
+    // Socket.IO robust verbinden
+    const socket = io({
+      path: '/socket.io',
+      transports: ['websocket', 'polling']
+    });
     const $ = (s) => document.querySelector(s);
 
     // Stabile UID
     let UID = localStorage.getItem('qp_uid');
-    if (!UID) { UID = (crypto?.randomUUID?.() || (Date.now()+Math.random().toString(16).slice(2))); localStorage.setItem('qp_uid', UID); }
+    if (!UID) {
+      UID = (crypto?.randomUUID?.() || (Date.now() + Math.random().toString(16).slice(2)));
+      localStorage.setItem('qp_uid', UID);
+    }
     $('#uidLbl').textContent = UID;
 
     // Inputs
@@ -76,8 +84,8 @@
     // State
     let myName      = localStorage.getItem('qp_name') || '';
     let myRoom      = localStorage.getItem('qp_room') || '';
-    let joinedOnce  = false;         // gesperrt erst nach echtem Join
-    let lastVersion = -1;            // damit Version 0 gerendert wird
+    let joinedOnce  = false;
+    let lastVersion = -1;
 
     if (myName) inpName.value = myName;
     if (myRoom) inpCode.value = myRoom;
@@ -86,7 +94,7 @@
     const setJoinUI = (disabled) => { inpCode.disabled = disabled; inpName.disabled = disabled; btnJoin.disabled = disabled; };
 
     // Enter-Shortcut
-    ;[inpCode, inpName].forEach(el => el.addEventListener('keydown', e => { if (e.key === 'Enter') btnJoin.click(); }));
+    [inpCode, inpName].forEach(el => el.addEventListener('keydown', e => { if (e.key === 'Enter') btnJoin.click(); }));
 
     // Join Button
     btnJoin.onclick = () => {
@@ -94,6 +102,7 @@
       const name = (inpName.value || '').trim() || 'Spieler';
       if (joinedOnce) { $('#pStatus').textContent = 'Du bist bereits in der Lobby.'; return; }
       if (!code) { $('#pStatus').textContent = 'Bitte Raumcode eingeben.'; return; }
+      if (!socket.connected) { $('#pStatus').textContent = 'Nicht verbunden – kurz warten...'; return; }
       $('#pStatus').textContent = 'Beitreten...';
       socket.emit('player:join', { code, uid: UID, name });
     };
@@ -108,16 +117,17 @@
       $('#pStatus').textContent = 'Reset – neuer Raum möglich.';
       try { socket.disconnect(); } catch {}
       socket.connect();
-      setTimeout(()=>$('#pStatus').textContent = '', 1000);
+      setTimeout(() => $('#pStatus').textContent = '', 1000);
     };
 
     // Antworten senden
     btnSend.onclick = () => {
       const a = inpAnswer.value.trim();
       if (!a) return;
+      if (!socket.connected) { $('#pStatus').textContent = 'Nicht verbunden.'; return; }
       socket.emit('player:answer', { answer: a });
       inpAnswer.value = '';
-      $('#pStatus').textContent = 'Antwort gesendet.'; setTimeout(()=>$('#pStatus').textContent='', 800);
+      $('#pStatus').textContent = 'Antwort gesendet.'; setTimeout(() => $('#pStatus').textContent = '', 800);
     };
 
     // Rendering
@@ -134,10 +144,10 @@
           <div class="chips">🪙 0</div>
         `;
       }
-      const arr = Array.from(playersByUid.values()).sort((a,b) => (a.seat??99)-(b.seat??99));
+      const arr = Array.from(playersByUid.values()).sort((a,b) => (a.seat ?? 99) - (b.seat ?? 99));
       arr.forEach(p => {
         if (typeof p.seat !== 'number') return;
-        const slot = document.querySelector(\`.seat[data-seat="\${p.seat}"]\`);
+        const slot = document.querySelector(`.seat[data-seat="${p.seat}"]`);
         if (!slot) return;
         slot.innerHTML = `
           <div class="avatar">🙂</div>
@@ -149,11 +159,11 @@
     }
     function renderList() {
       const list = $('#playerList'); list.innerHTML = '';
-      const arr = Array.from(playersByUid.values()).sort((a,b)=> (a.seat??99)-(b.seat??99));
+      const arr = Array.from(playersByUid.values()).sort((a,b)=> (a.seat ?? 99) - (b.seat ?? 99));
       arr.forEach(p => {
         const div = document.createElement('div');
         div.className = 'spieler-box' + (p.connected ? '' : ' disconnected');
-        div.innerHTML = \`<strong>Sitz \${(p.seat??-1)+1}:</strong> \${p.name} – 🪙 \${p.chips ?? 0}\`;
+        div.innerHTML = `<strong>Sitz ${(p.seat ?? -1) + 1}:</strong> ${p.name} – 🪙 ${p.chips ?? 0}`;
         list.appendChild(div);
       });
     }
@@ -165,7 +175,7 @@
     // Socket Events
     socket.on('connect', () => {
       $('#pStatus').textContent = 'Verbunden.';
-      setTimeout(()=>$('#pStatus').textContent='', 800);
+      setTimeout(() => $('#pStatus').textContent = '', 800);
       // Reconnect nur wenn Eingabecode = gespeicherter Raum oder leer
       if (myRoom && (currentInputCode() === '' || currentInputCode() === myRoom)) {
         socket.emit('hello', { uid: UID, room: myRoom });
@@ -182,12 +192,13 @@
       $('#chips').textContent = r.chips ?? 0;
       $('#pStatus').textContent = `In Lobby: ${myName}`;
       joinedOnce = true; setJoinUI(true);
-      setTimeout(()=>$('#pStatus').textContent='', 1000);
+      setTimeout(() => $('#pStatus').textContent = '', 1000);
     });
 
     socket.on('state:full', (state) => {
-      if ((state.version ?? -1) <= lastVersion) return;
-      lastVersion = state.version ?? -1;
+      const ver = (state.version ?? -1);
+      if (ver <= lastVersion) return;
+      lastVersion = ver;
       $('#roomCode').textContent = state.code || '—';
       $('#question').textContent = state.question?.text || '–';
       if (typeof state.pot === 'number') $('#pot').textContent = state.pot;
@@ -204,19 +215,21 @@
     });
 
     socket.on('players:update', (msg) => {
-      if ((msg.version ?? -1) <= lastVersion) return;
-      lastVersion = msg.version ?? -1;
+      const ver = (msg.version ?? -1);
+      if (ver <= lastVersion) return;
+      lastVersion = ver;
       (msg.players || []).forEach(p => playersByUid.set(p.uid, p));
       renderAll();
     });
 
     socket.on('question:show', (q) => {
-      if ((q.version ?? -1) <= lastVersion) return;
-      lastVersion = q.version ?? -1;
+      const ver = (q.version ?? -1);
+      if (ver <= lastVersion) return;
+      lastVersion = ver;
       $('#question').textContent = q.text || '–';
     });
 
-    socket.on('status', (t) => { $('#pStatus').textContent = t; setTimeout(()=>$('#pStatus').textContent='', 1500); });
+    socket.on('status', (t) => { $('#pStatus').textContent = t; setTimeout(() => $('#pStatus').textContent = '', 1500); });
   </script>
 </body>
 </html>
