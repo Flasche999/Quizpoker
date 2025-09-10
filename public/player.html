@@ -4,13 +4,9 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>QuizPoker – Spieler</title>
-  <link rel="stylesheet" href="/style.css?v=5" />
+  <link rel="stylesheet" href="/style.css?v=6" />
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
   <style>
-    .badge{display:inline-block;font-weight:700;color:#000;background:#fff;border-radius:50%;width:20px;height:20px;line-height:20px;text-align:center;margin-left:6px;font-size:12px}
-    .badge-s{border:2px solid #6aa6ff}.badge-b{border:2px solid #ff4d4d}
-    .seat.turn,.spieler-box.turn{border:3px solid gold!important;box-shadow:0 0 10px rgba(255,215,0,.7);border-radius:10px}
-    .seat.folded,.spieler-box.folded{opacity:.5;filter:saturate(.5)}
     .betline{font-size:12px;opacity:.9}
     .muted{opacity:.7}
     .chatlog{height:180px;overflow:auto;border:1px solid #262b36;border-radius:10px;background:#0f1118;padding:8px;margin-top:6px}
@@ -50,15 +46,13 @@
         <button id="btnFold"  class="err">Passen (Fold)</button>
       </div>
 
-      <!-- Schätzen ab Frage-Start -->
       <h3 class="h" style="margin-top:16px;">Schätzen (ab Frage-Start)</h3>
       <div class="row" style="margin-top:8px;">
         <input id="inpEstimate" type="number" placeholder="Dein Wert">
         <button id="btnEstimate">Schätzwert senden</button>
       </div>
-      <div class="small muted">Hinweis: Du kannst deinen Schätzwert erneut senden; der letzte zählt.</div>
+      <div class="small muted">Du kannst deinen Schätzwert mehrfach senden – der letzte zählt.</div>
 
-      <!-- Privater DM mit Admin -->
       <h3 class="h" style="margin-top:16px;">Privater Chat mit Admin</h3>
       <div id="dmLog" class="chatlog"></div>
       <div class="row" style="margin-top:6px;">
@@ -66,7 +60,6 @@
         <button id="dmSend" class="primary">Senden</button>
       </div>
 
-      <!-- (optional) alte Einweg-Nachricht -->
       <div class="row" style="margin-top:8px;">
         <input id="inpAnswer" placeholder="Kurze Nachricht (optional)" style="flex:1;">
         <button id="btnSend">Senden</button>
@@ -89,7 +82,6 @@
         </div>
       </div>
 
-      <!-- Große Frage & Hinweise direkt unter dem Tisch -->
       <section id="qaPanel" class="item" style="margin-top:12px;">
         <h3 class="h">Frage & Hinweise</h3>
         <div class="list">
@@ -108,15 +100,19 @@
   </div>
 
   <script>
-    const socket = io({ path:'/socket.io', transports:['websocket','polling'] });
-    const $ = (s)=>document.querySelector(s);
+    const socket = io({
+      path:'/socket.io',
+      transports:['polling','websocket'],
+      upgrade:true,
+      reconnection:true,
+      reconnectionAttempts: Infinity,
+      reconnectionDelay:500,
+      reconnectionDelayMax:3000,
+      timeout:20000
+    });
 
-    // stabile UID pro Gerät
-    let UID = localStorage.getItem('qp_uid');
-    if(!UID){
-      UID = (crypto?.randomUUID?.() || (Date.now()+Math.random().toString(16).slice(2)));
-      localStorage.setItem('qp_uid', UID);
-    }
+    const $ = (s)=>document.querySelector(s);
+    let UID = localStorage.getItem('qp_uid'); if(!UID){ UID=(crypto?.randomUUID?.()|| (Date.now()+Math.random().toString(16).slice(2))); localStorage.setItem('qp_uid',UID); }
     $('#uidLbl').textContent = UID;
 
     const inpCode=$('#inpCode'), inpName=$('#inpName'), btnJoin=$('#btnJoin'), btnReset=$('#btnReset');
@@ -124,12 +120,8 @@
     const betAmount=$('#betAmount'), btnBet=$('#btnBet'), btnCall=$('#btnCall'), btnAllin=$('#btnAllin'), btnFold=$('#btnFold');
     const inpEstimate=$('#inpEstimate'), btnEstimate=$('#btnEstimate');
 
-    // DM UI
     const dmLog = $('#dmLog'), dmInput = $('#dmInput'), dmSend = $('#dmSend');
-    const dmAppend = (html)=>{
-      const d=document.createElement('div'); d.className='chatrow'; d.innerHTML=html;
-      dmLog.appendChild(d); dmLog.scrollTop = dmLog.scrollHeight;
-    };
+    const dmAppend = (html)=>{ const d=document.createElement('div'); d.className='chatrow'; d.innerHTML=html; dmLog.appendChild(d); dmLog.scrollTop = dmLog.scrollHeight; };
     const escapeHtml = (s)=>String(s||'').replace(/[&<>"]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[m]));
 
     let myName = localStorage.getItem('qp_name')||''; if (myName) inpName.value=myName;
@@ -144,7 +136,6 @@
 
     [inpCode, inpName].forEach(el=>el.addEventListener('keydown', e=>{ if(e.key==='Enter') btnJoin.click(); }));
 
-    // Join/Reset
     btnJoin.onclick = ()=>{
       const code=currentInputCode(); const name=(inpName.value||'').trim()||'Spieler';
       if (joinedOnce) { $('#pStatus').textContent='Du bist bereits in der Lobby.'; return; }
@@ -159,15 +150,11 @@
       try{ socket.disconnect(); }catch{} socket.connect(); setTimeout(()=>$('#pStatus').textContent='', 1000);
     };
 
-    // (legacy) Einweg-Nachricht
     btnSend.onclick = ()=>{
       const a=inpAnswer.value.trim(); if(!a) return;
-      socket.emit('player:answer', { answer:a });
-      inpAnswer.value='';
-      $('#pStatus').textContent='Gesendet.'; setTimeout(()=>$('#pStatus').textContent='',800);
+      socket.emit('player:answer', { answer:a }); inpAnswer.value=''; $('#pStatus').textContent='Gesendet.'; setTimeout(()=>$('#pStatus').textContent='',800);
     };
 
-    // Private DM: Spieler -> Admin
     const sendDM = ()=>{
       const msg = dmInput.value.trim(); if(!msg) return;
       socket.emit('player:dm', { message: msg });
@@ -177,13 +164,11 @@
     dmSend.onclick = sendDM;
     dmInput.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); sendDM(); }});
 
-    // Betting
     btnBet.onclick   = ()=>{ const amt=Math.max(1,parseInt(betAmount.value||'0',10)||0); socket.emit('player:bet',{ amount:amt }); };
     btnCall.onclick  = ()=> socket.emit('player:call');
     btnAllin.onclick = ()=> socket.emit('player:allin');
     btnFold.onclick  = ()=> socket.emit('player:fold');
 
-    // Estimate (ab Frage-Start; Server prüft)
     btnEstimate.onclick = ()=>{
       const v = inpEstimate.value;
       if (v==='' || v===null) socket.emit('player:estimate',{ value:null });
@@ -191,7 +176,6 @@
       $('#pStatus').textContent='Schätzwert gesendet.'; setTimeout(()=>$('#pStatus').textContent='',800);
     };
 
-    // Helfer
     function badge(p){
       const isSB = (p.seat === (current.blinds?.small ?? null));
       const isBB = (p.seat === (current.blinds?.big ?? null));
@@ -199,12 +183,12 @@
     }
 
     function renderSeats(){
-      for (let i=0;i<8;i++){
-        const slot=document.querySelector(`.seat[data-seat="${i}"]`);
-        if (!slot) continue;
-        slot.className=`seat s${i}`;
+      const wrap = document.querySelector('.table-circle');
+      // reset Inhalte
+      wrap.querySelectorAll('.seat').forEach(slot=>{
+        slot.className = slot.className.replace(/\bturn\b|\bfolded\b|\bdisconnected\b/g,'').trim();
         slot.innerHTML='<div class="avatar">—</div><div class="name">Frei</div><div class="chips">🪙 0</div><div class="betline">Runde: 🪙 0 · Gesamt: 🪙 0</div>';
-      }
+      });
       const arr=Array.from(playersByUid.values()).sort((a,b)=>(a.seat??99)-(b.seat??99));
       arr.forEach(p=>{
         if (typeof p.seat!=='number') return;
@@ -235,7 +219,6 @@
       if (typeof st.pot==='number') $('#pot').textContent = st.pot;
       $('#currentBet').textContent = st.currentBetRound || 0;
 
-      // große Frage/Hinweise unter dem Tisch
       $('#qTextMain').textContent = st.question?.text || '–';
       $('#qH1Main').textContent   = st.question?.hint1 ?? 'verdeckt';
       $('#qH2Main').textContent   = st.question?.hint2 ?? 'verdeckt';
@@ -246,7 +229,6 @@
       const me = playersByUid.get(UID); if (me) $('#chips').textContent = me.chips ?? 0;
     }
 
-    // Sockets
     socket.on('connect', ()=>{
       $('#pStatus').textContent='Verbunden.'; setTimeout(()=>$('#pStatus').textContent='',800);
       if (myRoom && (currentInputCode()==='' || currentInputCode()===myRoom)) socket.emit('hello', { uid:UID, room:myRoom });
@@ -294,7 +276,6 @@
         $('#qH2Main').textContent   = patch.question?.hint2 ?? 'verdeckt';
         $('#qSolMain').textContent  = patch.question?.solution ?? 'verdeckt';
       }
-      // KEIN mod:sync-all hier!
     });
 
     socket.on('question:show',(q)=>{
@@ -302,7 +283,6 @@
       $('#qH1Main').textContent='verdeckt'; $('#qH2Main').textContent='verdeckt'; $('#qSolMain').textContent='verdeckt';
     });
 
-    // DMs: Admin → Spieler & Clear
     socket.on('dm:from-admin', ({ message, ts })=>{
       dmAppend(`<span class="pill admin">Admin</span> ${new Date(ts||Date.now()).toLocaleTimeString()} — ${escapeHtml(message)}`);
     });
