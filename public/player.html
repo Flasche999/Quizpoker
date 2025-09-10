@@ -4,8 +4,10 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>QuizPoker – Spieler</title>
-  <link rel="stylesheet" href="/style.css?v=6" />
+  <!-- Cache-Bust, damit die neue style.css sicher geladen wird -->
+  <link rel="stylesheet" href="/style.css?v=9" />
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+
   <style>
     .betline{font-size:12px;opacity:.9}
     .muted{opacity:.7}
@@ -14,6 +16,25 @@
     .pill{display:inline-block;border:1px solid #262b36;border-radius:999px;padding:2px 8px;font-size:12px;margin-right:6px}
     .pill.admin{background:#3b2a5e}
     .pill.me{background:#2a5e3b}
+
+    /* ─── Harter Fix gegen überlappende Sitze ─── */
+    .table-circle{
+      position:relative;
+      width:100%;
+      max-width:560px;
+      margin:6px auto;
+      border:1px solid var(--border, #213055);
+      border-radius:16px;
+      background:#0f1118;
+      aspect-ratio:1/1;               /* immer quadratisch */
+    }
+    .table-circle::before{ display:none !important; content:""; }
+
+    /* Sitze zwingend zentrieren – Verteilung erfolgt über transform (style.css) */
+    .seat.s0,.seat.s1,.seat.s2,.seat.s3,.seat.s4,.seat.s5,.seat.s6,.seat.s7{
+      top:50% !important; left:50% !important; right:auto !important; bottom:auto !important; margin:0 !important;
+      position:absolute;
+    }
   </style>
 </head>
 <body>
@@ -122,7 +143,7 @@
 
     const dmLog = $('#dmLog'), dmInput = $('#dmInput'), dmSend = $('#dmSend');
     const dmAppend = (html)=>{ const d=document.createElement('div'); d.className='chatrow'; d.innerHTML=html; dmLog.appendChild(d); dmLog.scrollTop = dmLog.scrollHeight; };
-    const escapeHtml = (s)=>String(s||'').replace(/[&<>"]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[m]));
+    const escapeHtml = (s)=>String(s||'').replace(/[&<>"]/g,m=>({"&":"&amp;","<":"&lt;","&gt;":"&gt;","\"":"&quot;"}[m]));
 
     let myName = localStorage.getItem('qp_name')||''; if (myName) inpName.value=myName;
     let myRoom = localStorage.getItem('qp_room')||''; if (myRoom) inpCode.value=myRoom;
