@@ -5,8 +5,10 @@
 // - Einzigartige Namen pro Raum
 // - Kein Doppelplatz: UID wird einmalig geführt
 // - Reconnect erlaubt, Takeover kickt alte Verbindung derselben UID
-// - NEU: blinds (small/big) + turnUid im State, Admin-Event mod:set-turn
+// - Blinds (small/big) + turnUid (wer ist dran)
+// - NEU: Betting (Bet/Call/Fold/All-in), Live-Pot, Bets pro Spieler
 // - NEU: Soft-Handling, wenn Moderator disconnectet + mod:claim-room
+// - NEU: Pot-Auszahlung an Gewinner (mod:award-pot)
 
 import express from 'express';
 import http from 'http';
@@ -23,8 +25,8 @@ const server = http.createServer(app);
 const io     = new Server(server, {
   cors: { origin: '*' },
   pingInterval: 20000,
-  pingTimeout: 60000,              // etwas großzügiger
-  connectionStateRecovery: {}      // hilft bei kurzen Verbindungsabbrüchen
+  pingTimeout: 60000,
+  connectionStateRecovery: {}
 });
 
 // ─────────────────────────────────────────────────────────────
@@ -68,10 +70,11 @@ const rooms = new Map();
     code,
     moderatorId,               // Admin-Socket-ID (oder null)
     version,
-    players: Map<uid, { uid, name, chips, connected, socketId, seat }>,
+    players: Map<uid, { uid, name, chips, connected, socketId, seat, bet, status }>,
     questions: [...],
     qIndex: number,            // -1 bevor gestartet
     pot: number,
+    currentBet: number,        // höchste Bet in der aktuellen Runde
     blinds: { small: number|null, big: number|null },
     turnUid: string|null,
     closeTimer?: NodeJS.Timeout|null
@@ -83,6 +86,7 @@ function roomState(room) {
     code: room.code,
     version: room.version || 0,
     pot: room.pot || 0,
+    currentBet: room.currentBet || 0,
     qIndex: room.qIndex ?? -1,
     blinds: room.blinds || { small: null, big: null },
     turnUid: room.turnUid || null,
@@ -91,7 +95,9 @@ function roomState(room) {
       name: p.name,
       chips: p.chips,
       connected: !!p.connected,
-      seat: typeof p.seat === 'number' ? p.seat : null
+      seat: typeof p.seat === 'number' ? p.seat : null,
+      bet: p.bet || 0,
+      status: p.status || 'active'  // active | folded | allin
     })),
     question: room.questions?.[room.qIndex] ? {
       index: room.qIndex,
@@ -102,7 +108,7 @@ function roomState(room) {
 const bump = (room) => { room.version = (room.version || 0) + 1; };
 const ensureRoom = (code) => rooms.get(code) || null;
 
-// Sitz-Utils
+// Sitz-/Hilfsfunktionen
 function seatIsFree(room, idx) {
   for (const p of room.players.values()) if (p.seat === idx) return false;
   return true;
@@ -111,19 +117,25 @@ function nextFreeSeat(room) {
   for (let i = 0; i < MAX_SEATS; i++) if (seatIsFree(room, i)) return i;
   return -1;
 }
-function nameTaken(room, name, byUid = null) {
-  const n = (name || '').trim().toLowerCase();
-  for (const p of room.players.values()) {
-    if (byUid && p.uid === byUid) continue;
-    if ((p.name || '').trim().toLowerCase() === n) return true;
-  }
-  return false;
-}
 function findUidBySeat(room, seat) {
-  for (const p of room.players.values()) {
-    if (p.seat === seat) return p.uid;
-  }
+  for (const p of room.players.values()) if (p.seat === seat) return p.uid;
   return null;
+}
+function resetBets(room) {
+  room.currentBet = 0;
+  room.pot = 0;
+  for (const p of room.players.values()) {
+    p.bet = 0;
+    p.status = 'active';
+  }
+}
+function addToPot(room, p, amount) {
+  const amt = Math.max(0, Math.min(Number(amount) || 0, p.chips));
+  if (!amt) return 0;
+  p.chips -= amt;
+  p.bet = (p.bet || 0) + amt;
+  room.pot = (room.pot || 0) + amt;
+  return amt;
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -145,6 +157,7 @@ io.on('connection', (socket) => {
       questions: loadQuestions(),
       qIndex: -1,
       pot: 0,
+      currentBet: 0,
       blinds: { small: null, big: null },
       turnUid: null,
       closeTimer: null
@@ -159,7 +172,6 @@ io.on('connection', (socket) => {
   });
 
   // Moderator übernimmt (erneut) einen bestehenden Raum
-  // payload: { code: string }
   socket.on('mod:claim-room', ({ code }) => {
     code = String(code || '').toUpperCase().trim();
     const room = rooms.get(code);
@@ -176,7 +188,7 @@ io.on('connection', (socket) => {
     console.log('[ROOM] moderator claimed', code, '->', socket.id);
   });
 
-  // Admin setzt Blinds (optional) – erwartet seats (Zahlen) oder null
+  // Admin setzt Blinds (optional)
   socket.on('mod:set-blinds', ({ small, big }) => {
     const c = socket.data.room; const room = ensureRoom(c); if (!room) return;
     const sSeat = (Number.isInteger(small) ? small : null);
@@ -188,14 +200,10 @@ io.on('connection', (socket) => {
   });
 
   // Admin setzt „wer ist am Zug“
-  // payload: { uid?: string, seat?: number }
   socket.on('mod:set-turn', ({ uid, seat }) => {
     const c = socket.data.room; const room = ensureRoom(c); if (!room) return;
-
     let targetUid = uid || null;
-    if (!targetUid && Number.isInteger(seat)) {
-      targetUid = findUidBySeat(room, seat);
-    }
+    if (!targetUid && Number.isInteger(seat)) targetUid = findUidBySeat(room, seat);
     if (!targetUid || !room.players.has(targetUid)) {
       io.to(socket.id).emit('status', 'Konnte Turn nicht setzen: UID/Seat ungültig.');
       return;
@@ -206,14 +214,23 @@ io.on('connection', (socket) => {
     console.log('[TURN]', c, '->', room.turnUid);
   });
 
-  // Admin nächste Frage
+  // Admin nächste Frage (setzt Bets/Pot zurück + zeigt Frage)
   socket.on('mod:next-question', () => {
     const c = socket.data.room; const room = ensureRoom(c); if (!room) return;
     if (!room.questions || room.questions.length === 0) return;
 
     if (room.qIndex + 1 < room.questions.length) {
       room.qIndex += 1;
+      // Neue Schätzfrage → Betting-Reset
+      resetBets(room);
       bump(room);
+      io.in(c).emit('state:partial', {
+        version: room.version,
+        pot: room.pot,
+        currentBet: room.currentBet
+      });
+      io.in(c).emit('players:update', { version: room.version, players: roomState(room).players });
+
       io.in(c).emit('question:show', {
         version: room.version,
         index: room.qIndex,
@@ -224,7 +241,28 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Admin markiert Ergebnis
+  // Admin: Pot an Gewinner auszahlen (UID)
+  socket.on('mod:award-pot', ({ uid }) => {
+    const c = socket.data.room; const room = ensureRoom(c); if (!room) return;
+    const p = room.players.get(uid);
+    if (!p) { io.to(socket.id).emit('status', 'Gewinner nicht gefunden.'); return; }
+
+    const pot = room.pot || 0;
+    if (pot > 0) {
+      p.chips = (p.chips || 0) + pot;
+      room.pot = 0;
+    }
+    // Runde schließen/resetten (Bets zurück)
+    for (const pl of room.players.values()) { pl.bet = 0; if (pl.status !== 'disconnected') pl.status = 'active'; }
+    room.currentBet = 0;
+
+    bump(room);
+    io.in(c).emit('state:partial', { version: room.version, pot: room.pot, currentBet: room.currentBet });
+    io.in(c).emit('players:update', { version: room.version, players: roomState(room).players });
+    io.in(c).emit('status', `🏆 Pot (${pot}) geht an ${p.name}.`);
+  });
+
+  // Admin markiert Ergebnis (bleibt erhalten)
   socket.on('mod:mark', ({ uid, result, delta }) => {
     const c = socket.data.room; const room = ensureRoom(c); if (!room) return;
     const p = room.players.get(uid); if (!p) return;
@@ -282,7 +320,7 @@ io.on('connection', (socket) => {
     // vorhandener Eintrag?
     let existing = room.players.get(uid);
 
-    // Takeover: gleiche UID noch connected → alte Verbindung kicken
+    // Takeover
     if (existing && existing.connected) {
       const oldSockId = existing.socketId;
       const oldSock = oldSockId && io.sockets.sockets.get(oldSockId);
@@ -308,14 +346,14 @@ io.on('connection', (socket) => {
       if (seat === -1) {
         return io.to(socket.id).emit('player:join-result', { ok: false, error: 'Tisch ist voll (8/8).' });
       }
-      p = { uid, name: desiredName, chips: 100, connected: true, socketId: socket.id, seat };
+      p = {
+        uid, name: desiredName, chips: 100,
+        connected: true, socketId: socket.id, seat,
+        bet: 0, status: 'active'
+      };
       room.players.set(uid, p);
+      if (!room.turnUid) room.turnUid = uid;
       console.log('[JOIN] new', { code, uid, name: p.name, seat: p.seat });
-
-      // Falls noch niemand am Zug ist, ersten Spieler setzen (optional)
-      if (!room.turnUid) {
-        room.turnUid = uid;
-      }
     } else {
       p.connected = true;
       p.socketId  = socket.id;
@@ -335,7 +373,7 @@ io.on('connection', (socket) => {
     io.in(code).emit('players:update', { version: room.version, players: roomState(room).players });
   });
 
-  // Spieler Antwort (an Admin, falls vorhanden)
+  // Spieler-Antwort (an Admin)
   socket.on('player:answer', ({ answer }) => {
     const c = socket.data.room; const uid = socket.data.uid;
     const room = ensureRoom(c); if (!room) return;
@@ -347,6 +385,59 @@ io.on('connection', (socket) => {
     }
   });
 
+  // ─────────────── NEU: Betting-Events (Player) ───────────────
+  socket.on('player:bet', ({ amount }) => {
+    const c = socket.data.room; const uid = socket.data.uid;
+    const room = ensureRoom(c); if (!room) return;
+    const p = room.players.get(uid); if (!p || p.status === 'folded') return;
+
+    const added = addToPot(room, p, Number(amount));
+    if (!added) return;
+
+    if (p.bet > room.currentBet) room.currentBet = p.bet;
+    bump(room);
+    io.in(c).emit('state:partial', { version: room.version, pot: room.pot, currentBet: room.currentBet });
+    io.in(c).emit('players:update', { version: room.version, players: roomState(room).players });
+  });
+
+  socket.on('player:call', () => {
+    const c = socket.data.room; const uid = socket.data.uid;
+    const room = ensureRoom(c); if (!room) return;
+    const p = room.players.get(uid); if (!p || p.status === 'folded') return;
+
+    const need = Math.max(0, (room.currentBet || 0) - (p.bet || 0));
+    if (need <= 0) return;
+    addToPot(room, p, need);
+    // currentBet bleibt gleich
+    bump(room);
+    io.in(c).emit('state:partial', { version: room.version, pot: room.pot, currentBet: room.currentBet });
+    io.in(c).emit('players:update', { version: room.version, players: roomState(room).players });
+  });
+
+  socket.on('player:allin', () => {
+    const c = socket.data.room; const uid = socket.data.uid;
+    const room = ensureRoom(c); if (!room) return;
+    const p = room.players.get(uid); if (!p || p.status === 'folded') return;
+
+    const added = addToPot(room, p, p.chips);
+    p.status = 'allin';
+    if (p.bet > room.currentBet) room.currentBet = p.bet;
+    if (!added) return;
+    bump(room);
+    io.in(c).emit('state:partial', { version: room.version, pot: room.pot, currentBet: room.currentBet });
+    io.in(c).emit('players:update', { version: room.version, players: roomState(room).players });
+  });
+
+  socket.on('player:fold', () => {
+    const c = socket.data.room; const uid = socket.data.uid;
+    const room = ensureRoom(c); if (!room) return;
+    const p = room.players.get(uid); if (!p) return;
+
+    p.status = 'folded';
+    bump(room);
+    io.in(c).emit('players:update', { version: room.version, players: roomState(room).players });
+  });
+
   // Disconnect
   socket.on('disconnect', (reason) => {
     const c = socket.data?.room;
@@ -356,10 +447,8 @@ io.on('connection', (socket) => {
     const role = socket.data?.role;
 
     if (role === 'moderator') {
-      // Soft-Handling: Raum bleibt bestehen; optionaler Cleanup-Timer
       const was = room.moderatorId;
       room.moderatorId = null;
-
       io.in(c).emit('status', 'Moderator kurz weg – Raum bleibt bestehen.');
 
       if (room.closeTimer) clearTimeout(room.closeTimer);
@@ -380,11 +469,10 @@ io.on('connection', (socket) => {
     if (uid && room.players.has(uid)) {
       const p = room.players.get(uid);
       if (p.socketId === socket.id) p.socketId = null;
-      p.connected = false;           // bleibt im Raum sichtbar, aber „offline“
+      p.connected = false;
       bump(room);
       io.in(c).emit('players:update', { version: room.version, players: roomState(room).players });
 
-      // Optional: wenn der am Zug gehende Spieler disconnectet, Turn löschen
       if (room.turnUid === uid) {
         room.turnUid = null;
         bump(room);
