@@ -82,37 +82,69 @@
   </div>
 
   <script>
-    const socket = io({ transports:['websocket'], path:'/socket.io' });
+    // ————————————————— Socket.IO: robust verbinden (WebSocket + Polling Fallback)
+    const socket = io({
+      path: '/socket.io',
+      transports: ['websocket', 'polling']
+    });
     const el = (s) => document.querySelector(s);
 
-    // UI: Buttons
-    el('#btnCreate').onclick    = () => socket.emit('mod:create-room');
-    el('#btnNextQ').onclick     = () => socket.emit('mod:next-question');
-    el('#btnSetBlinds').onclick = () => socket.emit('mod:set-blinds', { small: el('#inpSB').value.trim(), big: el('#inpBB').value.trim() });
-    el('#btnSyncAll').onclick   = () => socket.emit('mod:sync-all');
+    // hilfreiche Status-Logs/Feedback
+    socket.on('connect', () => {
+      console.log('[socket] connected', socket.id);
+      el('#adminStatus').textContent = 'Verbunden: ' + socket.id;
+    });
+    socket.on('connect_error', (err) => {
+      console.warn('[socket] connect_error', err?.message || err);
+      el('#adminStatus').textContent = 'Verbindungsfehler: ' + (err?.message || err);
+    });
+    socket.on('disconnect', (r) => {
+      console.log('[socket] disconnected', r);
+      el('#adminStatus').textContent = 'Getrennt: ' + r;
+    });
+
+    // kleiner Helfer: nur senden, wenn verbunden
+    function emitIfConnected(event, payload) {
+      if (!socket.connected) {
+        el('#adminStatus').textContent = 'Nicht verbunden – bitte kurz warten oder neu laden.';
+        return false;
+      }
+      socket.emit(event, payload);
+      return true;
+    }
+
+    // ————————————————— UI: Buttons
+    el('#btnCreate').onclick    = () => emitIfConnected('mod:create-room');
+    el('#btnNextQ').onclick     = () => emitIfConnected('mod:next-question');
+    el('#btnSetBlinds').onclick = () => {
+      const small = el('#inpSB').value.trim();
+      const big   = el('#inpBB').value.trim();
+      emitIfConnected('mod:set-blinds', { small, big });
+    };
+    el('#btnSyncAll').onclick   = () => emitIfConnected('mod:sync-all');
 
     el('#btnMarkCorrect').onclick = () => {
       const uid = el('#uidTarget').value.trim(); if (!uid) return;
       const delta = parseInt(el('#deltaChips').value || '0', 10) || 0;
-      socket.emit('mod:mark', { uid, result: 'correct', delta });
+      emitIfConnected('mod:mark', { uid, result: 'correct', delta });
     };
     el('#btnMarkWrong').onclick = () => {
       const uid = el('#uidTarget').value.trim(); if (!uid) return;
       const delta = parseInt(el('#deltaChips').value || '0', 10) || 0;
-      socket.emit('mod:mark', { uid, result: 'wrong', delta: -Math.abs(delta) });
+      emitIfConnected('mod:mark', { uid, result: 'wrong', delta: -Math.abs(delta) });
     };
     el('#btnPlus').onclick = () => {
       const uid = el('#uidTarget').value.trim(); if (!uid) return;
       const delta = Math.abs(parseInt(el('#deltaChips').value || '0', 10) || 0);
-      socket.emit('mod:adjust', { uid, delta });
+      emitIfConnected('mod:adjust', { uid, delta });
     };
     el('#btnMinus').onclick = () => {
       const uid = el('#uidTarget').value.trim(); if (!uid) return;
       const delta = -Math.abs(parseInt(el('#deltaChips').value || '0', 10) || 0);
-      socket.emit('mod:adjust', { uid, delta });
+      emitIfConnected('mod:adjust', { uid, delta });
     };
 
-    // State
+    // ————————————————— State
     let lastVersion = -1;
     const playersMap = new Map();
 
@@ -153,12 +185,13 @@
     el('#players').addEventListener('click', (e) => {
       const btn = e.target.closest('.score-btn'); if (!btn) return;
       const uid = btn.dataset.uid; const delta = parseInt(btn.dataset.d, 10);
-      socket.emit('mod:adjust', { uid, delta });
+      emitIfConnected('mod:adjust', { uid, delta });
     });
 
-    // Socket Events
+    // ————————————————— Socket Events vom Server
     socket.on('mod:room-created', ({ code, state }) => {
       el('#roomCode').textContent = code;
+      el('#adminStatus').textContent = 'Raum erstellt: ' + code;
       lastVersion = -1;
       playersMap.clear();
       (state.players || []).forEach(p => playersMap.set(p.uid, p));
