@@ -7,6 +7,30 @@
   <link rel="stylesheet" href="/style.css?v=4" />
   <!-- Socket.IO-Client über CDN (robust auf Render) -->
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+
+  <!-- Badges + Turn-Highlight (optional in style.css auslagern) -->
+  <style>
+    .badge {
+      display:inline-block;
+      font-weight:700;
+      color:#000;
+      background:#fff;
+      border-radius:50%;
+      width:20px; height:20px;
+      line-height:20px;
+      text-align:center;
+      margin-left:6px;
+      font-size:12px;
+    }
+    .badge-s { border:2px solid #1363ff; } /* blau */
+    .badge-b { border:2px solid #ff2b2b; } /* rot */
+
+    .seat.turn, .player.turn {
+      border:3px solid gold !important;
+      box-shadow:0 0 10px rgba(255,215,0,.7);
+      border-radius:10px;
+    }
+  </style>
 </head>
 <body>
   <div class="layout">
@@ -24,8 +48,8 @@
       </div>
 
       <div class="status" style="margin-top:12px;">
-        <div>Small Blind: <input id="inpSB" placeholder="Name" style="width:100%;margin-top:6px;"></div>
-        <div>Big Blind: <input id="inpBB" placeholder="Name" style="width:100%;margin-top:6px;"></div>
+        <div>Small Blind (Seat #): <input id="inpSB" placeholder="0–7" style="width:100%;margin-top:6px;"></div>
+        <div>Big Blind (Seat #): <input id="inpBB" placeholder="0–7" style="width:100%;margin-top:6px;"></div>
         <button id="btnSetBlinds" style="margin-top:6px;">Blinds setzen</button>
       </div>
 
@@ -114,12 +138,20 @@
       return true;
     }
 
+    // ——— globaler UI-State (für Badges/Turn)
+    const currentState = {
+      blinds: { small: null, big: null }, // seats (0–7)
+      turnUid: null
+    };
+
     // ————————————————— UI: Buttons
     el('#btnCreate').onclick    = () => emitIfConnected('mod:create-room');
     el('#btnNextQ').onclick     = () => emitIfConnected('mod:next-question');
     el('#btnSetBlinds').onclick = () => {
-      const small = el('#inpSB').value.trim();
-      const big   = el('#inpBB').value.trim();
+      const sb = el('#inpSB').value.trim();
+      const bb = el('#inpBB').value.trim();
+      const small = sb === '' ? null : Number(sb);
+      const big   = bb === '' ? null : Number(bb);
       emitIfConnected('mod:set-blinds', { small, big });
     };
     el('#btnSyncAll').onclick   = () => emitIfConnected('mod:sync-all');
@@ -151,12 +183,18 @@
 
     function renderPlayersPanel() {
       const wrap = el('#players'); wrap.innerHTML = '';
-      const arr = Array.from(playersMap.values()).sort((a,b)=> a.name.localeCompare(b.name));
+      const arr = Array.from(playersMap.values()).sort((a,b)=> (a.seat ?? 99) - (b.seat ?? 99));
+
       arr.forEach(p => {
+        const isSB = (p.seat === (currentState.blinds?.small ?? null));
+        const isBB = (p.seat === (currentState.blinds?.big ?? null));
+        const sBadge = isSB ? '<span class="badge badge-s">S</span>' : '';
+        const bBadge = isBB ? '<span class="badge badge-b">B</span>' : '';
+
         const div = document.createElement('div');
-        div.className = 'player';
+        div.className = 'player' + (p.uid === currentState.turnUid ? ' turn' : '');
         div.innerHTML = `
-          <span title="UID: ${p.uid}">${p.name} ${p.connected? '🟢':'🔴'}</span>
+          <span title="UID: ${p.uid}">${p.name} ${p.connected? '🟢':'🔴'} ${sBadge} ${bBadge}</span>
           <strong>${p.chips || 0}</strong>
           <div class="pm">
             <button class="score-btn" data-uid="${p.uid}" data-d="+10">+10</button>
@@ -178,8 +216,15 @@
         if (typeof p.seat !== 'number') return;
         const slot = document.querySelector(`.seat[data-seat="${p.seat}"]`);
         if (!slot) return;
-        slot.innerHTML = `<div class="avatar">🙂</div><div class="name">${p.name}</div><div class="chips">🪙 ${p.chips ?? 0}</div>`;
+
+        const isSB = (p.seat === (currentState.blinds?.small ?? null));
+        const isBB = (p.seat === (currentState.blinds?.big ?? null));
+        const sBadge = isSB ? '<span class="badge badge-s">S</span>' : '';
+        const bBadge = isBB ? '<span class="badge badge-b">B</span>' : '';
+
+        slot.innerHTML = `<div class="avatar">🙂</div><div class="name">${p.name} ${sBadge} ${bBadge}</div><div class="chips">🪙 ${p.chips ?? 0}</div>`;
         if (!p.connected) slot.classList.add('disconnected');
+        if (p.uid === currentState.turnUid) slot.classList.add('turn');
       });
     }
 
@@ -195,6 +240,11 @@
       el('#adminStatus').textContent = 'Raum erstellt: ' + code;
       lastVersion = -1;
       playersMap.clear();
+
+      // Blinds/Turn übernehmen, falls vorhanden
+      currentState.blinds = state?.blinds || { small:null, big:null };
+      currentState.turnUid = state?.turnUid || null;
+
       (state.players || []).forEach(p => playersMap.set(p.uid, p));
       el('#qIndex').textContent = state.qIndex >= 0 ? (state.qIndex + 1) : '–';
       el('#questionBox').textContent = state.question?.text || '–';
@@ -205,6 +255,10 @@
       const ver = (state.version ?? -1);
       if (ver <= lastVersion) return;
       lastVersion = ver;
+
+      currentState.blinds = state.blinds || { small:null, big:null };
+      currentState.turnUid = state.turnUid || null;
+
       playersMap.clear();
       (state.players || []).forEach(p => playersMap.set(p.uid, p));
       el('#qIndex').textContent = state.qIndex >= 0 ? (state.qIndex + 1) : '–';
@@ -217,6 +271,17 @@
       if (ver <= lastVersion) return;
       lastVersion = ver;
       (msg.players || []).forEach(p => playersMap.set(p.uid, p));
+      renderPlayersPanel(); renderSeats();
+    });
+
+    // ——— NEU: Partial-Updates (z. B. geänderte Blinds / Zugwechsel)
+    socket.on('state:partial', (patch) => {
+      const ver = (patch.version ?? -1);
+      if (ver <= lastVersion) return;
+      lastVersion = ver;
+
+      if (patch.blinds) currentState.blinds = patch.blinds;
+      if ('turnUid' in patch) currentState.turnUid = patch.turnUid;
       renderPlayersPanel(); renderSeats();
     });
 
