@@ -7,13 +7,12 @@
   <link rel="stylesheet" href="/style.css?v=4" />
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
   <style>
-    /* Badges + Turn-Highlight */
     .badge{display:inline-block;font-weight:700;color:#000;background:#fff;border-radius:50%;width:20px;height:20px;line-height:20px;text-align:center;margin-left:6px;font-size:12px}
-    .badge-s{border:2px solid #6aa6ff}
-    .badge-b{border:2px solid #ff4d4d}
+    .badge-s{border:2px solid #6aa6ff}.badge-b{border:2px solid #ff4d4d}
     .seat.turn,.spieler-box.turn{border:3px solid gold!important;box-shadow:0 0 10px rgba(255,215,0,.7);border-radius:10px}
     .seat.folded,.spieler-box.folded{opacity:.5;filter:saturate(.5)}
     .betline{font-size:12px;opacity:.9}
+    .muted{opacity:.7}
   </style>
 </head>
 <body>
@@ -31,18 +30,17 @@
       <div class="status">Du bist in Raum: <code id="roomCode" class="small">—</code></div>
       <div class="status">UID: <code id="uidLbl" class="small">—</code></div>
       <div class="status">Chips: <strong id="chips">0</strong></div>
-      <div class="status">Aktuelle Bet: <strong id="currentBet">0</strong></div>
+      <div class="status">Aktuelle Bet (Runde): <strong id="currentBet">0</strong></div>
       <div class="status" id="pStatus"></div>
 
-      <h3 class="h" style="margin-top:16px;">Aktuelle Frage</h3>
-      <div id="question" class="status" style="font-size:18px;">–</div>
+      <h3 class="h" style="margin-top:16px;">Frage & Hinweise</h3>
+      <div class="status"><strong>Frage:</strong> <span id="qText">–</span></div>
+      <div class="status"><strong>Hinweis 1:</strong> <span id="qH1" class="muted">verdeckt</span></div>
+      <div class="status"><strong>Hinweis 2:</strong> <span id="qH2" class="muted">verdeckt</span></div>
+      <div class="status"><strong>Lösung:</strong> <span id="qSol" class="muted">verdeckt</span></div>
 
-      <div class="row" style="margin-top:10px;">
-        <input id="inpAnswer" placeholder="Deine Antwort" style="flex:1;">
-        <button id="btnSend">Antwort senden</button>
-      </div>
-
-      <h3 class="h" style="margin-top:16px;">Einsatz</h3>
+      <h3 class="h" style="margin-top:16px;">Aktion</h3>
+      <div class="small muted">Du kannst nur handeln, wenn du am Zug bist (goldener Rahmen).</div>
       <div class="row" style="margin-top:8px;">
         <input id="betAmount" type="number" placeholder="Betrag" min="1" style="width:120px;">
         <button id="btnBet" class="primary">Setzen/Raise</button>
@@ -52,10 +50,21 @@
         <button id="btnAllin" class="ok">All-in</button>
         <button id="btnFold"  class="err">Passen (Fold)</button>
       </div>
+
+      <h3 class="h" style="margin-top:16px;">Schätzen (nur Runde 4)</h3>
+      <div class="row" style="margin-top:8px;">
+        <input id="inpEstimate" type="number" placeholder="Dein Wert">
+        <button id="btnEstimate">Schätzwert senden</button>
+      </div>
+
+      <div class="row" style="margin-top:8px;">
+        <input id="inpAnswer" placeholder="Nachricht an Admin (optional)" style="flex:1;">
+        <button id="btnSend">Senden</button>
+      </div>
     </aside>
 
     <main class="main">
-      <h3 class="h">Lobby – Virtueller Tisch</h3>
+      <h3 class="h">Virtueller Tisch</h3>
       <div class="table-wrap">
         <div class="table-circle" id="table">
           <div class="seat s0" data-seat="0"></div>
@@ -78,135 +87,114 @@
   </div>
 
   <script>
-    const socket = io({ path: '/socket.io', transports: ['websocket','polling'] });
-    const $ = (s) => document.querySelector(s);
-
-    // UID stabil
-    let UID = localStorage.getItem('qp_uid');
-    if (!UID) { UID = (crypto?.randomUUID?.() || (Date.now() + Math.random().toString(16).slice(2))); localStorage.setItem('qp_uid', UID); }
+    const socket = io({ path:'/socket.io', transports:['websocket','polling'] });
+    const $ = (s)=>document.querySelector(s);
+    let UID = localStorage.getItem('qp_uid'); if(!UID){ UID=(crypto?.randomUUID?.()|| (Date.now()+Math.random().toString(16).slice(2))); localStorage.setItem('qp_uid',UID); }
     $('#uidLbl').textContent = UID;
 
-    // Inputs
     const inpCode=$('#inpCode'), inpName=$('#inpName'), btnJoin=$('#btnJoin'), btnReset=$('#btnReset');
     const inpAnswer=$('#inpAnswer'), btnSend=$('#btnSend');
     const betAmount=$('#betAmount'), btnBet=$('#btnBet'), btnCall=$('#btnCall'), btnAllin=$('#btnAllin'), btnFold=$('#btnFold');
+    const inpEstimate=$('#inpEstimate'), btnEstimate=$('#btnEstimate');
 
-    // State
-    let myName = localStorage.getItem('qp_name') || '';
-    let myRoom = localStorage.getItem('qp_room') || '';
-    let joinedOnce = false, lastVersion = -1;
+    let myName = localStorage.getItem('qp_name')||''; if (myName) inpName.value=myName;
+    let myRoom = localStorage.getItem('qp_room')||''; if (myRoom) inpCode.value=myRoom;
+    let joinedOnce=false, lastVersion=-1;
 
-    const currentState = {
-      blinds: { small:null, big:null },
-      turnUid: null,
-      currentBet: 0
-    };
+    const current = { blinds:{small:null,big:null}, turnUid:null, roundIndex:0, currentBetRound:0 };
+    const playersByUid = new Map();
 
-    if (myName) inpName.value = myName;
-    if (myRoom) inpCode.value = myRoom;
-
-    const currentInputCode = () => (inpCode.value || '').toUpperCase().trim();
-    const setJoinUI = (disabled) => { inpCode.disabled = disabled; inpName.disabled = disabled; btnJoin.disabled = disabled; };
+    const currentInputCode = ()=> (inpCode.value||'').toUpperCase().trim();
+    const setJoinUI = (d)=>{ inpCode.disabled=d; inpName.disabled=d; btnJoin.disabled=d; };
 
     [inpCode, inpName].forEach(el=>el.addEventListener('keydown', e=>{ if(e.key==='Enter') btnJoin.click(); }));
 
-    // Join
-    btnJoin.onclick = () => {
-      const code = currentInputCode();
-      const name = (inpName.value || '').trim() || 'Spieler';
-      if (joinedOnce) { $('#pStatus').textContent = 'Du bist bereits in der Lobby.'; return; }
-      if (!code) { $('#pStatus').textContent = 'Bitte Raumcode eingeben.'; return; }
-      if (!socket.connected) { $('#pStatus').textContent = 'Nicht verbunden – kurz warten...'; return; }
-      $('#pStatus').textContent = 'Beitreten...';
-      socket.emit('player:join', { code, uid: UID, name });
+    btnJoin.onclick = ()=>{
+      const code=currentInputCode(); const name=(inpName.value||'').trim()||'Spieler';
+      if (joinedOnce) { $('#pStatus').textContent='Du bist bereits in der Lobby.'; return; }
+      if (!code) { $('#pStatus').textContent='Bitte Raumcode eingeben.'; return; }
+      if (!socket.connected) { $('#pStatus').textContent='Nicht verbunden.'; return; }
+      $('#pStatus').textContent='Beitreten...';
+      socket.emit('player:join', { code, uid:UID, name });
     };
-
-    btnReset.onclick = () => {
+    btnReset.onclick = ()=>{
       localStorage.removeItem('qp_room'); myRoom=''; joinedOnce=false; setJoinUI(false);
-      $('#roomCode').textContent = '—'; $('#pStatus').textContent = 'Reset – neuer Raum möglich.';
-      try { socket.disconnect(); } catch {}
-      socket.connect(); setTimeout(()=>$('#pStatus').textContent='', 1000);
+      $('#roomCode').textContent='—'; $('#pStatus').textContent='Reset – neuer Raum möglich.';
+      try{ socket.disconnect(); }catch{} socket.connect(); setTimeout(()=>$('#pStatus').textContent='', 1000);
     };
 
-    // Antworten
-    btnSend.onclick = () => {
-      const a = inpAnswer.value.trim(); if (!a) return;
-      if (!socket.connected) { $('#pStatus').textContent = 'Nicht verbunden.'; return; }
-      socket.emit('player:answer', { answer: a });
-      inpAnswer.value = ''; $('#pStatus').textContent = 'Antwort gesendet.'; setTimeout(()=>$('#pStatus').textContent='', 800);
+    btnSend.onclick = ()=>{
+      const a=inpAnswer.value.trim(); if(!a) return;
+      socket.emit('player:answer', { answer:a }); inpAnswer.value=''; $('#pStatus').textContent='Gesendet.'; setTimeout(()=>$('#pStatus').textContent='',800);
     };
 
-    // Betting
-    btnBet.onclick = () => {
-      const amt = Math.max(1, parseInt(betAmount.value || '0', 10) || 0);
-      socket.emit('player:bet', { amount: amt });
+    // Betting-Buttons (Server erzwingt: nur am Zug)
+    btnBet.onclick   = ()=>{ const amt=Math.max(1,parseInt(betAmount.value||'0',10)||0); socket.emit('player:bet',{ amount:amt }); };
+    btnCall.onclick  = ()=> socket.emit('player:call');
+    btnAllin.onclick = ()=> socket.emit('player:allin');
+    btnFold.onclick  = ()=> socket.emit('player:fold');
+
+    // Estimate (nur Runde 4 – Server prüft)
+    btnEstimate.onclick = ()=>{
+      const v = inpEstimate.value;
+      if (v==='' || v===null) socket.emit('player:estimate',{ value:null });
+      else socket.emit('player:estimate',{ value:Number(v) });
+      $('#pStatus').textContent='Schätzwert gesendet.'; setTimeout(()=>$('#pStatus').textContent='',800);
     };
-    btnCall.onclick = () => socket.emit('player:call');
-    btnAllin.onclick = () => socket.emit('player:allin');
-    btnFold.onclick  = () => socket.emit('player:fold');
 
-    // Rendering
-    const playersByUid = new Map();
-
-    function escapeHtml(s=''){return s.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
-
-    function renderSeats() {
-      for (let i=0;i<8;i++){
-        const slot = document.querySelector(`.seat[data-seat="${i}"]`);
-        if (!slot) continue;
-        slot.className = `seat s${i}`;
-        slot.innerHTML = '<div class="avatar">—</div><div class="name">Frei</div><div class="chips">🪙 0</div>';
-      }
-      const arr = Array.from(playersByUid.values()).sort((a,b)=>(a.seat??99)-(b.seat??99));
-      arr.forEach(p=>{
-        if (typeof p.seat!=='number') return;
-        const slot = document.querySelector(`.seat[data-seat="${p.seat}"]`); if(!slot) return;
-
-        const isSB = (p.seat === (currentState.blinds?.small ?? null));
-        const isBB = (p.seat === (currentState.blinds?.big ?? null));
-        const sBadge = isSB ? '<span class="badge badge-s">S</span>' : '';
-        const bBadge = isBB ? '<span class="badge badge-b">B</span>' : '';
-
-        slot.innerHTML = `
-          <div class="avatar">🙂</div>
-          <div class="name">${escapeHtml(p.name)} ${sBadge} ${bBadge}</div>
-          <div class="chips">🪙 ${p.chips ?? 0}</div>
-          <div class="betline">Bet: 🪙 ${p.bet ?? 0} ${p.status==='folded'?'· (Fold)':''}${p.status==='allin'?' · (All-in)':''}</div>
-        `;
-        if (!p.connected) slot.classList.add('disconnected');
-        if (p.status==='folded') slot.classList.add('folded');
-        if (p.uid === currentState.turnUid) slot.classList.add('turn');
-      });
+    function badge(p){
+      const isSB = (p.seat === (current.blinds?.small ?? null));
+      const isBB = (p.seat === (current.blinds?.big ?? null));
+      return (isSB?'<span class="badge badge-s">S</span>':'') + (isBB?'<span class="badge badge-b">B</span>':'');
     }
 
-    function renderList() {
-      const list = $('#playerList'); list.innerHTML = '';
-      const arr = Array.from(playersByUid.values()).sort((a,b)=> (a.seat??99)-(b.seat??99));
+    function renderSeats(){
+      for (let i=0;i<8;i++){
+        const slot=document.querySelector(`.seat[data-seat="${i}"]`);
+        if (!slot) continue;
+        slot.className=`seat s${i}`;
+        slot.innerHTML='<div class="avatar">—</div><div class="name">Frei</div><div class="chips">🪙 0</div><div class="betline">Runde: 🪙 0 · Gesamt: 🪙 0</div>';
+      }
+      const arr=Array.from(playersByUid.values()).sort((a,b)=>(a.seat??99)-(b.seat??99));
       arr.forEach(p=>{
-        const isSB = (p.seat === (currentState.blinds?.small ?? null));
-        const isBB = (p.seat === (currentState.blinds?.big ?? null));
-        const sBadge = isSB ? '<span class="badge badge-s">S</span>' : '';
-        const bBadge = isBB ? '<span class="badge badge-b">B</span>' : '';
-
-        const div = document.createElement('div');
-        div.className = 'spieler-box' + (p.connected ? '' : ' disconnected') + (p.status==='folded'?' folded':'') + (p.uid===currentState.turnUid?' turn':'');
-        div.innerHTML = `<strong>Sitz ${(p.seat??-1)+1}:</strong> ${escapeHtml(p.name)} ${sBadge} ${bBadge} – 🪙 ${p.chips ?? 0} · Bet: 🪙 ${p.bet ?? 0} ${p.status==='folded'?'· (Fold)':''}${p.status==='allin'?' · (All-in)':''}`;
+        if (typeof p.seat!=='number') return;
+        const slot=document.querySelector(`.seat[data-seat="${p.seat}"]`); if(!slot) return;
+        slot.innerHTML = `<div class="avatar">🙂</div><div class="name">${p.name} ${badge(p)}</div><div class="chips">🪙 ${p.chips??0}</div><div class="betline">Runde: 🪙 ${p.betRound||0} · Gesamt: 🪙 ${p.betTotal||0} ${p.status==='allin'?' · (All-in)':''}${p.status==='folded'?' · (Fold)':''}</div>`;
+        if (!p.connected) slot.classList.add('disconnected');
+        if (p.status==='folded') slot.classList.add('folded');
+        if (p.uid===current.turnUid) slot.classList.add('turn');
+      });
+    }
+    function renderList(){
+      const list=$('#playerList'); list.innerHTML='';
+      const arr=Array.from(playersByUid.values()).sort((a,b)=>(a.seat??99)-(b.seat??99));
+      arr.forEach(p=>{
+        const div=document.createElement('div');
+        div.className='spieler-box'+(p.connected?'':' disconnected')+(p.status==='folded'?' folded':'')+(p.uid===current.turnUid?' turn':'');
+        div.innerHTML = `<strong>Sitz ${(p.seat??-1)+1}:</strong> ${p.name} ${badge(p)} – 🪙 ${p.chips??0} · Bet: 🪙 ${p.betRound||0} / ${p.betTotal||0} ${p.status==='allin'?' · (All-in)':''}${p.status==='folded'?' · (Fold)':''}`;
         list.appendChild(div);
       });
     }
+    function renderAll(st){
+      $('#roomCode').textContent = st.code || '—';
+      if (typeof st.pot==='number') $('#pot').textContent = st.pot;
+      $('#currentBet').textContent = st.currentBetRound || 0;
 
-    function renderAll() {
+      // Frage/Hints
+      $('#qText').textContent = st.question?.text || '–';
+      $('#qH1').textContent   = st.question?.hint1 ?? 'verdeckt';
+      $('#qH2').textContent   = st.question?.hint2 ?? 'verdeckt';
+      $('#qSol').textContent  = st.question?.solution ?? 'verdeckt';
+
+      playersByUid.clear(); (st.players||[]).forEach(p=>playersByUid.set(p.uid,p));
       renderSeats(); renderList();
       const me = playersByUid.get(UID); if (me) $('#chips').textContent = me.chips ?? 0;
-      $('#currentBet').textContent = currentState.currentBet ?? 0;
     }
 
     // Sockets
     socket.on('connect', ()=>{
       $('#pStatus').textContent='Verbunden.'; setTimeout(()=>$('#pStatus').textContent='',800);
-      if (myRoom && (currentInputCode()==='' || currentInputCode()===myRoom)) {
-        socket.emit('hello', { uid: UID, room: myRoom });
-      }
+      if (myRoom && (currentInputCode()==='' || currentInputCode()===myRoom)) socket.emit('hello', { uid:UID, room:myRoom });
     });
     socket.on('disconnect', ()=>{ $('#pStatus').textContent='Verbindung getrennt.'; });
 
@@ -222,43 +210,42 @@
       setTimeout(()=>$('#pStatus').textContent='', 1000);
     });
 
-    socket.on('state:full',(state)=>{
-      const ver=(state.version??-1); if (ver<=lastVersion) return; lastVersion=ver;
-      $('#roomCode').textContent = state.code || '—';
-      $('#question').textContent = state.question?.text || '–';
-      if (typeof state.pot==='number') $('#pot').textContent = state.pot;
-      currentState.currentBet = state.currentBet || 0;
-      currentState.blinds = state.blinds || { small:null, big:null };
-      currentState.turnUid = state.turnUid || null;
-
-      playersByUid.clear();
-      (state.players||[]).forEach(p=>playersByUid.set(p.uid,p));
-      renderAll();
-
-      const me = playersByUid.get(UID);
-      if (me && state.code && state.code===(localStorage.getItem('qp_room')||'')) { joinedOnce=true; setJoinUI(true); } else { setJoinUI(false); }
+    socket.on('state:full',(st)=>{
+      const ver=(st.version??-1); if (ver<=lastVersion) return; lastVersion=ver;
+      current.blinds = st.blinds || {small:null,big:null};
+      current.turnUid = st.turnUid || null;
+      current.roundIndex = st.roundIndex || 0;
+      current.currentBetRound = st.currentBetRound || 0;
+      renderAll(st);
     });
-
     socket.on('players:update',(msg)=>{
       const ver=(msg.version??-1); if (ver<=lastVersion) return; lastVersion=ver;
       (msg.players||[]).forEach(p=>playersByUid.set(p.uid,p));
-      renderAll();
+      renderSeats(); renderList();
+      const me = playersByUid.get(UID); if (me) $('#chips').textContent = me.chips ?? 0;
     });
-
     socket.on('state:partial',(patch)=>{
       const ver=(patch.version??-1); if (ver<=lastVersion) return; lastVersion=ver;
+      if (patch.blinds) current.blinds = patch.blinds;
+      if ('turnUid' in patch) current.turnUid = patch.turnUid;
+      if ('roundIndex' in patch) current.roundIndex = patch.roundIndex;
+      if ('currentBetRound' in patch) { current.currentBetRound = patch.currentBetRound; $('#currentBet').textContent = current.currentBetRound; }
       if (typeof patch.pot==='number') $('#pot').textContent = patch.pot;
-      if (typeof patch.currentBet==='number') currentState.currentBet = patch.currentBet;
-      if (patch.blinds) currentState.blinds = patch.blinds;
-      if ('turnUid' in patch) currentState.turnUid = patch.turnUid;
-      renderAll();
+      if (patch.question) {
+        $('#qText').textContent = patch.question?.text || '–';
+        $('#qH1').textContent   = patch.question?.hint1 ?? 'verdeckt';
+        $('#qH2').textContent   = patch.question?.hint2 ?? 'verdeckt';
+        $('#qSol').textContent  = patch.question?.solution ?? 'verdeckt';
+      }
+      // Nach Partial die volle Liste refreshen, um Turn/Badges sicher zu zeichnen
+      socket.emit('mod:sync-all');
     });
-
     socket.on('question:show',(q)=>{
-      const ver=(q.version??-1); if (ver<=lastVersion) return; lastVersion=ver;
-      $('#question').textContent = q.text || '–';
+      $('#qText').textContent = q.text || '–';
+      $('#qH1').textContent = 'verdeckt';
+      $('#qH2').textContent = 'verdeckt';
+      $('#qSol').textContent = 'verdeckt';
     });
-
     socket.on('status',(t)=>{ $('#pStatus').textContent=t; setTimeout(()=>$('#pStatus').textContent='',1500); });
   </script>
 </body>
