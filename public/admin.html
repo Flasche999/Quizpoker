@@ -161,7 +161,7 @@
   </div>
 
   <script>
-    // robustere Socket-Init
+    // robuste Socket-Init (fällt von WS auf Polling zurück)
     const socket = io({
       path:'/socket.io',
       transports:['polling','websocket'],
@@ -176,7 +176,10 @@
     const el = (s)=>document.querySelector(s);
     const state = { blinds:{small:null,big:null}, turnUid:null, roundIndex:0, chats:new Map(), players:[] };
 
-    const emitOk = (evt, payload)=>{ if(!socket.connected){ el('#adminStatus').textContent='Nicht verbunden.'; return false; } socket.emit(evt,payload); return true; };
+    const emitOk = (evt, payload)=>{
+      if(!socket.connected){ el('#adminStatus').textContent='Nicht verbunden.'; return false; }
+      socket.emit(evt,payload); return true;
+    };
 
     socket.on('connect', ()=>{
       el('#adminStatus').textContent = 'Verbunden: '+socket.id;
@@ -220,7 +223,7 @@
     // DMs
     const dmSelect = el('#dmSelect');
     const dmLog = el('#dmLog');
-    const escapeHtml = (s)=>String(s||'').replace(/[&<>"]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[m]}));
+    const escapeHtml = (s)=>String(s||'').replace(/[&<>"]/g, m => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[m]));
     function dmAppend(html){ const d=document.createElement('div'); d.className='chatrow'; d.innerHTML=html; dmLog.appendChild(d); dmLog.scrollTop = dmLog.scrollHeight; }
     function renderDmFor(uid){
       dmLog.innerHTML='';
@@ -297,7 +300,6 @@
       (st.players||[]).forEach(p=>{
         if(typeof p.seat!=='number') return;
         const slot=wrap.querySelector(`.seat[data-seat="${p.seat}"]`); if(!slot) return;
-        const est = (p.estimate===null || typeof p.estimate==='number') ? (p.estimate===null?'—':p.estimate) : '—';
         slot.innerHTML = `<div class="avatar">🙂</div>
           <div class="name">${p.name} ${badge(p)}</div>
           <div class="chips">🪙 ${p.chips??0}</div>
@@ -336,7 +338,7 @@
         el('#qH2').textContent   = patch.question?.hint2 ?? 'verdeckt';
         el('#qSol').textContent  = patch.question?.solution ?? 'verdeckt';
       }
-      // Liste/Select aktualisieren
+      // Sitz-Render aktualisieren, wenn wir Spieler kennen
       if (state.players?.length) {
         renderSeats({players: state.players, blinds: state.blinds, turnUid: state.turnUid});
         refreshSelects(state.players);
