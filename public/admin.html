@@ -45,7 +45,7 @@
     .s5{bottom:36px;left:8px}
     .s6{top:calc(50% - 60px);left:8px}
     .s7{top:36px;left:8px}
-    #table-center2{font-weight:700}
+    #table-center2{font-weight:700;text-align:center}
     .chatlog{height:220px;overflow:auto;border:1px solid var(--line);border-radius:10px;background:#0f1118;padding:8px}
     .chatrow{margin-bottom:6px}
     .pill{display:inline-block;border:1px solid var(--line);border-radius:999px;padding:2px 8px;font-size:12px;margin-right:6px}
@@ -74,10 +74,18 @@
         <button id="btnNextQ">🆕 Frage starten</button>
       </div>
 
+      <!-- NEU: Blinds inkl. Betrag + Rotation -->
       <div class="status" style="margin-top:12px;">
         <div>Small Blind (Seat #): <input id="inpSB" placeholder="0–7" style="width:100%;margin-top:6px;"></div>
         <div>Big Blind (Seat #): <input id="inpBB" placeholder="0–7" style="width:100%;margin-top:6px;"></div>
-        <button id="btnSetBlinds" style="margin-top:6px;">Blinds setzen</button>
+        <div>Small Blind Betrag: <input id="inpSBVal" type="number" min="0" placeholder="z. B. 10" style="width:100%;margin-top:6px;"></div>
+        <div>Big Blind Betrag: <input id="inpBBVal" type="number" min="0" placeholder="z. B. 20" style="width:100%;margin-top:6px;"></div>
+        <label class="small" style="display:flex;align-items:center;gap:8px;margin-top:6px;">
+          <input id="chkAutoRotate" type="checkbox" checked>
+          Blinds pro Frage im Uhrzeigersinn rotieren
+        </label>
+        <button id="btnSetBlinds" style="margin-top:6px;">Blinds speichern</button>
+        <div class="small muted" id="blindInfo" style="margin-top:6px;">Aktuell: SB Seat – / BB Seat – · SB 0 / BB 0 · Rotation AN</div>
       </div>
 
       <div class="status" style="margin-top:12px;">
@@ -177,7 +185,10 @@
           <div class="seat s5" data-seat="5"></div>
           <div class="seat s6" data-seat="6"></div>
           <div class="seat s7" data-seat="7"></div>
-          <div id="table-center2">💰 Pot: <strong id="pot2">0</strong></div>
+          <div id="table-center2">
+            💰 Pot: <strong id="pot2">0</strong>
+            <div class="small muted" id="blindVals">SB — / BB —</div>
+          </div>
         </div>
       </div>
     </aside>
@@ -186,7 +197,7 @@
   <script>
     const socket = io({ path:'/socket.io', transports:['websocket','polling'] });
     const el = (s)=>document.querySelector(s);
-    const state = { blinds:{small:null,big:null}, turnUid:null, roundIndex:0, chats:new Map(), players:[] };
+    const state = { blinds:{small:null,big:null,sbValue:0,bbValue:0,autoRotate:true}, turnUid:null, roundIndex:0, chats:new Map(), players:[] };
 
     const emitOk = (evt, payload)=>{ if(!socket.connected){ el('#adminStatus').textContent='Nicht verbunden.'; return false; } socket.emit(evt,payload); return true; };
 
@@ -200,10 +211,21 @@
     // ───────── Buttons Grundfunktionen ─────────
     el('#btnCreate').onclick=()=>emitOk('mod:create-room');
     el('#btnNextQ').onclick =()=>emitOk('mod:next-question');
+
+    // NEU: Blinds speichern (Seats + Werte + Rotation)
     el('#btnSetBlinds').onclick = ()=>{
-      const sb=el('#inpSB').value.trim(), bb=el('#inpBB').value.trim();
-      emitOk('mod:set-blinds',{ small: sb===''?null:Number(sb), big: bb===''?null:Number(bb) });
+      const sbSeatStr=el('#inpSB').value.trim();
+      const bbSeatStr=el('#inpBB').value.trim();
+      const sbVal=Number(el('#inpSBVal').value.trim()||0);
+      const bbVal=Number(el('#inpBBVal').value.trim()||0);
+      const autoRotate = !!el('#chkAutoRotate').checked;
+
+      const small = sbSeatStr===''?null:Number(sbSeatStr);
+      const big   = bbSeatStr===''?null:Number(bbSeatStr);
+
+      emitOk('mod:set-blinds',{ small, big, sbValue:sbVal, bbValue:bbVal, autoRotate });
     };
+
     el('#btnRevealH1').onclick=()=>emitOk('mod:reveal-hint1');
     el('#btnRevealH2').onclick=()=>emitOk('mod:reveal-hint2');
     el('#btnRevealSol').onclick=()=>emitOk('mod:reveal-solution');
@@ -312,9 +334,21 @@
       el('#qH2').textContent   = st.question?.hint2 ?? 'verdeckt';
       el('#qSol').textContent  = st.question?.solution ?? 'verdeckt';
 
-      state.blinds = st.blinds||{small:null,big:null};
+      state.blinds = st.blinds||{small:null,big:null,sbValue:0,bbValue:0,autoRotate:true};
       state.turnUid = st.turnUid || null;
       state.roundIndex = st.roundIndex||0;
+
+      // Anzeige Blind-Werte im Tischzentrum
+      el('#blindVals').textContent = `SB ${state.blinds.sbValue ?? 0} / BB ${state.blinds.bbValue ?? 0}`;
+      // Panel-Felder (falls leer, nichts überschreiben)
+      if (st.blinds){
+        el('#inpSB').value = Number.isInteger(st.blinds.small) ? st.blinds.small : '';
+        el('#inpBB').value = Number.isInteger(st.blinds.big) ? st.blinds.big : '';
+        el('#inpSBVal').value = st.blinds.sbValue ?? 0;
+        el('#inpBBVal').value = st.blinds.bbValue ?? 0;
+        el('#chkAutoRotate').checked = !!st.blinds.autoRotate;
+        el('#blindInfo').textContent = `Aktuell: SB Seat ${st.blinds.small ?? '–'} / BB Seat ${st.blinds.big ?? '–'} · SB ${st.blinds.sbValue ?? 0} / BB ${st.blinds.bbValue ?? 0} · Rotation ${st.blinds.autoRotate?'AN':'AUS'}`;
+      }
     }
     function renderPlayers(st){
       state.players = (st.players||[]).slice();
@@ -368,7 +402,16 @@
     socket.on('state:full', (st)=>{ renderTop(st); renderPlayers(st); renderSeats(st); });
     socket.on('players:update', (msg)=>{ if(!msg?.players) return; renderPlayers({players:msg.players, blinds:state.blinds, turnUid:state.turnUid}); renderSeats({players:msg.players, blinds:state.blinds, turnUid:state.turnUid}); });
     socket.on('state:partial', (patch)=>{
-      if (patch.blinds) state.blinds = patch.blinds;
+      if (patch.blinds) {
+        state.blinds = patch.blinds;
+        el('#inpSB').value = Number.isInteger(patch.blinds.small) ? patch.blinds.small : '';
+        el('#inpBB').value = Number.isInteger(patch.blinds.big) ? patch.blinds.big : '';
+        el('#inpSBVal').value = patch.blinds.sbValue ?? 0;
+        el('#inpBBVal').value = patch.blinds.bbValue ?? 0;
+        el('#chkAutoRotate').checked = !!patch.blinds.autoRotate;
+        el('#blindVals').textContent = `SB ${patch.blinds.sbValue ?? 0} / BB ${patch.blinds.bbValue ?? 0}`;
+        el('#blindInfo').textContent = `Aktuell: SB Seat ${patch.blinds.small ?? '–'} / BB Seat ${patch.blinds.big ?? '–'} · SB ${patch.blinds.sbValue ?? 0} / BB ${patch.blinds.bbValue ?? 0} · Rotation ${patch.blinds.autoRotate?'AN':'AUS'}`;
+      }
       if ('turnUid' in patch) state.turnUid = patch.turnUid;
       if ('roundIndex' in patch) state.roundIndex = patch.roundIndex;
       if ('actedCount' in patch) el('#acted').textContent = patch.actedCount;
