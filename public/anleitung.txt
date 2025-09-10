@@ -1,0 +1,10 @@
+🃏 QuizPoker LIVE (Multiplayer)
+
+1. Stelle sicher, dass Node.js installiert ist.
+2. Öffne ein Terminal in diesem Ordner.
+3. Führe aus: npm install express socket.io
+4. Dann: node server.js
+5. Öffne im Browser: http://localhost:3000/admin.html
+6. Weitere Spieler öffnen: http://localhost:3000/player.html
+
+Viel Spaß!

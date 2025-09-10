@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>QuizPoker – Admin</title>
+  <link rel="stylesheet" href="/style.css" />
+  <script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar">
+      <h3 class="h">Raum</h3>
+      <div class="list">
+        <div class="item">
+          <div>Code: <strong id="roomCode">—</strong></div>
+          <div class="small">Frage: <span id="qIndex">–</span></div>
+        </div>
+      </div>
+      <div class="row" style="margin-top:8px;">
+        <button id="btnCreate" class="primary">Raum erstellen</button>
+        <button id="btnNextQ">➡️ Nächste Frage</button>
+      </div>
+
+      <div class="status" style="margin-top:12px;">
+        <div>Small Blind: <input id="inpSB" placeholder="Name" style="width:100%;margin-top:6px;"></div>
+        <div>Big Blind: <input id="inpBB" placeholder="Name" style="width:100%;margin-top:6px;"></div>
+        <button id="btnSetBlinds" style="margin-top:6px;">Blinds setzen</button>
+      </div>
+
+      <div class="status" id="adminStatus"></div>
+      <div class="row" style="margin-top:10px;">
+        <button id="btnSyncAll">🔄 Alle synchronisieren</button>
+      </div>
+    </aside>
+
+    <main class="main">
+      <h3 class="h">Frage</h3>
+      <div id="questionBox" class="status" style="font-size:16px;">–</div>
+
+      <div class="row" style="margin-top:10px;">
+        <label style="display:flex; gap:6px; align-items:center;">
+          UID: <input id="uidTarget" placeholder="Spieler-UID" style="width:240px;">
+        </label>
+        <label style="display:flex; gap:6px; align-items:center;">
+          Δ Chips: <input id="deltaChips" type="number" value="10" style="width:120px;">
+        </label>
+        <button id="btnMarkCorrect" class="ok">✅ Korrekt</button>
+        <button id="btnMarkWrong"  class="err">❌ Falsch</button>
+      </div>
+
+      <div class="row" style="margin-top:10px;">
+        <button id="btnMinus" class="err">− Manuell</button>
+        <button id="btnPlus"  class="ok">+ Manuell</button>
+      </div>
+
+      <div class="status" id="status"></div>
+
+      <h3 class="h" style="margin-top:16px;">Antworten (live)</h3>
+      <div id="answers" class="list" style="max-height:240px;overflow:auto;"></div>
+    </main>
+
+    <aside class="right">
+      <h3 class="h">Spieler & Chips</h3>
+      <div id="players" class="score"></div>
+
+      <h3 class="h" style="margin-top:12px;">Tisch</h3>
+      <div class="table">
+        <div id="players-left"></div>
+        <div id="players-top"></div>
+        <div id="players-right"></div>
+        <div id="players-bottom"></div>
+        <div id="table-center">💰 Pot: <strong id="pot">0</strong></div>
+      </div>
+    </aside>
+  </div>
+
+  <script>
+    const socket = io();
+
+    const el   = (s) => document.querySelector(s);
+    const playersList = el('#players');
+    const answersList = el('#answers');
+
+    // State
+    let lastVersion = 0;
+    const playersMap = new Map(); // uid -> {uid,name,chips,connected}
+
+    // UI: Buttons
+    el('#btnCreate').onclick   = () => socket.emit('mod:create-room');
+    el('#btnNextQ').onclick    = () => socket.emit('mod:next-question');
+    el('#btnSetBlinds').onclick= () => socket.emit('mod:set-blinds', { small: el('#inpSB').value.trim(), big: el('#inpBB').value.trim() });
+    el('#btnSyncAll').onclick  = () => socket.emit('mod:sync-all');
+
+    el('#btnMarkCorrect').onclick = () => {
+      const uid = el('#uidTarget').value.trim(); if (!uid) return;
+      const delta = parseInt(el('#deltaChips').value || '0', 10) || 0;
+      socket.emit('mod:mark', { uid, result: 'correct', delta });
+    };
+    el('#btnMarkWrong').onclick = () => {
+      const uid = el('#uidTarget').value.trim(); if (!uid) return;
+      const delta = parseInt(el('#deltaChips').value || '0', 10) || 0;
+      socket.emit('mod:mark', { uid, result: 'wrong', delta: -Math.abs(delta) });
+    };
+
+    el('#btnPlus').onclick = () => {
+      const uid = el('#uidTarget').value.trim(); if (!uid) return;
+      const delta = Math.abs(parseInt(el('#deltaChips').value || '0', 10) || 0);
+      socket.emit('mod:adjust', { uid, delta });
+    };
+    el('#btnMinus').onclick = () => {
+      const uid = el('#uidTarget').value.trim(); if (!uid) return;
+      const delta = -Math.abs(parseInt(el('#deltaChips').value || '0', 10) || 0);
+      socket.emit('mod:adjust', { uid, delta });
+    };
+
+    // Rendering
+    function renderPlayersPanel() {
+      const arr = Array.from(playersMap.values()).sort((a,b) => a.name.localeCompare(b.name));
+      playersList.innerHTML = '';
+      arr.forEach(p => {
+        const div = document.createElement('div');
+        div.className = 'player';
+        div.innerHTML = `
+          <span title="UID: ${p.uid}">${p.name} ${p.connected? '🟢':'🔴'}</span>
+          <strong>${p.chips || 0}</strong>
+          <div class="pm">
+            <button class="score-btn" data-uid="${p.uid}" data-d="+10">+10</button>
+            <button class="score-btn" data-uid="${p.uid}" data-d="-10">-10</button>
+          </div>`;
+        playersList.appendChild(div);
+      });
+    }
+
+    function renderTable() {
+      const left   = el('#players-left');
+      const right  = el('#players-right');
+      const top    = el('#players-top');
+      const bottom = el('#players-bottom');
+      [left, right, top, bottom].forEach(n => n.innerHTML = '');
+
+      const arr = Array.from(playersMap.values()).sort((a,b) => a.name.localeCompare(b.name));
+      arr.forEach((p, i) => {
+        const box = document.createElement('div');
+        box.className = 'spieler-box' + (p.connected ? '' : ' disconnected');
+        box.innerHTML = `<strong>${p.name}</strong><br/>🪙 ${p.chips || 0}`;
+        switch (i % 4) {
+          case 0: left.appendChild(box); break;
+          case 1: top.appendChild(box); break;
+          case 2: right.appendChild(box); break;
+          case 3: bottom.appendChild(box); break;
+        }
+      });
+    }
+
+    playersList.addEventListener('click', (e) => {
+      const btn = e.target.closest('.score-btn');
+      if (!btn) return;
+      const uid   = btn.dataset.uid;
+      const delta = parseInt(btn.dataset.d, 10);
+      socket.emit('mod:adjust', { uid, delta });
+    });
+
+    // Socket Events
+    socket.on('mod:room-created', ({ code, state }) => {
+      el('#roomCode').textContent = code;
+      lastVersion = 0;
+      playersMap.clear();
+      (state.players || []).forEach(p => playersMap.set(p.uid, p));
+      el('#qIndex').textContent = state.qIndex >= 0 ? (state.qIndex + 1) : '–';
+      el('#questionBox').textContent = state.question?.text || '–';
+      renderPlayersPanel(); renderTable();
+    });
+
+    socket.on('state:full', (state) => {
+      if (state.version <= lastVersion) return;
+      lastVersion = state.version;
+      playersMap.clear();
+      (state.players || []).forEach(p => playersMap.set(p.uid, p));
+      el('#qIndex').textContent = state.qIndex >= 0 ? (state.qIndex + 1) : '–';
+      el('#questionBox').textContent = state.question?.text || '–';
+      renderPlayersPanel(); renderTable();
+    });
+
+    socket.on('state:partial', (msg) => {
+      if (msg.version <= lastVersion) return;
+      lastVersion = msg.version;
+      // z.B. blinds
+    });
+
+    socket.on('players:update', (msg) => {
+      if (msg.version <= lastVersion) return;
+      lastVersion = msg.version;
+      (msg.players || []).forEach(p => playersMap.set(p.uid, p));
+      renderPlayersPanel(); renderTable();
+    });
+
+    socket.on('question:show', (q) => {
+      if (q.version <= lastVersion) return;
+      lastVersion = q.version;
+      el('#qIndex').textContent = (q.index + 1);
+      el('#questionBox').textContent = q.text || '–';
+      el('#answers').innerHTML = '';
+    });
+
+    socket.on('answer:received', ({ uid, name, answer }) => {
+      const div = document.createElement('div');
+      div.className = 'item';
+      div.textContent = `${name}: ${answer}`;
+      answersList.prepend(div);
+      el('#uidTarget').value = uid; // Schnellmarkierung möglich
+    });
+
+    socket.on('result:correct', ({ name, delta }) => {
+      const s = el('#status');
+      s.textContent = `✅ ${name} +${Math.abs(delta||0)} Chips`;
+      setTimeout(() => s.textContent = '', 1500);
+    });
+    socket.on('result:wrong', ({ name, delta }) => {
+      const s = el('#status');
+      s.textContent = `❌ ${name} ${delta||0} Chips`;
+      setTimeout(() => s.textContent = '', 1500);
+    });
+
+    socket.on('status', (t) => { el('#adminStatus').textContent = t; });
+  </script>
+</body>
+</html>

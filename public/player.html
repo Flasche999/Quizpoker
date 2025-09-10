@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>QuizPoker – Spieler</title>
+  <link rel="stylesheet" href="/style.css" />
+  <script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar">
+      <h3 class="h">Beitreten</h3>
+      <div class="row" style="margin-top:8px;">
+        <input id="inpCode" placeholder="Raumcode" />
+        <input id="inpName" placeholder="Dein Name" />
+        <button id="btnJoin" class="primary">Beitreten</button>
+      </div>
+      <div class="status">Du bist in Raum: <code id="roomCode" class="small">—</code></div>
+      <div class="status">UID: <code id="uidLbl" class="small">—</code></div>
+      <div class="status">Chips: <strong id="chips">0</strong></div>
+      <div class="status" id="pStatus"></div>
+    </aside>
+
+    <main class="main">
+      <h3 class="h">Aktuelle Frage</h3>
+      <div id="question" class="status" style="font-size:18px;">–</div>
+
+      <div class="row" style="margin-top:10px;">
+        <input id="inpAnswer" placeholder="Deine Antwort" style="flex:1;">
+        <button id="btnSend">Antwort senden</button>
+      </div>
+    </main>
+
+    <aside class="right">
+      <h3 class="h">Spieler (Übersicht)</h3>
+      <div class="table">
+        <div id="players-left"></div>
+        <div id="players-top"></div>
+        <div id="players-right"></div>
+        <div id="players-bottom"></div>
+        <div id="table-center">💰 Pot: <strong id="pot">0</strong></div>
+      </div>
+    </aside>
+  </div>
+
+  <script>
+    const socket = io();
+    const el = (s) => document.querySelector(s);
+
+    // Stabile UID auf Gerät
+    let UID = localStorage.getItem('qp_uid');
+    if (!UID) { UID = (crypto?.randomUUID?.() || (Date.now() + Math.random().toString(16).slice(2))); localStorage.setItem('qp_uid', UID); }
+    el('#uidLbl').textContent = UID;
+
+    // Felder & Buttons
+    const inpCode   = el('#inpCode');
+    const inpName   = el('#inpName');
+    const btnJoin   = el('#btnJoin');
+    const inpAnswer = el('#inpAnswer');
+    const btnSend   = el('#btnSend');
+
+    // Lokaler State (nur Anzeige)
+    let myName     = localStorage.getItem('qp_name') || '';
+    let myRoom     = localStorage.getItem('qp_room') || '';
+    let lastVersion = 0;
+
+    if (myName) inpName.value = myName;
+    if (myRoom) inpCode.value = myRoom;
+
+    btnJoin.onclick = () => {
+      const code = (inpCode.value || '').toUpperCase().trim();
+      const name = (inpName.value || '').trim() || 'Spieler';
+      if (!code) { el('#pStatus').textContent = 'Bitte Raumcode eingeben.'; return; }
+      socket.emit('player:join', { code, uid: UID, name });
+    };
+
+    btnSend.onclick = () => {
+      const a = inpAnswer.value.trim();
+      if (!a) return;
+      socket.emit('player:answer', { answer: a });
+      inpAnswer.value = '';
+      el('#pStatus').textContent = 'Antwort gesendet.';
+      setTimeout(() => el('#pStatus').textContent = '', 1000);
+    };
+
+    // Render Table of players (Read-only im Player)
+    const playersMap = new Map();
+    function renderTable() {
+      const left   = el('#players-left');
+      const right  = el('#players-right');
+      const top    = el('#players-top');
+      const bottom = el('#players-bottom');
+      [left, right, top, bottom].forEach(n => n.innerHTML = '');
+
+      const arr = Array.from(playersMap.values()).sort((a,b) => a.name.localeCompare(b.name));
+      arr.forEach((p, i) => {
+        const box = document.createElement('div');
+        box.className = 'spieler-box' + (p.connected ? '' : ' disconnected');
+        box.innerHTML = `<strong>${p.name}</strong><br/>🪙 ${p.chips || 0}`;
+        switch (i % 4) {
+          case 0: left.appendChild(box); break;
+          case 1: top.appendChild(box); break;
+          case 2: right.appendChild(box); break;
+          case 3: bottom.appendChild(box); break;
+        }
+      });
+    }
+
+    // Socket Events
+    socket.on('connect', () => {
+      // wenn wir Raum & Name schon kennen → hello (optional)
+      if (myRoom) socket.emit('hello', { uid: UID, name: myName, room: myRoom });
+    });
+
+    socket.on('player:join-result', (r) => {
+      if (!r.ok) {
+        el('#pStatus').textContent = r.error || 'Fehler beim Beitritt.';
+        return;
+      }
+      myRoom = r.code; myName = r.name;
+      localStorage.setItem('qp_room', myRoom);
+      localStorage.setItem('qp_name', myName);
+      el('#roomCode').textContent = myRoom;
+      el('#chips').textContent = r.chips ?? 0;
+      el('#pStatus').textContent = `Beigetreten als ${myName}`;
+      setTimeout(() => el('#pStatus').textContent = '', 1200);
+    });
+
+    socket.on('state:full', (state) => {
+      if (state.version <= lastVersion) return;
+      lastVersion = state.version;
+      el('#roomCode').textContent = state.code || '—';
+      el('#question').textContent = state.question?.text || '–';
+      playersMap.clear();
+      (state.players || []).forEach(p => playersMap.set(p.uid, p));
+      renderTable();
+
+      // eigene Chips anzeigen, falls bekannt
+      const me = playersMap.get(UID);
+      if (me) el('#chips').textContent = me.chips ?? 0;
+    });
+
+    socket.on('players:update', (msg) => {
+      if (msg.version <= lastVersion) return;
+      lastVersion = msg.version;
+      (msg.players || []).forEach(p => playersMap.set(p.uid, p));
+      const me = playersMap.get(UID);
+      if (me) el('#chips').textContent = me.chips ?? 0;
+      renderTable();
+    });
+
+    socket.on('question:show', (q) => {
+      if (q.version <= lastVersion) return;
+      lastVersion = q.version;
+      el('#question').textContent = q.text || '–';
+    });
+
+    socket.on('status', (t) => { el('#pStatus').textContent = t; setTimeout(()=>el('#pStatus').textContent='', 1500); });
+  </script>
+</body>
+</html>
