@@ -153,3 +153,29 @@ button:disabled { opacity:.6; pointer-events:none; }
 @media (max-width: 560px) {
   :root { --ring: 320px; --seat: 84px; }
 }
+
+/* ───────── Badges für Blinds + Zug-Markierung ───────── */
+.badge {
+  display:inline-block;
+  font-weight:700;
+  color:#000;                 /* schwarzer Buchstabe */
+  background:#fff;            /* weißer Kreis */
+  border-radius:50%;
+  width:20px; height:20px;
+  line-height:20px;
+  text-align:center;
+  margin-left:6px;
+  font-size:12px;
+}
+.badge-s { border:2px solid #6aa6ff; }  /* S: blau umranded */
+.badge-b { border:2px solid #ff4d4d; }  /* B: rot umranded */
+
+/* Goldener Rahmen für den Spieler, der am Zug ist */
+.seat.turn,
+.spieler-box.turn,
+.player.turn {
+  border:3px solid gold !important;
+  box-shadow:0 0 12px rgba(255,215,0,.65);
+  border-radius:12px;
+}
+
