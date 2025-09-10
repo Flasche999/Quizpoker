@@ -10,9 +10,7 @@
 // - Turn-Logik mit "pending"-Set: Raise öffnet Action erneut für alle, die noch nicht auf das neue Bet-Level equalized sind.
 // - Striktes Rundenende: pending leer ODER ≤1 aktive Spieler.
 // - Admin-Controls: set-turn / next-turn / skip-fold.
-// - Sofort-Schätzantworten ab Runde 1 (nicht mehr nur Runde 4).
-// - Private DMs Spieler ↔ Admin mit Löschfunktionen.
-// - Chips-Massen-/Einzelverteilung (set-all / add-all / add-one).
+// - Blind-Beträge (sbValue/bbValue) + Auto-Rotation der SB/BB-Sitze pro Frage + Auto-Posten der Blinds.
 
 import express from 'express';
 import http from 'http';
@@ -60,6 +58,8 @@ function loadQuestions() {
 }
 
 // ─────────────────────────────────────────────────────────────
+// Game State
+// ─────────────────────────────────────────────────────────────
 const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const genCode = () => Array.from({ length: 5 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
 const MAX_SEATS = 8;
@@ -72,18 +72,17 @@ const rooms = new Map();
       uid,name,seat,connected,socketId,
       chips,status,           // 'active' | 'folded' | 'allin'
       betTotal, betRound,
-      estimate                // number|null|undefined
+      estimate
     }>,
     questions, qIndex,
     pot,
-    blinds: { small:number|null, big:number|null },
+    blinds: { small:number|null, big:number|null, sbValue:number, bbValue:number, autoRotate:boolean },
     // Round engine:
     roundIndex,                   // 0 = keine, 1..4 = aktive Runde
     currentBetRound,              // gefordertes Bet-Level dieser Runde
     pending: Set<uid>,            // wer muss noch reagieren (diese Runde)
     turnUid: string|null,         // am Zug
     reveals: { hint1:boolean, hint2:boolean, solution:boolean },
-    chats: Map<uid, Array<{from:'player'|'admin',message:string,ts:number}>>,
     closeTimer: Timeout|null
   }
 */
@@ -104,7 +103,7 @@ const roomState = (room) => {
     version: room.version || 0,
     pot: room.pot || 0,
     qIndex: room.qIndex ?? -1,
-    blinds: room.blinds || { small: null, big: null },
+    blinds: room.blinds || { small: null, big: null, sbValue:0, bbValue:0, autoRotate:false },
     turnUid: room.turnUid || null,
     roundIndex: room.roundIndex || 0,
     currentBetRound: room.currentBetRound || 0,
@@ -115,7 +114,7 @@ const roomState = (room) => {
       uid: p.uid, name: p.name, seat: p.seat ?? null, connected: !!p.connected,
       chips: p.chips ?? 0, status: p.status || 'active',
       betTotal: p.betTotal || 0, betRound: p.betRound || 0,
-      estimate: (p.estimate === null || typeof p.estimate === 'number') ? p.estimate : null
+      estimate: (p.estimate===null || typeof p.estimate==='number') ? p.estimate : null
     })),
     question
   };
@@ -203,7 +202,6 @@ function advanceAfter(room, uidJustActed) {
 }
 
 function roundIsComplete(room) {
-  // Ende, wenn niemand mehr reagieren muss ODER ≤1 aktive Spieler übrig
   if (!room.pending || room.pending.size === 0) return true;
   if (countActionablePlayers(room) <= 1) return true;
   return false;
@@ -211,6 +209,58 @@ function roundIsComplete(room) {
 
 function broadcastFull(room, code) { bump(room); io.in(code).emit('state:full', roomState(room)); }
 function broadcastPartial(room, code, patch={}) { bump(room); io.in(code).emit('state:partial', { version: room.version, ...patch }); }
+
+// ─────────────────────────────────────────────────────────────
+// Blind-Rotation + Auto-Posten
+// ─────────────────────────────────────────────────────────────
+function rotateBlinds(room) {
+  const seats = listSeats(room, p => true); // alle belegten Sitze
+  if (seats.length < 2) return; // für Blinds mind. 2 Spieler
+  const curSB = Number.isInteger(room.blinds?.small) ? room.blinds.small : null;
+  const curBB = Number.isInteger(room.blinds?.big)   ? room.blinds.big   : null;
+
+  // Index-Helfer
+  const idxOfSeat = (seat) => seats.findIndex(p => p.seat === seat);
+  if (curSB===null || curBB===null || idxOfSeat(curSB)===-1 || idxOfSeat(curBB)===-1) {
+    // initialisieren: erste beiden Plätze werden SB/BB
+    room.blinds.small = seats[0].seat;
+    room.blinds.big   = seats[1].seat;
+    return;
+  }
+  const iSB = idxOfSeat(curSB);
+  const iBB = idxOfSeat(curBB);
+  const nextSB = seats[(iSB + 1) % seats.length].seat;
+  const nextBB = seats[(iBB + 1) % seats.length].seat;
+
+  // Sicherstellen, dass SB != BB (bei >=2 Seats gegeben)
+  room.blinds.small = nextSB;
+  room.blinds.big   = nextBB;
+}
+
+function postBlindsAtRoundStart(room) {
+  // Nach resetRound() aufrufen, damit betRound nicht überschrieben wird
+  const sbSeat = Number.isInteger(room.blinds?.small) ? room.blinds.small : null;
+  const bbSeat = Number.isInteger(room.blinds?.big)   ? room.blinds.big   : null;
+  const sbVal  = Number(room.blinds?.sbValue || 0);
+  const bbVal  = Number(room.blinds?.bbValue || 0);
+
+  if (sbSeat===null && bbSeat===null) return;
+
+  const sb = Array.from(room.players.values()).find(p => p.seat === sbSeat);
+  const bb = Array.from(room.players.values()).find(p => p.seat === bbSeat);
+
+  const prev = room.currentBetRound || 0;
+
+  if (sb && sbVal > 0) addToPot(room, sb, sbVal);
+  if (bb && bbVal > 0) addToPot(room, bb, bbVal);
+
+  // BB definiert typischerweise das Bet-Level
+  const newLevel = Math.max(prev, (bb?.betRound||0));
+  room.currentBetRound = Math.max(room.currentBetRound||0, newLevel);
+
+  // Action startet nach dem BB (startSeatUid berücksichtigt das über blinds.big)
+  room.turnUid = startSeatUid(room);
+}
 
 // ─────────────────────────────────────────────────────────────
 // Socket.IO
@@ -224,11 +274,11 @@ io.on('connection', (socket) => {
     const room = {
       code, moderatorId: socket.id, version: 0,
       players: new Map(), questions: loadQuestions(), qIndex: -1,
-      pot: 0, blinds: { small:null, big:null },
+      pot: 0,
+      blinds: { small:null, big:null, sbValue: 0, bbValue: 0, autoRotate: true },
       roundIndex: 0, currentBetRound: 0,
       pending: new Set(), turnUid: null,
       reveals: { hint1:false, hint2:false, solution:false },
-      chats: new Map(),
       closeTimer: null
     };
     rooms.set(code, room);
@@ -251,29 +301,40 @@ io.on('connection', (socket) => {
     io.in(code).emit('status','Moderator ist wieder da.');
   });
 
-  // Admin: Blinds setzen (Seat-Index 0..7 oder null)
-  socket.on('mod:set-blinds', ({ small, big }) => {
+  // Admin: Blinds setzen (Seats + Werte + AutoRotate)
+  socket.on('mod:set-blinds', ({ small, big, sbValue, bbValue, autoRotate }) => {
     const c = socket.data.room; const room = ensureRoom(c); if (!room) return;
     room.blinds = {
       small: Number.isInteger(small) ? small : null,
-      big:   Number.isInteger(big)   ? big   : null
+      big:   Number.isInteger(big)   ? big   : null,
+      sbValue: Number.isFinite(sbValue) ? Math.max(0, sbValue) : (room.blinds?.sbValue||0),
+      bbValue: Number.isFinite(bbValue) ? Math.max(0, bbValue) : (room.blinds?.bbValue||0),
+      autoRotate: typeof autoRotate==='boolean' ? autoRotate : !!(room.blinds?.autoRotate)
     };
     broadcastPartial(room, c, { blinds: room.blinds });
+    io.in(c).emit('status', `Blinds aktualisiert: SB Seat ${room.blinds.small ?? '–'} / BB Seat ${room.blinds.big ?? '–'} · Werte SB ${room.blinds.sbValue} / BB ${room.blinds.bbValue} · Rotation ${room.blinds.autoRotate?'AN':'AUS'}`);
   });
 
-  // Admin: Frage starten -> Runde 1 (Sofort-Schätzen ab hier erlaubt)
+  // Admin: Frage starten -> Runde 1 (+ Rotation + Auto-Posten)
   socket.on('mod:next-question', () => {
     const c = socket.data.room; const room = ensureRoom(c); if (!room) return;
     if (!room.questions || room.questions.length===0) return;
 
     if (room.qIndex + 1 < room.questions.length) {
+      // Blinds rotieren (falls aktiv)
+      if (room.blinds?.autoRotate) rotateBlinds(room);
+
       room.qIndex += 1;
       room.reveals = { hint1:false, hint2:false, solution:false };
-      resetAllBets(room);           // setzt auch estimate=undefined
+      resetAllBets(room);
       room.roundIndex = 1;
       resetRound(room);
+
+      // Auto-Posten der Blind-Werte
+      postBlindsAtRoundStart(room);
+
       broadcastFull(room, c);
-      io.in(c).emit('status','Runde 1 gestartet. (SB/BB dürfen in R1 nicht folden) – Schätzwerte können ab jetzt gesendet werden.');
+      io.in(c).emit('status','Runde 1 gestartet. (SB/BB dürfen in R1 nicht folden)');
     } else {
       io.in(c).emit('status','🎉 Alle Fragen durch!');
     }
@@ -367,7 +428,7 @@ io.on('connection', (socket) => {
       actedCount: 0, needCount: countActionablePlayers(room),
       currentBetRound: room.currentBetRound
     });
-    io.in(c).emit('status','Lösung aufgedeckt. Runde 4 (final) gestartet – jetzt letzte Aktion! (Schätzwerte konntet ihr bereits ab Runde 1 abgeben.)');
+    io.in(c).emit('status','Lösung aufgedeckt. Runde 4 (final) gestartet – jetzt schätzen & letzte Aktion!');
   });
 
   // Admin: Pot-Award
@@ -400,7 +461,7 @@ io.on('connection', (socket) => {
     io.in(c).emit('status', `🏆 Pot (${pot}) automatisch an ${winner.name} (Ziel ${q.target}).`);
   });
 
-  // Admin: bestehende Chips-Controls (behalten)
+  // Admin: bestehende Chips-Controls
   socket.on('mod:mark', ({ uid, result, delta }) => {
     const c = socket.data.room; const room = ensureRoom(c); if (!room) return;
     const p = room.players.get(uid); if (!p) return;
@@ -418,31 +479,6 @@ io.on('connection', (socket) => {
   socket.on('mod:sync-all', () => {
     const c = socket.data.room; const room = ensureRoom(c); if (!room) return;
     io.in(c).emit('state:full', roomState(room));
-  });
-
-  // ─────────── NEU: Chips-Distribution (Admin-Panel) ───────────
-  socket.on('mod:chips-set-all', ({ amount }) => {
-    const c = socket.data.room; const room = ensureRoom(c); if (!room) return;
-    const val = Math.max(0, Number(amount) || 0);
-    for (const p of room.players.values()) p.chips = val;
-    broadcastPartial(room, c, { pot: room.pot });
-    io.in(c).emit('players:update', { version: ++room.version, players: roomState(room).players });
-    io.in(c).emit('status', `Startchips gesetzt: ${val} für alle Spieler.`);
-  });
-  socket.on('mod:chips-add-all', ({ delta }) => {
-    const c = socket.data.room; const room = ensureRoom(c); if (!room) return;
-    const d = Number(delta) || 0;
-    for (const p of room.players.values()) p.chips = Math.max(0, (p.chips||0) + d);
-    io.in(c).emit('players:update', { version: ++room.version, players: roomState(room).players });
-    io.in(c).emit('status', `Allen ${d>=0?'+':''}${d} Chips hinzugefügt.`);
-  });
-  socket.on('mod:chips-add-one', ({ uid, delta }) => {
-    const c = socket.data.room; const room = ensureRoom(c); if (!room) return;
-    const p = room.players.get(uid); if (!p) return;
-    const d = Number(delta) || 0;
-    p.chips = Math.max(0, (p.chips||0) + d);
-    io.in(c).emit('players:update', { version: ++room.version, players: roomState(room).players });
-    io.in(c).emit('status', `${p.name} ${d>=0?'+':''}${d} Chips.`);
   });
 
   // Spieler: Reconnect/Backfill
@@ -496,48 +532,7 @@ io.on('connection', (socket) => {
     io.in(code).emit('players:update', { version: ++room.version, players: roomState(room).players });
   });
 
-  // ─────────── Private DMs (NEU) ───────────
-  // Spieler → Admin
-  socket.on('player:dm', ({ message }) => {
-    const c = socket.data.room; const uid = socket.data.uid;
-    const room = ensureRoom(c); if (!room) return;
-    const p = room.players.get(uid); if (!p) return;
-    const msg = String(message ?? '').slice(0, 2000);
-    const entry = { from:'player', message: msg, ts: Date.now() };
-    const arr = room.chats.get(uid) ?? [];
-    arr.push(entry); room.chats.set(uid, arr);
-    if (room.moderatorId) io.to(room.moderatorId).emit('dm:from-player', { uid, name: p.name, message: msg, ts: entry.ts });
-  });
-
-  // Admin → Spieler
-  socket.on('mod:dm', ({ uid, message }) => {
-    const c = socket.data.room; const room = ensureRoom(c); if (!room) return;
-    const p = room.players.get(uid); if (!p) return;
-    const msg = String(message ?? '').slice(0, 2000);
-    const entry = { from:'admin', message: msg, ts: Date.now() };
-    const arr = room.chats.get(uid) ?? [];
-    arr.push(entry); room.chats.set(uid, arr);
-    io.to(p.socketId || '').emit('dm:from-admin', { message: msg, ts: entry.ts });
-    if (room.moderatorId) io.to(room.moderatorId).emit('dm:sent', { uid, name: p.name, message: msg, ts: entry.ts });
-  });
-
-  // Chats löschen
-  socket.on('mod:chat-clear-one', ({ uid }) => {
-    const c = socket.data.room; const room = ensureRoom(c); if (!room) return;
-    room.chats.set(uid, []);
-    const p = room.players.get(uid);
-    if (p?.socketId) io.to(p.socketId).emit('dm:cleared');
-    if (room.moderatorId) io.to(room.moderatorId).emit('dm:cleared-one', { uid });
-  });
-  socket.on('mod:chat-clear-all', () => {
-    const c = socket.data.room; const room = ensureRoom(c); if (!room) return;
-    room.chats.clear();
-    // Info an alle Spieler
-    for (const p of room.players.values()) if (p.socketId) io.to(p.socketId).emit('dm:cleared');
-    if (room.moderatorId) io.to(room.moderatorId).emit('dm:cleared-all');
-  });
-
-  // Spieler: Nachricht an Admin (bestehende einfache Textantwort; optional)
+  // Spieler: Nachricht an Admin (optional)
   socket.on('player:answer', ({ answer }) => {
     const c = socket.data.room; const uid = socket.data.uid;
     const room = ensureRoom(c); if (!room) return;
@@ -545,15 +540,14 @@ io.on('connection', (socket) => {
     if (room.moderatorId) io.to(room.moderatorId).emit('answer:received', { uid:p.uid, name:p.name, answer: String(answer||'') });
   });
 
-  // ─────────── Schätzantwort (NEU: ab Runde 1 erlaubt) ───────────
+  // Spieler: Schätzantwort (ab Frage-Start erlaubt)
   socket.on('player:estimate', ({ value }) => {
     const c = socket.data.room; const uid = socket.data.uid; const room = ensureRoom(c); if (!room) return;
     const p = room.players.get(uid); if (!p) return;
-    // ab Runde 1 (sobald Frage gestartet wurde) erlaubt:
-    if (room.roundIndex < 1 || room.qIndex < 0) { io.to(socket.id).emit('status','Noch keine aktive Frage.'); return; }
+    if (room.roundIndex < 1) { io.to(socket.id).emit('status','Schätzen erst nach Frage-Start.'); return; }
     const v = (value===null || value===undefined) ? null : Number(value);
     if (v===null || Number.isFinite(v)) {
-      p.estimate = v; // ein Update überschreibt die vorherige Eingabe; falls "nur einmal" gewünscht, hier absichern.
+      p.estimate = v;
       if (room.moderatorId) io.to(room.moderatorId).emit('status', `📩 Schätzantwort von ${p.name}: ${v===null?'(leer)':v}`);
       io.in(c).emit('players:update', { version: ++room.version, players: roomState(room).players });
     }
@@ -565,7 +559,6 @@ io.on('connection', (socket) => {
     return !!uid && uid === room.turnUid;
   }
   function afterAction(room, uidActed, code) {
-    // Ende prüfen
     if (roundIsComplete(room)) {
       room.turnUid = null;
       broadcastPartial(room, code, {
@@ -599,12 +592,9 @@ io.on('connection', (socket) => {
     const added = addToPot(room, p, add);
     if (!added) return;
 
-    // Raise?
     if (p.betRound > room.currentBetRound) room.currentBetRound = p.betRound;
-    // Spieler hat gehandelt -> aus pending raus
     if (room.pending) room.pending.delete(uid);
 
-    // Wenn Raise (neues Level), müssen alle aktiven (≠folded/≠allin) mit weniger betRound wieder in pending (außer Raiser)
     const raised = room.currentBetRound > prev;
     if (raised) {
       for (const q of room.players.values()) {
@@ -640,7 +630,6 @@ io.on('connection', (socket) => {
 
     if (room.pending) room.pending.delete(uid);
 
-    // All-in kann Raise sein -> pending reaktivieren
     const raised = room.currentBetRound > prev;
     if (raised) {
       for (const q of room.players.values()) {
@@ -692,7 +681,6 @@ io.on('connection', (socket) => {
       p.connected = false;
       io.in(c).emit('players:update', { version: ++room.version, players: roomState(room).players });
 
-      // wenn Spieler am Zug -> nur Turn weitergeben, pending bleibt
       if (room.turnUid === uid) {
         const seat = Number.isInteger(p.seat) ? p.seat : -1;
         const next = nextFromPending(room, seat);
