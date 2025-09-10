@@ -4,54 +4,8 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>QuizPoker – Admin</title>
-  <link rel="stylesheet" href="/style.css" />
+  <link rel="stylesheet" href="/style.css?v=4" />
   <script src="/socket.io/socket.io.js"></script>
-  <style>
-    /* Runde Tisch-Ansicht wie bei player.html */
-    :root { --ring: 460px; --seat: 96px; }
-    .table-wrap { display:flex; justify-content:center; }
-    .table-circle {
-      position:relative; width:var(--ring); height:var(--ring);
-      margin:10px auto; border-radius:50%;
-      background: radial-gradient(closest-side, #11213a 0%, #0d172a 60%, #0b1220 100%);
-      box-shadow: 0 0 0 2px #1d2636 inset, 0 10px 30px rgba(0,0,0,.5);
-    }
-    .seat {
-      position:absolute; width:var(--seat); height:var(--seat);
-      border-radius:14px; border:1px solid #26324a; background:#0b1220;
-      display:flex; flex-direction:column; align-items:center; justify-content:center;
-      gap:6px; padding:8px; text-align:center;
-      transform: translate(-50%, -50%);
-      cursor: pointer;
-    }
-    .seat .avatar {
-      width:48px; height:48px; border-radius:50%; background:#141a2a;
-      display:flex; align-items:center; justify-content:center; border:1px solid #283552;
-      font-weight:700; overflow:hidden;
-    }
-    .seat .name { font-size:13px; line-height:1.2; }
-    .seat .chips { font-size:12px; opacity:.9; }
-    .seat.disconnected { opacity:.5; filter:saturate(.5); }
-    /* Sitzpositionen (0 oben, dann im Uhrzeigersinn) */
-    .s0 { left:50%; top:7%; }
-    .s1 { left:82%; top:20%; }
-    .s2 { left:93%; top:50%; }
-    .s3 { left:82%; top:80%; }
-    .s4 { left:50%; top:93%; }
-    .s5 { left:18%; top:80%; }
-    .s6 { left:7%;  top:50%; }
-    .s7 { left:18%; top:20%; }
-    /* Center */
-    #table-center2 {
-      position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
-      padding:10px 14px; border-radius:12px; border:1px solid #2a3650; background:#0f1420;
-      text-align:center; font-size:14px;
-    }
-
-    @media (max-width: 560px) {
-      :root { --ring: 320px; --seat: 84px; }
-    }
-  </style>
 </head>
 <body>
   <div class="layout">
@@ -107,21 +61,20 @@
     </main>
 
     <aside class="right">
-      <h3 class="h">Spieler & Chips</h3>
+      <h3 class="h">Lobby – Spieler</h3>
       <div id="players" class="score"></div>
 
-      <h3 class="h" style="margin-top:12px;">Tisch</h3>
+      <h3 class="h" style="margin-top:12px;">Virtueller Tisch</h3>
       <div class="table-wrap">
-        <div class="table-circle" id="table">
-          <!-- feste 8 Plätze -->
-          <div class="seat s0" data-seat="0" title="Sitz 1"></div>
-          <div class="seat s1" data-seat="1" title="Sitz 2"></div>
-          <div class="seat s2" data-seat="2" title="Sitz 3"></div>
-          <div class="seat s3" data-seat="3" title="Sitz 4"></div>
-          <div class="seat s4" data-seat="4" title="Sitz 5"></div>
-          <div class="seat s5" data-seat="5" title="Sitz 6"></div>
-          <div class="seat s6" data-seat="6" title="Sitz 7"></div>
-          <div class="seat s7" data-seat="7" title="Sitz 8"></div>
+        <div class="table-circle">
+          <div class="seat s0" data-seat="0"></div>
+          <div class="seat s1" data-seat="1"></div>
+          <div class="seat s2" data-seat="2"></div>
+          <div class="seat s3" data-seat="3"></div>
+          <div class="seat s4" data-seat="4"></div>
+          <div class="seat s5" data-seat="5"></div>
+          <div class="seat s6" data-seat="6"></div>
+          <div class="seat s7" data-seat="7"></div>
           <div id="table-center2">💰 Pot: <strong id="pot">0</strong></div>
         </div>
       </div>
@@ -129,15 +82,8 @@
   </div>
 
   <script>
-    const socket = io();
-
-    const el   = (s) => document.querySelector(s);
-    const playersList = el('#players');
-    const answersList = el('#answers');
-
-    // State
-    let lastVersion = 0;
-    const playersMap = new Map(); // uid -> {uid,name,chips,connected,seat}
+    const socket = io({ transports:['websocket'], path:'/socket.io' });
+    const el = (s) => document.querySelector(s);
 
     // UI: Buttons
     el('#btnCreate').onclick    = () => socket.emit('mod:create-room');
@@ -155,7 +101,6 @@
       const delta = parseInt(el('#deltaChips').value || '0', 10) || 0;
       socket.emit('mod:mark', { uid, result: 'wrong', delta: -Math.abs(delta) });
     };
-
     el('#btnPlus').onclick = () => {
       const uid = el('#uidTarget').value.trim(); if (!uid) return;
       const delta = Math.abs(parseInt(el('#deltaChips').value || '0', 10) || 0);
@@ -167,10 +112,13 @@
       socket.emit('mod:adjust', { uid, delta });
     };
 
-    // Rendering: Score-Liste
+    // State
+    let lastVersion = -1;
+    const playersMap = new Map();
+
     function renderPlayersPanel() {
-      const arr = Array.from(playersMap.values()).sort((a,b) => (a.seat ?? 99) - (b.seat ?? 99));
-      playersList.innerHTML = '';
+      const wrap = el('#players'); wrap.innerHTML = '';
+      const arr = Array.from(playersMap.values()).sort((a,b)=> a.name.localeCompare(b.name));
       arr.forEach(p => {
         const div = document.createElement('div');
         div.className = 'player';
@@ -181,103 +129,64 @@
             <button class="score-btn" data-uid="${p.uid}" data-d="+10">+10</button>
             <button class="score-btn" data-uid="${p.uid}" data-d="-10">-10</button>
           </div>`;
-        // Bei Klick auf den Namen → UID ins Ziel übernehmen
-        div.querySelector('span').addEventListener('click', () => {
-          el('#uidTarget').value = p.uid;
-        });
-        playersList.appendChild(div);
+        wrap.appendChild(div);
       });
     }
 
-    // Rendering: Feste Sitze 0..7 im Kreis
     function renderSeats() {
-      // leeren/belegen
-      for (let i = 0; i < 8; i++) {
-        const slot = document.querySelector(`.seat[data-seat="${i}"]`);
+      for (let i=0;i<8;i++) {
+        const slot = document.querySelector(\`.seat[data-seat="\${i}"]\`);
         if (!slot) continue;
-        slot.className = `seat s${i}`;
-        slot.innerHTML = `
-          <div class="avatar">—</div>
-          <div class="name">Frei</div>
-          <div class="chips">🪙 0</div>
-        `;
-        slot.onclick = null;
-        slot.dataset.uid = '';
+        slot.className = \`seat s\${i}\`;
+        slot.innerHTML = '<div class="avatar">—</div><div class="name">Frei</div><div class="chips">🪙 0</div>';
       }
-      // Spieler einsetzen
-      for (const p of playersMap.values()) {
-        const si = (typeof p.seat === 'number') ? p.seat : null;
-        if (si === null || si < 0 || si > 7) continue;
-        const slot = document.querySelector(`.seat[data-seat="${si}"]`);
-        if (!slot) continue;
-        slot.innerHTML = `
-          <div class="avatar">${(p.avatar && p.avatar.startsWith?.('http')) ? `<img src="${p.avatar}" alt="Avatar" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">` : '🙂'}</div>
-          <div class="name">${p.name}</div>
-          <div class="chips">🪙 ${p.chips ?? 0}</div>
-        `;
+      const arr = Array.from(playersMap.values());
+      arr.forEach(p => {
+        if (typeof p.seat !== 'number') return;
+        const slot = document.querySelector(\`.seat[data-seat="\${p.seat}"]\`);
+        if (!slot) return;
+        slot.innerHTML = \`<div class="avatar">🙂</div><div class="name">\${p.name}</div><div class="chips">🪙 \${p.chips ?? 0}</div>\`;
         if (!p.connected) slot.classList.add('disconnected');
-        slot.dataset.uid = p.uid;
-        // Klick auf Sitz → UID ins Feld übernehmen (schnell markieren)
-        slot.onclick = () => { el('#uidTarget').value = p.uid; };
-      }
+      });
     }
 
-    function renderAll(stateLike = null) {
-      if (stateLike && typeof stateLike.pot === 'number') {
-        el('#pot').textContent = stateLike.pot;
-      }
-      renderPlayersPanel();
-      renderSeats();
-    }
-
-    // Click-Handler für +10/-10 im Score-Panel
-    playersList.addEventListener('click', (e) => {
-      const btn = e.target.closest('.score-btn');
-      if (!btn) return;
-      const uid   = btn.dataset.uid;
-      const delta = parseInt(btn.dataset.d, 10);
-      el('#uidTarget').value = uid;
+    el('#players').addEventListener('click', (e) => {
+      const btn = e.target.closest('.score-btn'); if (!btn) return;
+      const uid = btn.dataset.uid; const delta = parseInt(btn.dataset.d, 10);
       socket.emit('mod:adjust', { uid, delta });
     });
 
     // Socket Events
     socket.on('mod:room-created', ({ code, state }) => {
       el('#roomCode').textContent = code;
-      lastVersion = 0;
+      lastVersion = -1;
       playersMap.clear();
       (state.players || []).forEach(p => playersMap.set(p.uid, p));
       el('#qIndex').textContent = state.qIndex >= 0 ? (state.qIndex + 1) : '–';
       el('#questionBox').textContent = state.question?.text || '–';
-      renderAll(state);
+      renderPlayersPanel(); renderSeats();
     });
 
     socket.on('state:full', (state) => {
-      if ((state.version ?? 0) <= lastVersion) return;
-      lastVersion = state.version ?? 0;
+      if ((state.version ?? -1) <= lastVersion) return;
+      lastVersion = state.version ?? -1;
       playersMap.clear();
       (state.players || []).forEach(p => playersMap.set(p.uid, p));
       el('#qIndex').textContent = state.qIndex >= 0 ? (state.qIndex + 1) : '–';
       el('#questionBox').textContent = state.question?.text || '–';
-      renderAll(state);
-    });
-
-    socket.on('state:partial', (msg) => {
-      if ((msg.version ?? 0) <= lastVersion) return;
-      lastVersion = msg.version ?? 0;
-      // z. B. blinds, pot etc. – wenn du später partielle Felder nachrüstest
-      if (typeof msg.pot === 'number') el('#pot').textContent = msg.pot;
+      renderPlayersPanel(); renderSeats();
     });
 
     socket.on('players:update', (msg) => {
-      if ((msg.version ?? 0) <= lastVersion) return;
-      lastVersion = msg.version ?? 0;
+      if ((msg.version ?? -1) <= lastVersion) return;
+      lastVersion = msg.version ?? -1;
       (msg.players || []).forEach(p => playersMap.set(p.uid, p));
-      renderAll();
+      renderPlayersPanel(); renderSeats();
     });
 
     socket.on('question:show', (q) => {
-      if ((q.version ?? 0) <= lastVersion) return;
-      lastVersion = q.version ?? 0;
+      if ((q.version ?? -1) <= lastVersion) return;
+      lastVersion = q.version ?? -1;
       el('#qIndex').textContent = (q.index + 1);
       el('#questionBox').textContent = q.text || '–';
       el('#answers').innerHTML = '';
@@ -287,19 +196,17 @@
       const div = document.createElement('div');
       div.className = 'item';
       div.textContent = `${name}: ${answer}`;
-      answersList.prepend(div);
-      el('#uidTarget').value = uid; // Schnellmarkierung möglich
+      document.querySelector('#answers').prepend(div);
+      el('#uidTarget').value = uid;
     });
 
     socket.on('result:correct', ({ name, delta }) => {
-      const s = el('#status');
-      s.textContent = `✅ ${name} +${Math.abs(delta||0)} Chips`;
-      setTimeout(() => s.textContent = '', 1500);
+      el('#status').textContent = `✅ ${name} +${Math.abs(delta||0)} Chips`;
+      setTimeout(() => el('#status').textContent = '', 1500);
     });
     socket.on('result:wrong', ({ name, delta }) => {
-      const s = el('#status');
-      s.textContent = `❌ ${name} ${delta||0} Chips`;
-      setTimeout(() => s.textContent = '', 1500);
+      el('#status').textContent = `❌ ${name} ${delta||0} Chips`;
+      setTimeout(() => el('#status').textContent = '', 1500);
     });
 
     socket.on('status', (t) => { el('#adminStatus').textContent = t; });
