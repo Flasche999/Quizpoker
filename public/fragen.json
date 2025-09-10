@@ -5,5 +5,481 @@
     "hint2": "Es sind weniger als 2000.",
     "solution": "1665 Stufen (bis zur Spitze – historischer Wert, variiert je nach Zählung).",
     "target": 1665
+  },
+  {
+    "text": "Wie hoch ist der Mount Everest über dem Meeresspiegel (in Metern)?",
+    "hint1": "Weniger als 9000 m.",
+    "hint2": "Mehr als 8800 m.",
+    "solution": "8.848–8.849 m, je nach Messung.",
+    "target": 8848
+  },
+  {
+    "text": "Wie viele Knochen hat ein erwachsener Mensch?",
+    "hint1": "Weniger als 250.",
+    "hint2": "Mehr als 200.",
+    "solution": "Im Regelfall 206 Knochen.",
+    "target": 206
+  },
+  {
+    "text": "Wie viele Minuten hat ein Tag?",
+    "hint1": "24 Stunden.",
+    "hint2": "Stunden × 60.",
+    "solution": "1.440 Minuten.",
+    "target": 1440
+  },
+  {
+    "text": "Wie weit ist die mittlere Entfernung zwischen Erde und Mond (in km)?",
+    "hint1": "Mehr als 300.000 km.",
+    "hint2": "Weniger als 400.000 km.",
+    "solution": "Rund 384.400 km (mittlerer Wert).",
+    "target": 384400
+  },
+  {
+    "text": "Wie viele Tasten (inklusive Sondertasten) hat eine Standard-PC-Tastatur im Vollformat?",
+    "hint1": "Deutlich über 80.",
+    "hint2": "Knapp unter 110.",
+    "solution": "Üblicherweise 104 Tasten.",
+    "target": 104
+  },
+  {
+    "text": "Wie viele Spieler stehen im Fußball pro Team gleichzeitig auf dem Platz?",
+    "hint1": "Mehr als 9.",
+    "hint2": "Weniger als 12.",
+    "solution": "11 Spieler.",
+    "target": 11
+  },
+  {
+    "text": "Wie viele Sekunden hat eine Stunde?",
+    "hint1": "Minuten × 60.",
+    "hint2": "60 × 60.",
+    "solution": "3.600 Sekunden.",
+    "target": 3600
+  },
+  {
+    "text": "Wie viele Milliliter passen in eine Standard-Getränkedose?",
+    "hint1": "Zwischen 300 und 400 ml.",
+    "hint2": "Sehr gängig in Europa.",
+    "solution": "330 ml.",
+    "target": 330
+  },
+  {
+    "text": "Wie viele Karten hat ein französisches Standard-Spielkartenset ohne Joker?",
+    "hint1": "Mehr als 40.",
+    "hint2": "Weniger als 60.",
+    "solution": "52 Karten.",
+    "target": 52
+  },
+  {
+    "text": "Wie viele Felder hat ein klassisches Schachbrett?",
+    "hint1": "Quadratische Anordnung.",
+    "hint2": "8 × 8.",
+    "solution": "64 Felder.",
+    "target": 64
+  },
+  {
+    "text": "Wie viele Elemente stehen aktuell im Periodensystem (gerundet, anerkannte benannte Elemente)?",
+    "hint1": "Mehr als 110.",
+    "hint2": "Weniger als 120.",
+    "solution": "118 Elemente.",
+    "target": 118
+  },
+  {
+    "text": "Wie schnell ist die Schallgeschwindigkeit in Luft bei 20°C (in m/s, grob)?",
+    "hint1": "Zwischen 300 und 400 m/s.",
+    "hint2": "Knapp über 340 m/s.",
+    "solution": "Etwa 343 m/s.",
+    "target": 343
+  },
+  {
+    "text": "Wie lang ist ein Marathon (in Kilometern)?",
+    "hint1": "Knapp über 42 km.",
+    "hint2": "Exakt 42 km + 195 m.",
+    "solution": "42,195 km.",
+    "target": 42195
+  },
+  {
+    "text": "Wie viele Planeten zählen im heutigen Sinne zum Sonnensystem?",
+    "hint1": "Mehr als 7.",
+    "hint2": "Weniger als 10.",
+    "solution": "8 Planeten.",
+    "target": 8
+  },
+  {
+    "text": "Wie viele Nullen hat eine Milliarde (deutschsprachige Skala)?",
+    "hint1": "Mehr als 8.",
+    "hint2": "Weniger als 10.",
+    "solution": "9 Nullen (1.000.000.000).",
+    "target": 9
+  },
+  {
+    "text": "Wie viele Bundesländer hat Deutschland?",
+    "hint1": "Mehr als 15.",
+    "hint2": "Weniger als 20.",
+    "solution": "16 Bundesländer.",
+    "target": 16
+  },
+  {
+    "text": "Wie viele Seiten hat ein Dodekaeder?",
+    "hint1": "Mehr als 10.",
+    "hint2": "Weniger als 15.",
+    "solution": "12 Flächen (Fünfecke).",
+    "target": 12
+  },
+  {
+    "text": "Wie viele Zähne hat ein vollständiges erwachsenes Gebiss üblicherweise (inkl. Weisheitszähne)?",
+    "hint1": "Zwischen 28 und 36.",
+    "hint2": "Vielfach 32.",
+    "solution": "32 Zähne, sofern alle Weisheitszähne vorhanden sind.",
+    "target": 32
+  },
+  {
+    "text": "Wie viele Minuten hat eine Fußball-Halbzeit (ohne Nachspielzeit)?",
+    "hint1": "Mehr als 40.",
+    "hint2": "Weniger als 50.",
+    "solution": "45 Minuten.",
+    "target": 45
+  },
+  {
+    "text": "Wie viele Wochen hat ein Jahr (gerundet, ohne Schaltlogik)?",
+    "hint1": "Mehr als 50.",
+    "hint2": "Weniger als 53.",
+    "solution": "52 Wochen (plus 1–2 Tage).",
+    "target": 52
+  },
+  {
+    "text": "Wie viele Tasten (inkl. Enter, Shift etc.) hat in der Regel eine Klaviertastatur eines modernen Konzertflügels?",
+    "hint1": "Mehr als 80.",
+    "hint2": "Weniger als 90.",
+    "solution": "88 Tasten.",
+    "target": 88
+  },
+  {
+    "text": "Wie viele Millimeter sind ein Zoll (inch, gerundet)?",
+    "hint1": "Zwischen 25 und 26.",
+    "hint2": "Sehr nah an 25,4.",
+    "solution": "25,4 mm.",
+    "target": 25
+  },
+  {
+    "text": "Wie viele Grad (°) hat der Vollwinkel?",
+    "hint1": "Mehr als 300°.",
+    "hint2": "Weniger als 400°.",
+    "solution": "360°.",
+    "target": 360
+  },
+  {
+    "text": "Wie viele Spieler sind bei Volleyball pro Team gleichzeitig auf dem Feld?",
+    "hint1": "Mehr als 5.",
+    "hint2": "Weniger als 7.",
+    "solution": "6 Spieler.",
+    "target": 6
+  },
+  {
+    "text": "Wie viele Milliliter hat ein Liter?",
+    "hint1": "Zehnerpotenzen.",
+    "hint2": "Drei Nullen.",
+    "solution": "1.000 ml.",
+    "target": 1000
+  },
+  {
+    "text": "Wie viele Tasten hat ein Gamepad mit klassischem SNES-Layout (ohne Sticks/Klicks)?",
+    "hint1": "Einstellige Zahl.",
+    "hint2": "Schultertasten zählen mit.",
+    "solution": "8 (A, B, X, Y, L, R, Start, Select).",
+    "target": 8
+  },
+  {
+    "text": "Wie viele Zeichen hat das deutsche Alphabet (ohne Umlaute/ß)?",
+    "hint1": "Zwischen 20 und 30.",
+    "hint2": "Wie im Englischen.",
+    "solution": "26 Buchstaben.",
+    "target": 26
+  },
+  {
+    "text": "Wie viele Bits hat ein Byte?",
+    "hint1": "Zweierpotenzen-Bereich.",
+    "hint2": "Mehr als 7, weniger als 9.",
+    "solution": "8 Bits.",
+    "target": 8
+  },
+  {
+    "text": "Wie viele Kontinente zählt man üblicherweise (Schulzählung in Europa)?",
+    "hint1": "Mehr als 5.",
+    "hint2": "Weniger als 8.",
+    "solution": "7 Kontinente.",
+    "target": 7
+  },
+  {
+    "text": "Wie viele Ringe zeigt das Olympiasymbol?",
+    "hint1": "Mehr als 4.",
+    "hint2": "Weniger als 6.",
+    "solution": "Fünf Ringe.",
+    "target": 5
+  },
+  {
+    "text": "Wie viele Zentimeter sind ein Meter?",
+    "hint1": "Zehnerpotenz.",
+    "hint2": "Zwei Nullen.",
+    "solution": "100 cm.",
+    "target": 100
+  },
+  {
+    "text": "Wie viele Basenpaare hat das menschliche Genom ungefähr (in Milliarden, grob)?",
+    "hint1": "Zwischen 2 und 4 Milliarden.",
+    "hint2": "Rund 3,2.",
+    "solution": "Ca. 3,2 Milliarden Basenpaare.",
+    "target": 3200000000
+  },
+  {
+    "text": "Wie viele Spieler sind beim Basketball pro Team gleichzeitig auf dem Feld?",
+    "hint1": "Weniger als 6.",
+    "hint2": "Mehr als 4.",
+    "solution": "5 Spieler.",
+    "target": 5
+  },
+  {
+    "text": "Wie viele Seiten hat eine reguläre D20-Würfel (Tabletop)?",
+    "hint1": "Mehr als 15.",
+    "hint2": "Weniger als 25.",
+    "solution": "20 Seiten.",
+    "target": 20
+  },
+  {
+    "text": "Wie viele Minuten (ungefähr) dauert ein durchschnittlicher Kinofilm?",
+    "hint1": "Mehr als 80.",
+    "hint2": "Weniger als 140.",
+    "solution": "Etwa 120 Minuten als Richtwert.",
+    "target": 120
+  },
+  {
+    "text": "Wie viele Pixel hat Full HD (Breite × Höhe)?",
+    "hint1": "Breite 1920.",
+    "hint2": "Höhe 1080.",
+    "solution": "2.073.600 Pixel (1920×1080).",
+    "target": 2073600
+  },
+  {
+    "text": "Wie viele Tage hat ein Schaltjahr?",
+    "hint1": "Mehr als 365.",
+    "hint2": "Nur einen Tag mehr.",
+    "solution": "366 Tage.",
+    "target": 366
+  },
+  {
+    "text": "Wie viele Grad Kelvin sind 0°C?",
+    "hint1": "Mehr als 270 K.",
+    "hint2": "Knapp 273 K.",
+    "solution": "273,15 K.",
+    "target": 273
+  },
+  {
+    "text": "Wie viele Seiten hat ein reguläres Hexagon?",
+    "hint1": "Mehr als 5.",
+    "hint2": "Weniger als 7.",
+    "solution": "6 Seiten.",
+    "target": 6
+  },
+  {
+    "text": "Wie viele Monate haben 31 Tage?",
+    "hint1": "Mehr als 6.",
+    "hint2": "Weniger als 8.",
+    "solution": "7 Monate.",
+    "target": 7
+  },
+  {
+    "text": "Wie viele Tasten hat ein klassisches Handy-Nummernfeld (ohne Navigation), inkl. * und #?",
+    "hint1": "Mehr als 10.",
+    "hint2": "Weniger als 13.",
+    "solution": "12 Tasten.",
+    "target": 12
+  },
+  {
+    "text": "Wie viele Bundeskanzler(innen) hatte Deutschland seit 1949 bis heute (grober Orientierungswert)?",
+    "hint1": "Zwischen 8 und 12.",
+    "hint2": "Einstellig zweistellig.",
+    "solution": "Richtwert 9–10, nimm 9 als Spielwert.",
+    "target": 9
+  },
+  {
+    "text": "Wie viele Tasten hat ein Standard-MIDI-Keyboard oft im kompakten Format?",
+    "hint1": "Mehr als 20.",
+    "hint2": "Sehr häufige Variante.",
+    "solution": "49 Tasten sind sehr verbreitet (auch 25/61 existieren).",
+    "target": 49
+  },
+  {
+    "text": "Wie viele Minuten kocht man ein hartes Ei ungefähr (ab Siedepunkt, Meereshöhe)?",
+    "hint1": "Mehr als 6.",
+    "hint2": "Weniger als 12.",
+    "solution": "Etwa 8–10 Minuten (Richtwert 9).",
+    "target": 9
+  },
+  {
+    "text": "Wie viele Tasten hat ein Nummernblock auf der PC-Tastatur (inkl. Enter, Plus, Minus, Punkt, * , /)?",
+    "hint1": "Zwischen 15 und 20.",
+    "hint2": "Direktblock rechts.",
+    "solution": "17 Tasten (typisch).",
+    "target": 17
+  },
+  {
+    "text": "Wie viele Zeitzonen (theoretisch) gibt es weltweit (Stundenabstufungen)?",
+    "hint1": "Mehr als 20.",
+    "hint2": "Weniger als 30.",
+    "solution": "24 Standard-Zeitzonen.",
+    "target": 24
+  },
+  {
+    "text": "Wie viele Meter lang ist ein olympisches Schwimmbecken?",
+    "hint1": "Mehr als 40 m.",
+    "hint2": "Klassisch für Bahnenzählen.",
+    "solution": "50 m.",
+    "target": 50
+  },
+  {
+    "text": "Wie viele Kilobyte sind ein Megabyte (dezimal, grob im Alltag)?",
+    "hint1": "Mehr als 900.",
+    "hint2": "Weniger als 1100.",
+    "solution": "1.000 KB (dezimal, nicht binär).",
+    "target": 1000
+  },
+  {
+    "text": "Wie viel Prozent Sauerstoff enthält trockene Luft ungefähr auf Meereshöhe?",
+    "hint1": "Weniger als 25%.",
+    "hint2": "Mehr als 18%.",
+    "solution": "Etwa 21%.",
+    "target": 21
+  },
+  {
+    "text": "Wie viele Spieler starten bei Texas Hold’em an einem vollen Tisch (Full Ring)?",
+    "hint1": "Mehr als 8.",
+    "hint2": "Weniger als 11.",
+    "solution": "9 Spieler (oft auch 10, je nach Hausregel).",
+    "target": 9
+  },
+  {
+    "text": "Wie viele Notenlinien hat ein Notensystem (Notenzeile)?",
+    "hint1": "Mehr als 4.",
+    "hint2": "Weniger als 6.",
+    "solution": "5 Linien.",
+    "target": 5
+  },
+  {
+    "text": "Wie viele Tage hat der Monat Februar in einem Schaltjahr?",
+    "hint1": "Mehr als 28.",
+    "hint2": "Nur einen Tag mehr als normal.",
+    "solution": "29 Tage.",
+    "target": 29
+  },
+  {
+    "text": "Wie viele Schachfiguren hat ein Spieler zu Beginn (inkl. Bauern)?",
+    "hint1": "Mehr als 14.",
+    "hint2": "Weniger als 18.",
+    "solution": "16 Figuren.",
+    "target": 16
+  },
+  {
+    "text": "Wie viele Grad beträgt ein rechter Winkel?",
+    "hint1": "Zwischen 80 und 100.",
+    "hint2": "Genau die Mitte zwischen 0° und 180°?",
+    "solution": "90°.",
+    "target": 90
+  },
+  {
+    "text": "Wie viele Monate hat ein Jahr?",
+    "hint1": "Zweistellig.",
+    "hint2": "Ein Jahr ist in gleich viele Monate geteilt wie ein Dutzend.",
+    "solution": "12 Monate.",
+    "target": 12
+  },
+  {
+    "text": "Wie viele Tasten hat ein klassischer Game-Boy (ohne Lautstärke/Power/Rad)?",
+    "hint1": "Einstellig.",
+    "hint2": "Mit Steuerkreuz gezählt.",
+    "solution": "8 (Kreuz=4, A, B, Start, Select).",
+    "target": 8
+  },
+  {
+    "text": "Wie viele Kilometer sind 1 nautische Meile (gerundet)?",
+    "hint1": "Mehr als 1,8 km.",
+    "hint2": "Weniger als 2 km.",
+    "solution": "1,852 km.",
+    "target": 1852
+  },
+  {
+    "text": "Wie viele Spieler sind bei Handball pro Team gleichzeitig auf dem Feld (inkl. Torwart)?",
+    "hint1": "Mehr als 6.",
+    "hint2": "Weniger als 8.",
+    "solution": "7 Spieler.",
+    "target": 7
+  },
+  {
+    "text": "Wie viele Tassen Kaffee ergeben ungefähr 1 Liter (haushaltsübliche Tasse ~200 ml)?",
+    "hint1": "Mehr als 4.",
+    "hint2": "Weniger als 6.",
+    "solution": "Etwa 5 Tassen.",
+    "target": 5
+  },
+  {
+    "text": "Wie viele Millisekunden hat eine Sekunde?",
+    "hint1": "Zehnerpotenz.",
+    "hint2": "Drei Nullen.",
+    "solution": "1.000 ms.",
+    "target": 1000
+  },
+  {
+    "text": "Wie viele Buchstaben hat das Wort „Donaudampfschifffahrtsgesellschaftskapitän“ (ohne Bindestriche, Umlaute als ein Zeichen)?",
+    "hint1": "Mehr als 35.",
+    "hint2": "Weniger als 45.",
+    "solution": "43 Zeichen (je nach Schreibweise leicht variabel).",
+    "target": 43
+  },
+  {
+    "text": "Wie viele Tage dauert der Februar in einem Nicht-Schaltjahr?",
+    "hint1": "Weniger als 30.",
+    "hint2": "Standardwert.",
+    "solution": "28 Tage.",
+    "target": 28
+  },
+  {
+    "text": "Wie viele verschiedene Farben hat ein klassischer Rubik’s Cube (3×3×3)?",
+    "hint1": "Einstellig.",
+    "hint2": "Mehr als 5, weniger als 7.",
+    "solution": "6 Farben.",
+    "target": 6
+  },
+  {
+    "text": "Wie viele Spieler sind bei Eishockey pro Team gleichzeitig auf dem Eis (inkl. Torwart, bei voller Stärke)?",
+    "hint1": "Mehr als 4.",
+    "hint2": "Weniger als 7.",
+    "solution": "6 Spieler.",
+    "target": 6
+  },
+  {
+    "text": "Wie viele Jahre hat ein Jahrzehnt?",
+    "hint1": "Zweistellig, aber klein.",
+    "hint2": "Ein Zehnerpaket.",
+    "solution": "10 Jahre.",
+    "target": 10
+  },
+  {
+    "text": "Wie viele Tasten (ohne Funktionstasten F1–F12) hat die Buchstabenreihe QWERTZ (nur Buchstaben) auf einer deutschen Tastatur?",
+    "hint1": "Mehr als 20.",
+    "hint2": "Weniger als 30.",
+    "solution": "26 Buchstaben.",
+    "target": 26
+  },
+  {
+    "text": "Wie viele Farben hat ein Regenbogen in der üblichen Zählweise?",
+    "hint1": "Weniger als 8.",
+    "hint2": "Mehr als 6.",
+    "solution": "7 Farben.",
+    "target": 7
+  },
+  {
+    "text": "Wie viele Tasten hat das Ziffernfeld (oben, nicht Numpad) auf einer PC-Tastatur?",
+    "hint1": "Mehr als 9.",
+    "hint2": "Weniger als 11.",
+    "solution": "10 (0–9).",
+    "target": 10
   }
 ]
