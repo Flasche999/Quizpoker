@@ -10,8 +10,9 @@
     .badge{display:inline-block;font-weight:700;color:#000;background:#fff;border-radius:50%;width:20px;height:20px;line-height:20px;text-align:center;margin-left:6px;font-size:12px}
     .badge-s{border:2px solid #1363ff}.badge-b{border:2px solid #ff2b2b}
     .seat.turn,.player.turn{border:3px solid gold!important;box-shadow:0 0 10px rgba(255,215,0,.7);border-radius:10px}
-    .seat.folded{opacity:.5;filter:saturate(.5)}
+    .seat.folded,.player.folded{opacity:.5;filter:saturate(.5)}
     .betline{font-size:12px;opacity:.9}
+    .muted{opacity:.7}
   </style>
 </head>
 <body>
@@ -22,18 +23,30 @@
         <div class="item">
           <div>Code: <strong id="roomCode">—</strong></div>
           <div class="small">Frage: <span id="qIndex">–</span></div>
-          <div class="small">Aktuelle Bet: <strong id="currentBet">0</strong></div>
+          <div class="small">Runde: <strong id="roundIdx">0</strong> · Aktionen: <strong id="acted">0</strong>/<strong id="need">0</strong></div>
+          <div class="small">Aktuelle Bet (Runde): <strong id="currentBet">0</strong></div>
+          <div class="small">Pot: <strong id="pot">0</strong></div>
         </div>
       </div>
+
       <div class="row" style="margin-top:8px;">
         <button id="btnCreate" class="primary">Raum erstellen</button>
-        <button id="btnNextQ">➡️ Nächste Frage</button>
+        <button id="btnNextQ">🆕 Frage starten</button>
       </div>
 
       <div class="status" style="margin-top:12px;">
         <div>Small Blind (Seat #): <input id="inpSB" placeholder="0–7" style="width:100%;margin-top:6px;"></div>
         <div>Big Blind (Seat #): <input id="inpBB" placeholder="0–7" style="width:100%;margin-top:6px;"></div>
         <button id="btnSetBlinds" style="margin-top:6px;">Blinds setzen</button>
+      </div>
+
+      <div class="status" style="margin-top:12px;">
+        <div class="row">
+          <button id="btnRevealH1">🔓 Hinweis 1 aufdecken</button>
+          <button id="btnRevealH2">🔓 Hinweis 2 aufdecken</button>
+          <button id="btnRevealSol">🔓 Lösung aufdecken</button>
+        </div>
+        <div class="small muted">Nur möglich, wenn die vorherige Aktionsrunde komplett ist.</div>
       </div>
 
       <div class="status" style="margin-top:12px;">
@@ -46,10 +59,12 @@
       </div>
 
       <div class="status" style="margin-top:12px;">
-        <div>Gewinner-UID für Pot:</div>
         <div class="row">
-          <input id="inpWinnerUid" placeholder="UID" style="flex:1;">
+          <input id="inpWinnerUid" placeholder="Gewinner-UID (manuell)" style="flex:1;">
           <button id="btnAwardPot" class="ok">🏆 Pot auszahlen</button>
+        </div>
+        <div class="row" style="margin-top:6px;">
+          <button id="btnAwardNearest">🏆 Nächstliegenden automatisch</button>
         </div>
       </div>
 
@@ -60,26 +75,13 @@
     </aside>
 
     <main class="main">
-      <h3 class="h">Frage</h3>
-      <div id="questionBox" class="status" style="font-size:16px;">–</div>
-
-      <div class="row" style="margin-top:10px;">
-        <label style="display:flex; gap:6px; align-items:center;">
-          UID: <input id="uidTarget" placeholder="Spieler-UID" style="width:240px;">
-        </label>
-        <label style="display:flex; gap:6px; align-items:center;">
-          Δ Chips: <input id="deltaChips" type="number" value="10" style="width:120px;">
-        </label>
-        <button id="btnMarkCorrect" class="ok">✅ Korrekt</button>
-        <button id="btnMarkWrong"  class="err">❌ Falsch</button>
+      <h3 class="h">Frage & Hinweise</h3>
+      <div class="list">
+        <div class="item"><strong>Frage:</strong> <span id="qText">–</span></div>
+        <div class="item"><strong>Hinweis 1:</strong> <span id="qH1" class="muted">verdeckt</span></div>
+        <div class="item"><strong>Hinweis 2:</strong> <span id="qH2" class="muted">verdeckt</span></div>
+        <div class="item"><strong>Lösung:</strong> <span id="qSol" class="muted">verdeckt</span></div>
       </div>
-
-      <div class="row" style="margin-top:10px;">
-        <button id="btnMinus" class="err">− Manuell</button>
-        <button id="btnPlus"  class="ok">+ Manuell</button>
-      </div>
-
-      <div class="status" id="status"></div>
 
       <h3 class="h" style="margin-top:16px;">Antworten (live)</h3>
       <div id="answers" class="list" style="max-height:240px;overflow:auto;"></div>
@@ -100,197 +102,141 @@
           <div class="seat s5" data-seat="5"></div>
           <div class="seat s6" data-seat="6"></div>
           <div class="seat s7" data-seat="7"></div>
-          <div id="table-center2">💰 Pot: <strong id="pot">0</strong></div>
+          <div id="table-center2">💰 Pot: <strong id="pot2">0</strong></div>
         </div>
       </div>
     </aside>
   </div>
 
   <script>
-    const socket = io({ path: '/socket.io', transports: ['websocket','polling'] });
+    const socket = io({ path:'/socket.io', transports:['websocket','polling'] });
     const el = (s)=>document.querySelector(s);
+    const state = { blinds:{small:null,big:null}, turnUid:null, roundIndex:0, acted:0, need:0, currentBetRound:0 };
 
     socket.on('connect', ()=>{
-      el('#adminStatus').textContent = 'Verbunden: ' + socket.id;
-      const last = localStorage.getItem('qp_admin_room');
-      if (last) socket.emit('mod:claim-room', { code:last });
+      el('#adminStatus').textContent = 'Verbunden: '+socket.id;
+      const last = localStorage.getItem('qp_admin_room'); if (last) socket.emit('mod:claim-room', { code:last });
     });
-    socket.on('connect_error',(err)=>{ el('#adminStatus').textContent='Verbindungsfehler: '+(err?.message||err); });
-    socket.on('disconnect',(r)=>{ el('#adminStatus').textContent='Getrennt: '+r; });
+    socket.on('disconnect', ()=>{ el('#adminStatus').textContent='Getrennt.'; });
 
-    function emitIfConnected(evt, payload){
-      if(!socket.connected){ el('#adminStatus').textContent='Nicht verbunden – neu laden?'; return false; }
-      socket.emit(evt, payload); return true;
-    }
-
-    const currentState = { blinds:{small:null,big:null}, turnUid:null, currentBet:0 };
+    function emitOk(evt, payload){ if(!socket.connected){ el('#adminStatus').textContent='Nicht verbunden.'; return false; } socket.emit(evt,payload); return true; }
 
     // Buttons
-    el('#btnCreate').onclick = ()=> emitIfConnected('mod:create-room');
-    el('#btnNextQ').onclick  = ()=> emitIfConnected('mod:next-question');
+    el('#btnCreate').onclick=()=>emitOk('mod:create-room');
+    el('#btnNextQ').onclick =()=>emitOk('mod:next-question');
     el('#btnSetBlinds').onclick = ()=>{
       const sb=el('#inpSB').value.trim(), bb=el('#inpBB').value.trim();
-      emitIfConnected('mod:set-blinds',{ small: sb===''?null:Number(sb), big: bb===''?null:Number(bb) });
+      emitOk('mod:set-blinds',{ small: sb===''?null:Number(sb), big: bb===''?null:Number(bb) });
     };
+    el('#btnRevealH1').onclick=()=>emitOk('mod:reveal-hint1');
+    el('#btnRevealH2').onclick=()=>emitOk('mod:reveal-hint2');
+    el('#btnRevealSol').onclick=()=>emitOk('mod:reveal-solution');
     el('#btnSetTurn').onclick = ()=>{
-      const uid = el('#inpTurnUid').value.trim();
-      const seatStr = el('#inpTurnSeat').value.trim();
-      const seat = seatStr===''?null:Number(seatStr);
-      emitIfConnected('mod:set-turn',{ uid: uid||undefined, seat: Number.isInteger(seat)?seat:undefined });
+      const uid=el('#inpTurnUid').value.trim(); const seatStr=el('#inpTurnSeat').value.trim(); const seat=seatStr===''?null:Number(seatStr);
+      emitOk('mod:set-turn',{ uid: uid||undefined, seat: Number.isInteger(seat)?seat:undefined });
     };
-    el('#btnSyncAll').onclick = ()=> emitIfConnected('mod:sync-all');
-    el('#btnAwardPot').onclick = ()=>{
-      const uid = el('#inpWinnerUid').value.trim(); if(!uid) return;
-      emitIfConnected('mod:award-pot',{ uid });
+    el('#btnAwardPot').onclick=()=>{
+      const uid=el('#inpWinnerUid').value.trim(); if(!uid) return; emitOk('mod:award-pot',{ uid });
     };
+    el('#btnAwardNearest').onclick=()=>emitOk('mod:award-nearest');
+    el('#btnSyncAll').onclick=()=>emitOk('mod:sync-all');
 
-    el('#btnMarkCorrect').onclick = ()=>{
-      const uid=el('#uidTarget').value.trim(); if(!uid) return;
-      const delta = parseInt(el('#deltaChips').value||'0',10)||0;
-      emitIfConnected('mod:mark',{ uid, result:'correct', delta });
-    };
-    el('#btnMarkWrong').onclick = ()=>{
-      const uid=el('#uidTarget').value.trim(); if(!uid) return;
-      const delta = parseInt(el('#deltaChips').value||'0',10)||0;
-      emitIfConnected('mod:mark',{ uid, result:'wrong', delta:-Math.abs(delta) });
-    };
-    el('#btnPlus').onclick = ()=>{
-      const uid=el('#uidTarget').value.trim(); if(!uid) return;
-      const delta = Math.abs(parseInt(el('#deltaChips').value||'0',10)||0);
-      emitIfConnected('mod:adjust',{ uid, delta });
-    };
-    el('#btnMinus').onclick = ()=>{
-      const uid=el('#uidTarget').value.trim(); if(!uid) return;
-      const delta = -Math.abs(parseInt(el('#deltaChips').value||'0',10)||0);
-      emitIfConnected('mod:adjust',{ uid, delta });
-    };
+    // Rendering helpers
+    function badge(p){
+      const isSB = (p.seat === (state.blinds?.small ?? null));
+      const isBB = (p.seat === (state.blinds?.big ?? null));
+      return (isSB?'<span class="badge badge-s">S</span>':'') + (isBB?'<span class="badge badge-b">B</span>':'');
+    }
+    function renderTop(st){
+      el('#roomCode').textContent = st.code || '—';
+      el('#qIndex').textContent = st.qIndex>=0 ? (st.qIndex+1) : '–';
+      el('#roundIdx').textContent = st.roundIndex||0;
+      el('#acted').textContent = st.actedCount||0;
+      el('#need').textContent = st.needCount||0;
+      el('#currentBet').textContent = st.currentBetRound||0;
+      el('#pot').textContent = st.pot||0;
+      el('#pot2').textContent = st.pot||0;
 
-    // State
-    let lastVersion=-1;
-    const playersMap = new Map();
-
-    function renderPlayersPanel(){
-      const wrap=el('#players'); wrap.innerHTML='';
-      const arr=Array.from(playersMap.values()).sort((a,b)=>(a.seat??99)-(b.seat??99));
+      // Frage/Hints
+      el('#qText').textContent = st.question?.text || '–';
+      el('#qH1').textContent   = st.question?.hint1 ?? 'verdeckt';
+      el('#qH2').textContent   = st.question?.hint2 ?? 'verdeckt';
+      el('#qSol').textContent  = st.question?.solution ?? 'verdeckt';
+      state.blinds = st.blinds||{small:null,big:null};
+      state.turnUid = st.turnUid || null;
+      state.roundIndex = st.roundIndex||0;
+    }
+    function renderPlayers(st){
+      const wrap = el('#players'); wrap.innerHTML='';
+      const arr = (st.players||[]).slice().sort((a,b)=>(a.seat??99)-(b.seat??99));
       arr.forEach(p=>{
-        const isSB = (p.seat === (currentState.blinds?.small ?? null));
-        const isBB = (p.seat === (currentState.blinds?.big ?? null));
-        const sBadge = isSB?'<span class="badge badge-s">S</span>':'';
-        const bBadge = isBB?'<span class="badge badge-b">B</span>':'';
-
         const div=document.createElement('div');
-        div.className='player'+(p.uid===currentState.turnUid?' turn':'')+(p.status==='folded'?' folded':'');
+        div.className='player'+(p.uid===state.turnUid?' turn':'')+(p.status==='folded'?' folded':'');
         div.innerHTML=`
-          <span title="UID: ${p.uid}">${p.name} ${p.connected?'🟢':'🔴'} ${sBadge} ${bBadge}</span>
-          <strong>${p.chips||0}</strong>
-          <div class="pm">
-            <button class="score-btn" data-uid="${p.uid}" data-d="+10">+10</button>
-            <button class="score-btn" data-uid="${p.uid}" data-d="-10">-10</button>
-          </div>
-          <div class="small">Bet: 🪙 ${p.bet||0} ${p.status==='folded'?'· (Fold)':''}${p.status==='allin'?' · (All-in)':''}</div>
+          <span title="UID: ${p.uid}">${p.name} ${p.connected?'🟢':'🔴'} ${badge(p)}</span>
+          <strong>🪙 ${p.chips||0}</strong>
+          <div class="small betline">Gesamt: 🪙 ${p.betTotal||0} · Runde: 🪙 ${p.betRound||0} ${p.status==='allin'?' · (All-in)':''}${p.status==='folded'?' · (Fold)':''}</div>
         `;
         wrap.appendChild(div);
       });
     }
-
-    function renderSeats(){
+    function renderSeats(st){
       for(let i=0;i<8;i++){
-        const slot=document.querySelector(`.seat[data-seat="${i}"]`);
+        const slot = document.querySelector(`.seat[data-seat="${i}"]`);
         if(!slot) continue;
-        slot.className=`seat s${i}`;
-        slot.innerHTML='<div class="avatar">—</div><div class="name">Frei</div><div class="chips">🪙 0</div><div class="betline">Bet: 🪙 0</div>';
+        slot.className = `seat s${i}`;
+        slot.innerHTML = '<div class="avatar">—</div><div class="name">Frei</div><div class="chips">🪙 0</div><div class="betline">Runde: 🪙 0 · Gesamt: 🪙 0</div>';
       }
-      const arr=Array.from(playersMap.values());
-      arr.forEach(p=>{
+      (st.players||[]).forEach(p=>{
         if(typeof p.seat!=='number') return;
         const slot=document.querySelector(`.seat[data-seat="${p.seat}"]`); if(!slot) return;
-
-        const isSB = (p.seat === (currentState.blinds?.small ?? null));
-        const isBB = (p.seat === (currentState.blinds?.big ?? null));
-        const sBadge = isSB?'<span class="badge badge-s">S</span>':'';
-        const bBadge = isBB?'<span class="badge badge-b">B</span>':'';
-
-        slot.innerHTML = `<div class="avatar">🙂</div><div class="name">${p.name} ${sBadge} ${bBadge}</div><div class="chips">🪙 ${p.chips??0}</div><div class="betline">Bet: 🪙 ${p.bet||0} ${p.status==='folded'?'· (Fold)':''}${p.status==='allin'?' · (All-in)':''}</div>`;
+        slot.innerHTML = `<div class="avatar">🙂</div><div class="name">${p.name} ${badge(p)}</div><div class="chips">🪙 ${p.chips??0}</div><div class="betline">Runde: 🪙 ${p.betRound||0} · Gesamt: 🪙 ${p.betTotal||0} ${p.status==='allin'?' · (All-in)':''}${p.status==='folded'?' · (Fold)':''}</div>`;
         if(!p.connected) slot.classList.add('disconnected');
         if(p.status==='folded') slot.classList.add('folded');
-        if(p.uid===currentState.turnUid) slot.classList.add('turn');
+        if(p.uid===state.turnUid) slot.classList.add('turn');
       });
     }
 
-    el('#players').addEventListener('click',(e)=>{
-      const btn=e.target.closest('.score-btn'); if(!btn) return;
-      const uid=btn.dataset.uid; const delta=parseInt(btn.dataset.d,10);
-      emitIfConnected('mod:adjust', { uid, delta });
-    });
-
-    // Socket Events
-    socket.on('mod:room-created',({code,state})=>{
+    // Socket events
+    socket.on('mod:room-created', ({ code, state:st })=>{
       localStorage.setItem('qp_admin_room', code);
-      el('#roomCode').textContent=code;
-      el('#adminStatus').textContent='Raum erstellt: '+code;
-      lastVersion=-1; playersMap.clear();
-      currentState.blinds=state?.blinds||{small:null,big:null};
-      currentState.turnUid=state?.turnUid||null;
-      (state.players||[]).forEach(p=>playersMap.set(p.uid,p));
-      el('#qIndex').textContent = state.qIndex>=0 ? (state.qIndex+1) : '–';
-      el('#questionBox').textContent = state.question?.text || '–';
-      el('#pot').textContent = state.pot||0;
-      el('#currentBet').textContent = state.currentBet||0;
-      renderPlayersPanel(); renderSeats();
+      renderTop(st); renderPlayers(st); renderSeats(st);
+      el('#adminStatus').textContent = 'Raum erstellt: '+code;
     });
 
-    socket.on('state:full',(state)=>{
-      const ver=(state.version??-1); if (ver<=lastVersion) return; lastVersion=ver;
-      currentState.blinds=state.blinds||{small:null,big:null};
-      currentState.turnUid=state.turnUid||null;
-      el('#pot').textContent = state.pot||0;
-      el('#currentBet').textContent = state.currentBet||0;
+    socket.on('state:full', (st)=>{ renderTop(st); renderPlayers(st); renderSeats(st); });
+    socket.on('players:update', (msg)=>{ if(!msg?.players) return; const st={...state, players:msg.players, pot:Number(el('#pot').textContent)||0, qIndex:Number(el('#qIndex').textContent)||-1, roundIndex: state.roundIndex}; renderPlayers({players:msg.players}); renderSeats({players:msg.players}); });
+    socket.on('state:partial', (patch)=>{
+      if (patch.blinds) state.blinds = patch.blinds;
+      if ('turnUid' in patch) state.turnUid = patch.turnUid;
+      if ('roundIndex' in patch) state.roundIndex = patch.roundIndex;
+      if ('actedCount' in patch) el('#acted').textContent = patch.actedCount;
+      if ('needCount' in patch) el('#need').textContent = patch.needCount;
+      if ('currentBetRound' in patch) { el('#currentBet').textContent = patch.currentBetRound; }
+      if ('pot' in patch) { el('#pot').textContent = patch.pot; el('#pot2').textContent = patch.pot; }
+      if (patch.question || patch.reveals) {
+        // Ziehen uns frischen full-question aus question
+        const q = patch.question;
+        if (q) {
+          el('#qText').textContent = q.text || '–';
+          el('#qH1').textContent   = q.hint1 ?? 'verdeckt';
+          el('#qH2').textContent   = q.hint2 ?? 'verdeckt';
+          el('#qSol').textContent  = q.solution ?? 'verdeckt';
+        }
+      }
+      // Turn Markierung neu setzen
+      const stDummy = { players: Array.from(document.querySelectorAll('#players .player')).map(()=>({})) }; // kein repaint hier
+      // besser: triggere komplettes Repaint über sync-all kleiner Hack:
+      socket.emit('mod:sync-all');
+    });
+    socket.on('question:show', (q)=>{ el('#qIndex').textContent = (q.index+1); el('#qText').textContent = q.text || '–'; el('#qH1').textContent='verdeckt'; el('#qH2').textContent='verdeckt'; el('#qSol').textContent='verdeckt'; });
 
-      playersMap.clear(); (state.players||[]).forEach(p=>playersMap.set(p.uid,p));
-      el('#qIndex').textContent = state.qIndex>=0 ? (state.qIndex+1) : '–';
-      el('#questionBox').textContent = state.question?.text || '–';
-      renderPlayersPanel(); renderSeats();
+    socket.on('answer:received', ({ uid, name, answer })=>{
+      const div=document.createElement('div'); div.className='item'; div.textContent = `${name}: ${answer}`;
+      el('#answers').prepend(div);
     });
 
-    socket.on('players:update',(msg)=>{
-      const ver=(msg.version??-1); if (ver<=lastVersion) return; lastVersion=ver;
-      (msg.players||[]).forEach(p=>playersMap.set(p.uid,p));
-      renderPlayersPanel(); renderSeats();
-    });
-
-    socket.on('state:partial',(patch)=>{
-      const ver=(patch.version??-1); if (ver<=lastVersion) return; lastVersion=ver;
-      if (patch.blinds) currentState.blinds = patch.blinds;
-      if ('turnUid' in patch) currentState.turnUid = patch.turnUid;
-      if (typeof patch.pot==='number') el('#pot').textContent = patch.pot;
-      if (typeof patch.currentBet==='number') el('#currentBet').textContent = patch.currentBet;
-      renderPlayersPanel(); renderSeats();
-    });
-
-    socket.on('question:show',(q)=>{
-      const ver=(q.version??-1); if (ver<=lastVersion) return; lastVersion=ver;
-      el('#qIndex').textContent=(q.index+1);
-      el('#questionBox').textContent=q.text||'–';
-      el('#answers').innerHTML='';
-    });
-
-    socket.on('answer:received',({uid,name,answer})=>{
-      const div=document.createElement('div');
-      div.className='item'; div.textContent=`${name}: ${answer}`;
-      document.querySelector('#answers').prepend(div);
-      el('#uidTarget').value=uid;
-    });
-
-    socket.on('result:correct',({name,delta})=>{
-      el('#status').textContent=`✅ ${name} +${Math.abs(delta||0)} Chips`;
-      setTimeout(()=>el('#status').textContent='',1500);
-    });
-    socket.on('result:wrong',({name,delta})=>{
-      el('#status').textContent=`❌ ${name} ${delta||0} Chips`;
-      setTimeout(()=>el('#status').textContent='',1500);
-    });
-
-    socket.on('status',(t)=>{ el('#adminStatus').textContent=t; });
+    socket.on('status', (t)=>{ el('#adminStatus').textContent = t; });
   </script>
 </body>
 </html>
