@@ -4,15 +4,55 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>QuizPoker – Admin</title>
-  <link rel="stylesheet" href="/style.css?v=4" />
+  <link rel="stylesheet" href="/style.css?v=5" />
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
   <style>
-    .badge{display:inline-block;font-weight:700;color:#000;background:#fff;border-radius:50%;width:20px;height:20px;line-height:20px;text-align:center;margin-left:6px;font-size:12px}
-    .badge-s{border:2px solid #1363ff}.badge-b{border:2px solid #ff2b2b}
-    .seat.turn,.player.turn{border:3px solid gold!important;box-shadow:0 0 10px rgba(255,215,0,.7);border-radius:10px}
-    .seat.folded,.player.folded{opacity:.5;filter:saturate(.5)}
-    .betline{font-size:12px;opacity:.9}
+    :root{--bg:#0e0f12;--card:#151821;--line:#262b36;--ok:#2a5e3b;--err:#5b2730;--pri:#1363ff}
+    body{background:var(--bg);color:#e7e9ee;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;margin:0}
+    .layout{display:grid;grid-template-columns:320px 1fr 360px;gap:12px;padding:12px}
+    .sidebar,.main,.right{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px}
+    .h{margin:0 0 8px;font-size:16px}
+    .list{display:flex;flex-direction:column;gap:8px}
+    .item{border:1px solid var(--line);border-radius:10px;padding:8px;background:#0f1118}
+    .row{display:flex;gap:8px;align-items:center}
+    .row > input, .row > button, .row > select, .row > textarea{border:1px solid var(--line);background:#0f1118;color:#e7e9ee;border-radius:8px;padding:8px}
+    .row > button{cursor:pointer}
+    .row > button.primary{background:#0f1627;border-color:#1e3a8a}
+    .row > button.ok{border-color:var(--ok)}
+    .row > button.err{border-color:var(--err)}
+    .status{border:1px dashed var(--line);border-radius:10px;padding:8px}
+    .small{font-size:12px;opacity:.85}
     .muted{opacity:.7}
+    .score .player{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:10px;padding:8px;margin-bottom:8px;background:#0f1118}
+    .score .player.turn{border:3px solid gold!important;box-shadow:0 0 10px rgba(255,215,0,.7)}
+    .score .player.folded{opacity:.55;filter:saturate(.6)}
+    .betline{font-size:12px;opacity:.9}
+    .badge{display:inline-block;font-weight:700;color:#000;background:#fff;border-radius:50%;width:20px;height:20px;line-height:20px;text-align:center;margin-left:6px;font-size:12px}
+    .badge-s{border:2px solid #1363ff}
+    .badge-b{border:2px solid #ff2b2b}
+    .table-wrap{position:relative;height:280px}
+    .table-circle{position:relative;width:100%;height:100%;border:1px solid var(--line);border-radius:16px;display:grid;place-items:center;background:#0f1118}
+    .seat{position:absolute;width:120px;background:#10131b;border:1px solid var(--line);border-radius:10px;padding:6px}
+    .seat .name{font-size:13px;margin-top:4px}
+    .seat .chips,.seat .betline{font-size:12px;opacity:.9}
+    .seat.folded{opacity:.55}
+    .seat.turn{border:3px solid gold!important;box-shadow:0 0 10px rgba(255,215,0,.7)}
+    .s0{top:8px;left:calc(50% - 60px)}
+    .s1{top:36px;right:8px}
+    .s2{top:calc(50% - 60px);right:8px}
+    .s3{bottom:36px;right:8px}
+    .s4{bottom:8px;left:calc(50% - 60px)}
+    .s5{bottom:36px;left:8px}
+    .s6{top:calc(50% - 60px);left:8px}
+    .s7{top:36px;left:8px}
+    #table-center2{font-weight:700}
+    .chatlog{height:220px;overflow:auto;border:1px solid var(--line);border-radius:10px;background:#0f1118;padding:8px}
+    .chatrow{margin-bottom:6px}
+    .pill{display:inline-block;border:1px solid var(--line);border-radius:999px;padding:2px 8px;font-size:12px;margin-right:6px}
+    .pill.admin{background:#3b2a5e}
+    .pill.player{background:#283046}
+    .pill.me{background:#2a5e3b}
+    .two-col{display:grid;grid-template-columns:1fr 1fr;gap:8px}
   </style>
 </head>
 <body>
@@ -61,6 +101,23 @@
         </div>
       </div>
 
+      <!-- CHIPS MANAGEMENT -->
+      <div class="status" style="margin-top:12px;">
+        <div class="row">
+          <input id="chipsSetAll" type="number" placeholder="Startchips (z. B. 1000)" style="flex:1;">
+          <button id="btnChipsSetAll" class="ok">Allen setzen</button>
+        </div>
+        <div class="row" style="margin-top:6px;">
+          <input id="chipsDeltaAll" type="number" placeholder="+/− für alle (z. B. 100)" style="flex:1;">
+          <button id="btnChipsAddAll">Allen +/−</button>
+        </div>
+        <div class="row" style="margin-top:6px;">
+          <select id="chipsOneUid" style="flex:1;"><option value="">Spieler wählen…</option></select>
+          <input id="chipsDeltaOne" type="number" placeholder="+/− für einen" style="width:150px;">
+          <button id="btnChipsAddOne">Einzeln +/−</button>
+        </div>
+      </div>
+
       <div class="status" style="margin-top:12px;">
         <div class="row">
           <input id="inpWinnerUid" placeholder="Gewinner-UID (manuell)" style="flex:1;">
@@ -71,7 +128,7 @@
         </div>
       </div>
 
-      <div class="status" id="adminStatus"></div>
+      <div class="status" id="adminStatus" style="margin-top:12px;"></div>
       <div class="row" style="margin-top:10px;">
         <button id="btnSyncAll">🔄 Alle synchronisieren</button>
       </div>
@@ -86,8 +143,23 @@
         <div class="item"><strong>Lösung:</strong> <span id="qSol" class="muted">verdeckt</span></div>
       </div>
 
+      <h3 class="h" style="margin-top:16px;">Private DMs</h3>
+      <div class="item">
+        <div class="row">
+          <select id="dmSelect" style="flex:1;"><option value="">Spieler wählen…</option></select>
+          <button id="btnDmClearOne" class="err">Diesen Chat löschen</button>
+          <button id="btnDmClearAll" class="err">Alle Chats löschen</button>
+        </div>
+        <div class="chatlog" id="dmLog" style="margin-top:8px;"></div>
+        <div class="row" style="margin-top:8px;">
+          <input id="dmMessage" placeholder="Nachricht an Spieler… (Enter sendet)" style="flex:1;">
+          <button id="btnDmSend" class="primary">Senden</button>
+        </div>
+        <div class="small muted" style="margin-top:4px;">Hinweis: Der Verlauf ist pro Spieler. Auswahl oben ändert den sichtbaren Thread.</div>
+      </div>
+
       <h3 class="h" style="margin-top:16px;">Antworten (live)</h3>
-      <div id="answers" class="list" style="max-height:240px;overflow:auto;"></div>
+      <div id="answers" class="list" style="max-height:160px;overflow:auto;"></div>
     </main>
 
     <aside class="right">
@@ -114,17 +186,18 @@
   <script>
     const socket = io({ path:'/socket.io', transports:['websocket','polling'] });
     const el = (s)=>document.querySelector(s);
-    const state = { blinds:{small:null,big:null}, turnUid:null, roundIndex:0 };
+    const state = { blinds:{small:null,big:null}, turnUid:null, roundIndex:0, chats:new Map(), players:[] };
 
     const emitOk = (evt, payload)=>{ if(!socket.connected){ el('#adminStatus').textContent='Nicht verbunden.'; return false; } socket.emit(evt,payload); return true; };
 
+    // ───────── Connect / Restore ─────────
     socket.on('connect', ()=>{
       el('#adminStatus').textContent = 'Verbunden: '+socket.id;
       const last = localStorage.getItem('qp_admin_room'); if (last) socket.emit('mod:claim-room', { code:last });
     });
     socket.on('disconnect', ()=>{ el('#adminStatus').textContent='Getrennt.'; });
 
-    // Buttons
+    // ───────── Buttons Grundfunktionen ─────────
     el('#btnCreate').onclick=()=>emitOk('mod:create-room');
     el('#btnNextQ').onclick =()=>emitOk('mod:next-question');
     el('#btnSetBlinds').onclick = ()=>{
@@ -149,11 +222,80 @@
     el('#btnAwardNearest').onclick=()=>emitOk('mod:award-nearest');
     el('#btnSyncAll').onclick=()=>emitOk('mod:sync-all');
 
-    // Render Helfer
+    // ───────── Chips Management ─────────
+    el('#btnChipsSetAll').onclick=()=>{
+      const amount = Number(el('#chipsSetAll').value || 0);
+      emitOk('mod:chips-set-all', { amount });
+    };
+    el('#btnChipsAddAll').onclick=()=>{
+      const delta = Number(el('#chipsDeltaAll').value || 0);
+      emitOk('mod:chips-add-all', { delta });
+    };
+    el('#btnChipsAddOne').onclick=()=>{
+      const uid = el('#chipsOneUid').value;
+      const delta = Number(el('#chipsDeltaOne').value || 0);
+      if (!uid) { el('#adminStatus').textContent='Bitte Spieler wählen.'; return; }
+      emitOk('mod:chips-add-one', { uid, delta });
+    };
+
+    // ───────── DMs ─────────
+    const dmSelect = el('#dmSelect');
+    const dmLog = el('#dmLog');
+    function dmAppend(html){
+      const d=document.createElement('div'); d.className='chatrow'; d.innerHTML=html;
+      dmLog.appendChild(d); dmLog.scrollTop = dmLog.scrollHeight;
+    }
+    function escapeHtml(s){return String(s||'').replace(/[&<>"]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[m]));}
+
+    function renderDmFor(uid){
+      dmLog.innerHTML='';
+      const thread = state.chats.get(uid) || [];
+      thread.forEach(t=>{
+        const who = t.from==='admin' ? '<span class="pill admin">Admin</span>' : '<span class="pill player">Spieler</span>';
+        dmAppend(`${who} ${new Date(t.ts).toLocaleTimeString()} — ${escapeHtml(t.message)}`);
+      });
+    }
+    dmSelect.onchange = ()=>{ if(dmSelect.value) renderDmFor(dmSelect.value); };
+
+    function ensureChat(uid){ if(!state.chats.has(uid)) state.chats.set(uid,[]); return state.chats.get(uid); }
+
+    el('#btnDmSend').onclick = ()=>{
+      const uid = dmSelect.value; const msg = el('#dmMessage').value.trim();
+      if(!uid || !msg) return;
+      emitOk('mod:dm', { uid, message: msg });
+      // lokales Echo:
+      const thr = ensureChat(uid);
+      thr.push({ from:'admin', message:msg, ts:Date.now() });
+      renderDmFor(uid);
+      el('#dmMessage').value = '';
+    };
+    el('#dmMessage').addEventListener('keydown',(e)=>{ if(e.key==='Enter'){ e.preventDefault(); el('#btnDmSend').click(); }});
+
+    el('#btnDmClearOne').onclick = ()=>{ const uid = dmSelect.value; if(!uid) return; emitOk('mod:chat-clear-one', { uid }); };
+    el('#btnDmClearAll').onclick = ()=>emitOk('mod:chat-clear-all');
+
+    // ───────── Render Helfer ─────────
     function badge(p){
       const isSB = (p.seat === (state.blinds?.small ?? null));
       const isBB = (p.seat === (state.blinds?.big ?? null));
       return (isSB?'<span class="badge badge-s">S</span>':'') + (isBB?'<span class="badge badge-b">B</span>':'');
+    }
+    function refreshSelects(players){
+      // DM-Select & Chips-Einzel-Select
+      const keeps = new Set();
+      const curDm = dmSelect.value;
+      const curChip = el('#chipsOneUid').value;
+      dmSelect.innerHTML = '<option value="">Spieler wählen…</option>';
+      el('#chipsOneUid').innerHTML = '<option value="">Spieler wählen…</option>';
+      players.forEach(p=>{
+        const opt1=document.createElement('option'); opt1.value=p.uid; opt1.textContent=`${p.name} (${p.uid.slice(0,6)}…)`;
+        const opt2=opt1.cloneNode(true);
+        dmSelect.appendChild(opt1);
+        el('#chipsOneUid').appendChild(opt2);
+        keeps.add(p.uid);
+      });
+      if (keeps.has(curDm)) dmSelect.value = curDm;
+      if (keeps.has(curChip)) el('#chipsOneUid').value = curChip;
     }
     function renderTop(st){
       el('#roomCode').textContent = st.code || '—';
@@ -175,36 +317,48 @@
       state.roundIndex = st.roundIndex||0;
     }
     function renderPlayers(st){
+      state.players = (st.players||[]).slice();
       const wrap = el('#players'); wrap.innerHTML='';
-      const arr = (st.players||[]).slice().sort((a,b)=>(a.seat??99)-(b.seat??99));
+      const arr = state.players.slice().sort((a,b)=>(a.seat??99)-(b.seat??99));
       arr.forEach(p=>{
         const div=document.createElement('div');
         div.className='player'+(p.uid===state.turnUid?' turn':'')+(p.status==='folded'?' folded':'');
+        const est = (p.estimate===null || typeof p.estimate==='number') ? (p.estimate===null?'—':p.estimate) : '—';
         div.innerHTML=`
-          <span title="UID: ${p.uid}">${p.name} ${p.connected?'🟢':'🔴'} ${badge(p)}</span>
-          <strong>🪙 ${p.chips||0}</strong>
-          <div class="small betline">Gesamt: 🪙 ${p.betTotal||0} · Runde: 🪙 ${p.betRound||0} ${p.status==='allin'?' · (All-in)':''}${p.status==='folded'?' · (Fold)':''}</div>
+          <div class="row" style="justify-content:space-between;">
+            <span title="UID: ${p.uid}">${p.name} ${p.connected?'🟢':'🔴'} ${badge(p)}</span>
+            <strong>🪙 ${p.chips||0}</strong>
+          </div>
+          <div class="small betline">Runde: 🪙 ${p.betRound||0} · Gesamt: 🪙 ${p.betTotal||0} ${p.status==='allin'?' · (All-in)':''}${p.status==='folded'?' · (Fold)':''}</div>
+          <div class="small">Schätzwert: <strong>${est}</strong></div>
         `;
         wrap.appendChild(div);
       });
+      refreshSelects(arr);
     }
     function renderSeats(st){
       for(let i=0;i<8;i++){
         const slot = document.querySelector(`.seat[data-seat="${i}"]`);
         if(!slot) continue;
         slot.className = `seat s${i}`;
-        slot.innerHTML = '<div class="avatar">—</div><div class="name">Frei</div><div class="chips">🪙 0</div><div class="betline">Runde: 🪙 0 · Gesamt: 🪙 0</div>';
+        slot.innerHTML = '<div class="avatar">🙂</div><div class="name">Frei</div><div class="chips">🪙 0</div><div class="betline">Runde: 🪙 0 · Gesamt: 🪙 0</div>';
       }
       (st.players||[]).forEach(p=>{
         if(typeof p.seat!=='number') return;
         const slot=document.querySelector(`.seat[data-seat="${p.seat}"]`); if(!slot) return;
-        slot.innerHTML = `<div class="avatar">🙂</div><div class="name">${p.name} ${badge(p)}</div><div class="chips">🪙 ${p.chips??0}</div><div class="betline">Runde: 🪙 ${p.betRound||0} · Gesamt: 🪙 ${p.betTotal||0} ${p.status==='allin'?' · (All-in)':''}${p.status==='folded'?' · (Fold)':''}</div>`;
+        const est = (p.estimate===null || typeof p.estimate==='number') ? (p.estimate===null?'—':p.estimate) : '—';
+        slot.innerHTML = `<div class="avatar">🙂</div>
+          <div class="name">${p.name} ${badge(p)}</div>
+          <div class="chips">🪙 ${p.chips??0}</div>
+          <div class="betline">Runde: 🪙 ${p.betRound||0} · Gesamt: 🪙 ${p.betTotal||0}</div>
+          <div class="small">Schätzwert: <strong>${est}</strong></div>`;
         if(!p.connected) slot.classList.add('disconnected');
         if(p.status==='folded') slot.classList.add('folded');
         if(p.uid===state.turnUid) slot.classList.add('turn');
       });
     }
 
+    // ───────── Socket Events vom Server ─────────
     socket.on('mod:room-created', ({ code, state:st })=>{
       localStorage.setItem('qp_admin_room', code);
       renderTop(st); renderPlayers(st); renderSeats(st);
@@ -227,7 +381,6 @@
         el('#qH2').textContent   = patch.question?.hint2 ?? 'verdeckt';
         el('#qSol').textContent  = patch.question?.solution ?? 'verdeckt';
       }
-      // Zustand auffrischen
       socket.emit('mod:sync-all');
     });
 
@@ -240,6 +393,23 @@
     socket.on('answer:received', ({ uid, name, answer })=>{
       const div=document.createElement('div'); div.className='item'; div.textContent = `${name}: ${answer}`;
       el('#answers').prepend(div);
+    });
+
+    // DMs vom Server
+    socket.on('dm:from-player', ({ uid, name, message, ts })=>{
+      const thr = ensureChat(uid); thr.push({ from:'player', message, ts });
+      if (dmSelect.value === uid) renderDmFor(uid);
+    });
+    socket.on('dm:sent', ({ uid, name, message, ts })=>{
+      const thr = ensureChat(uid); thr.push({ from:'admin', message, ts });
+      if (dmSelect.value === uid) renderDmFor(uid);
+    });
+    socket.on('dm:cleared-one', ({ uid })=>{
+      state.chats.set(uid, []);
+      if (dmSelect.value === uid) renderDmFor(uid);
+    });
+    socket.on('dm:cleared-all', ()=>{
+      state.chats.clear(); dmLog.innerHTML='';
     });
 
     socket.on('status', (t)=>{ el('#adminStatus').textContent = t; });
