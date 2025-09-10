@@ -38,6 +38,7 @@ body {
 .h { margin: 0 0 10px; font-size: 14px; color: var(--muted); letter-spacing: .08em; text-transform: uppercase; }
 .status { margin-top: 8px; color: var(--muted); }
 .small { font-size: 12px; color: var(--muted); }
+.muted { opacity:.7; color: var(--muted); }
 
 /* Lists / Items */
 .list .item {
@@ -54,7 +55,7 @@ body {
 
 /* Controls */
 .row { display:flex; gap:8px; flex-wrap: wrap; }
-button, input {
+button, input, select, textarea {
   background: #0b1224;
   color: var(--text);
   border: 1px solid var(--border);
@@ -74,6 +75,9 @@ button:disabled { opacity:.6; pointer-events:none; }
 }
 .player .pm { display:flex; gap:6px; }
 .player .pm .score-btn { width:28px; height:28px; border-radius:8px; padding:0; }
+
+/* Allgemeine Mini-Infozeile */
+.betline { font-size:12px; opacity:.9; }
 
 /* ─────────────────────────────────────────────
    Alte (Grid) Tisch-Ansicht – weiterhin vorhanden
@@ -105,7 +109,7 @@ button:disabled { opacity:.6; pointer-events:none; }
 .buzzing { background: #3a1a21; border-color: #8a3b4c; }
 
 /* ─────────────────────────────────────────────
-   NEU: Runde Tisch-Ansicht (player.html/admin.html)
+   Runde Tisch-Ansicht (player.html/admin.html)
    ───────────────────────────────────────────── */
 :root { --ring: 460px; --seat: 96px; }
 
@@ -179,3 +183,32 @@ button:disabled { opacity:.6; pointer-events:none; }
   border-radius:12px;
 }
 
+/* Gefoldete/abwesende Zustände */
+.seat.folded,
+.spieler-box.folded,
+.player.folded { opacity:.55; filter:saturate(.6); }
+
+/* ───────── Chat (Admin & Player DMs) ───────── */
+.chatlog {
+  height: 220px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #0f1422;
+  padding: 8px;
+}
+.chatrow { margin-bottom: 6px; }
+.pill{
+  display:inline-block;
+  border:1px solid var(--border);
+  border-radius:999px;
+  padding:2px 8px;
+  font-size:12px;
+  margin-right:6px;
+}
+.pill.admin { background:#3b2a5e; }
+.pill.player { background:#283046; }
+.pill.me { background:#1e3a2b; }
+
+/* Kleine Helfer */
+code { background:#0f1422; border:1px solid var(--border); border-radius:6px; padding:2px 6px; }
