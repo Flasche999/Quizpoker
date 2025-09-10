@@ -42,20 +42,23 @@
 
       <div class="status" style="margin-top:12px;">
         <div class="row">
-          <button id="btnRevealH1">🔓 Hinweis 1 aufdecken</button>
-          <button id="btnRevealH2">🔓 Hinweis 2 aufdecken</button>
-          <button id="btnRevealSol">🔓 Lösung aufdecken</button>
+          <button id="btnRevealH1">🔓 Hinweis 1</button>
+          <button id="btnRevealH2">🔓 Hinweis 2</button>
+          <button id="btnRevealSol">🔓 Lösung</button>
         </div>
-        <div class="small muted">Nur möglich, wenn die vorherige Aktionsrunde komplett ist.</div>
+        <div class="small muted">Nur möglich, wenn die jeweilige Aktionsrunde vollständig ist.</div>
       </div>
 
       <div class="status" style="margin-top:12px;">
-        <div>Turn an (UID oder Seat#):</div>
         <div class="row">
-          <input id="inpTurnUid" placeholder="UID" style="flex:1;">
+          <input id="inpTurnUid" placeholder="Turn: UID" style="flex:1;">
           <input id="inpTurnSeat" placeholder="Seat 0–7" style="width:120px;">
         </div>
-        <button id="btnSetTurn" style="margin-top:6px;">Zug setzen</button>
+        <div class="row" style="margin-top:6px;">
+          <button id="btnSetTurn">Turn setzen</button>
+          <button id="btnNextTurn">⏭️ Nächster Spieler</button>
+          <button id="btnSkipFold" class="err">⏳ Spieler überspringen (Fold)</button>
+        </div>
       </div>
 
       <div class="status" style="margin-top:12px;">
@@ -111,15 +114,15 @@
   <script>
     const socket = io({ path:'/socket.io', transports:['websocket','polling'] });
     const el = (s)=>document.querySelector(s);
-    const state = { blinds:{small:null,big:null}, turnUid:null, roundIndex:0, acted:0, need:0, currentBetRound:0 };
+    const state = { blinds:{small:null,big:null}, turnUid:null, roundIndex:0 };
+
+    const emitOk = (evt, payload)=>{ if(!socket.connected){ el('#adminStatus').textContent='Nicht verbunden.'; return false; } socket.emit(evt,payload); return true; };
 
     socket.on('connect', ()=>{
       el('#adminStatus').textContent = 'Verbunden: '+socket.id;
       const last = localStorage.getItem('qp_admin_room'); if (last) socket.emit('mod:claim-room', { code:last });
     });
     socket.on('disconnect', ()=>{ el('#adminStatus').textContent='Getrennt.'; });
-
-    function emitOk(evt, payload){ if(!socket.connected){ el('#adminStatus').textContent='Nicht verbunden.'; return false; } socket.emit(evt,payload); return true; }
 
     // Buttons
     el('#btnCreate').onclick=()=>emitOk('mod:create-room');
@@ -131,17 +134,22 @@
     el('#btnRevealH1').onclick=()=>emitOk('mod:reveal-hint1');
     el('#btnRevealH2').onclick=()=>emitOk('mod:reveal-hint2');
     el('#btnRevealSol').onclick=()=>emitOk('mod:reveal-solution');
+
     el('#btnSetTurn').onclick = ()=>{
-      const uid=el('#inpTurnUid').value.trim(); const seatStr=el('#inpTurnSeat').value.trim(); const seat=seatStr===''?null:Number(seatStr);
-      emitOk('mod:set-turn',{ uid: uid||undefined, seat: Number.isInteger(seat)?seat:undefined });
+      const uid=el('#inpTurnUid').value.trim(); const seatStr=el('#inpTurnSeat').value.trim();
+      const seat = seatStr==='' ? undefined : Number(seatStr);
+      emitOk('mod:set-turn',{ uid: uid || undefined, seat: Number.isInteger(seat)?seat:undefined });
     };
+    el('#btnNextTurn').onclick = ()=>emitOk('mod:next-turn');
+    el('#btnSkipFold').onclick = ()=>emitOk('mod:skip-fold');
+
     el('#btnAwardPot').onclick=()=>{
       const uid=el('#inpWinnerUid').value.trim(); if(!uid) return; emitOk('mod:award-pot',{ uid });
     };
     el('#btnAwardNearest').onclick=()=>emitOk('mod:award-nearest');
     el('#btnSyncAll').onclick=()=>emitOk('mod:sync-all');
 
-    // Rendering helpers
+    // Render Helfer
     function badge(p){
       const isSB = (p.seat === (state.blinds?.small ?? null));
       const isBB = (p.seat === (state.blinds?.big ?? null));
@@ -157,11 +165,11 @@
       el('#pot').textContent = st.pot||0;
       el('#pot2').textContent = st.pot||0;
 
-      // Frage/Hints
       el('#qText').textContent = st.question?.text || '–';
       el('#qH1').textContent   = st.question?.hint1 ?? 'verdeckt';
       el('#qH2').textContent   = st.question?.hint2 ?? 'verdeckt';
       el('#qSol').textContent  = st.question?.solution ?? 'verdeckt';
+
       state.blinds = st.blinds||{small:null,big:null};
       state.turnUid = st.turnUid || null;
       state.roundIndex = st.roundIndex||0;
@@ -197,7 +205,6 @@
       });
     }
 
-    // Socket events
     socket.on('mod:room-created', ({ code, state:st })=>{
       localStorage.setItem('qp_admin_room', code);
       renderTop(st); renderPlayers(st); renderSeats(st);
@@ -205,31 +212,30 @@
     });
 
     socket.on('state:full', (st)=>{ renderTop(st); renderPlayers(st); renderSeats(st); });
-    socket.on('players:update', (msg)=>{ if(!msg?.players) return; const st={...state, players:msg.players, pot:Number(el('#pot').textContent)||0, qIndex:Number(el('#qIndex').textContent)||-1, roundIndex: state.roundIndex}; renderPlayers({players:msg.players}); renderSeats({players:msg.players}); });
+    socket.on('players:update', (msg)=>{ if(!msg?.players) return; renderPlayers({players:msg.players, blinds:state.blinds, turnUid:state.turnUid}); renderSeats({players:msg.players, blinds:state.blinds, turnUid:state.turnUid}); });
     socket.on('state:partial', (patch)=>{
       if (patch.blinds) state.blinds = patch.blinds;
       if ('turnUid' in patch) state.turnUid = patch.turnUid;
       if ('roundIndex' in patch) state.roundIndex = patch.roundIndex;
       if ('actedCount' in patch) el('#acted').textContent = patch.actedCount;
       if ('needCount' in patch) el('#need').textContent = patch.needCount;
-      if ('currentBetRound' in patch) { el('#currentBet').textContent = patch.currentBetRound; }
+      if ('currentBetRound' in patch) el('#currentBet').textContent = patch.currentBetRound;
       if ('pot' in patch) { el('#pot').textContent = patch.pot; el('#pot2').textContent = patch.pot; }
-      if (patch.question || patch.reveals) {
-        // Ziehen uns frischen full-question aus question
-        const q = patch.question;
-        if (q) {
-          el('#qText').textContent = q.text || '–';
-          el('#qH1').textContent   = q.hint1 ?? 'verdeckt';
-          el('#qH2').textContent   = q.hint2 ?? 'verdeckt';
-          el('#qSol').textContent  = q.solution ?? 'verdeckt';
-        }
+      if (patch.question) {
+        el('#qText').textContent = patch.question?.text || '–';
+        el('#qH1').textContent   = patch.question?.hint1 ?? 'verdeckt';
+        el('#qH2').textContent   = patch.question?.hint2 ?? 'verdeckt';
+        el('#qSol').textContent  = patch.question?.solution ?? 'verdeckt';
       }
-      // Turn Markierung neu setzen
-      const stDummy = { players: Array.from(document.querySelectorAll('#players .player')).map(()=>({})) }; // kein repaint hier
-      // besser: triggere komplettes Repaint über sync-all kleiner Hack:
+      // Zustand auffrischen
       socket.emit('mod:sync-all');
     });
-    socket.on('question:show', (q)=>{ el('#qIndex').textContent = (q.index+1); el('#qText').textContent = q.text || '–'; el('#qH1').textContent='verdeckt'; el('#qH2').textContent='verdeckt'; el('#qSol').textContent='verdeckt'; });
+
+    socket.on('question:show', (q)=>{
+      el('#qIndex').textContent = (q.index+1);
+      el('#qText').textContent = q.text || '–';
+      el('#qH1').textContent='verdeckt'; el('#qH2').textContent='verdeckt'; el('#qSol').textContent='verdeckt';
+    });
 
     socket.on('answer:received', ({ uid, name, answer })=>{
       const div=document.createElement('div'); div.className='item'; div.textContent = `${name}: ${answer}`;
