@@ -5,6 +5,7 @@
 // - Einzigartige Namen pro Raum
 // - Kein Doppelplatz: UID wird einmalig geführt
 // - Reconnect erlaubt, Takeover kickt alte Verbindung derselben UID
+// - NEU: blinds (small/big) + turnUid im State, Admin-Event mod:set-turn
 
 import express from 'express';
 import http from 'http';
@@ -69,7 +70,8 @@ const rooms = new Map();
     questions: [...],
     qIndex: number,            // -1 bevor gestartet
     pot: number,
-    blinds: { small: null, big: null },
+    blinds: { small: null, big: null }, // seats (0–7) oder null
+    turnUid: string|null,               // UID des Spielers am Zug
   }
 */
 
@@ -80,6 +82,7 @@ function roomState(room) {
     pot: room.pot || 0,
     qIndex: room.qIndex ?? -1,
     blinds: room.blinds || { small: null, big: null },
+    turnUid: room.turnUid || null,
     players: Array.from(room.players.values()).map(p => ({
       uid: p.uid,
       name: p.name,
@@ -113,6 +116,12 @@ function nameTaken(room, name, byUid = null) {
   }
   return false;
 }
+function findUidBySeat(room, seat) {
+  for (const p of room.players.values()) {
+    if (p.seat === seat) return p.uid;
+  }
+  return null;
+}
 
 // ─────────────────────────────────────────────────────────────
 // Socket.IO
@@ -133,7 +142,8 @@ io.on('connection', (socket) => {
       questions: loadQuestions(),
       qIndex: -1,
       pot: 0,
-      blinds: { small: null, big: null }
+      blinds: { small: null, big: null },
+      turnUid: null
     };
     rooms.set(code, room);
 
@@ -144,12 +154,34 @@ io.on('connection', (socket) => {
     console.log('[ROOM] created', code);
   });
 
-  // Admin setzt Blinds (optional)
+  // Admin setzt Blinds (optional) – erwartet seats (Zahlen) oder null
   socket.on('mod:set-blinds', ({ small, big }) => {
     const c = socket.data.room; const room = ensureRoom(c); if (!room) return;
-    room.blinds = { small: small || null, big: big || null };
+    const sSeat = (Number.isInteger(small) ? small : null);
+    const bSeat = (Number.isInteger(big)   ? big   : null);
+    room.blinds = { small: sSeat, big: bSeat };
     bump(room);
     io.in(c).emit('state:partial', { version: room.version, blinds: room.blinds });
+    console.log('[BLINDS]', c, room.blinds);
+  });
+
+  // NEU: Admin setzt „wer ist am Zug“
+  // payload: { uid?: string, seat?: number }
+  socket.on('mod:set-turn', ({ uid, seat }) => {
+    const c = socket.data.room; const room = ensureRoom(c); if (!room) return;
+
+    let targetUid = uid || null;
+    if (!targetUid && Number.isInteger(seat)) {
+      targetUid = findUidBySeat(room, seat);
+    }
+    if (!targetUid || !room.players.has(targetUid)) {
+      io.to(socket.id).emit('status', 'Konnte Turn nicht setzen: UID/Seat ungültig.');
+      return;
+    }
+    room.turnUid = targetUid;
+    bump(room);
+    io.in(c).emit('state:partial', { version: room.version, turnUid: room.turnUid });
+    console.log('[TURN]', c, '->', room.turnUid);
   });
 
   // Admin nächste Frage
@@ -257,6 +289,12 @@ io.on('connection', (socket) => {
       p = { uid, name: desiredName, chips: 100, connected: true, socketId: socket.id, seat };
       room.players.set(uid, p);
       console.log('[JOIN] new', { code, uid, name: p.name, seat: p.seat });
+
+      // Falls noch niemand am Zug ist, ersten Spieler setzen (optional)
+      if (!room.turnUid) {
+        room.turnUid = uid;
+        // kein bump hier; gleich unten wird gebumpt
+      }
     } else {
       p.connected = true;
       p.socketId  = socket.id;
@@ -311,6 +349,13 @@ io.on('connection', (socket) => {
       p.connected = false;           // bleibt im Raum sichtbar, aber „offline“
       bump(room);
       io.in(c).emit('players:update', { version: room.version, players: roomState(room).players });
+
+      // Optional: wenn der am Zug gehende Spieler disconnectet, Turn löschen
+      if (room.turnUid === uid) {
+        room.turnUid = null;
+        bump(room);
+        io.in(c).emit('state:partial', { version: room.version, turnUid: room.turnUid });
+      }
     }
   });
 });
