@@ -128,13 +128,13 @@
       socket.emit('player:answer', { answer:a }); inpAnswer.value=''; $('#pStatus').textContent='Gesendet.'; setTimeout(()=>$('#pStatus').textContent='',800);
     };
 
-    // Betting-Buttons (Server erzwingt: nur am Zug)
+    // Betting-Buttons (Server prüft Turn/pending)
     btnBet.onclick   = ()=>{ const amt=Math.max(1,parseInt(betAmount.value||'0',10)||0); socket.emit('player:bet',{ amount:amt }); };
     btnCall.onclick  = ()=> socket.emit('player:call');
     btnAllin.onclick = ()=> socket.emit('player:allin');
     btnFold.onclick  = ()=> socket.emit('player:fold');
 
-    // Estimate (nur Runde 4 – Server prüft)
+    // Estimate (nur Runde 4)
     btnEstimate.onclick = ()=>{
       const v = inpEstimate.value;
       if (v==='' || v===null) socket.emit('player:estimate',{ value:null });
@@ -180,7 +180,6 @@
       if (typeof st.pot==='number') $('#pot').textContent = st.pot;
       $('#currentBet').textContent = st.currentBetRound || 0;
 
-      // Frage/Hints
       $('#qText').textContent = st.question?.text || '–';
       $('#qH1').textContent   = st.question?.hint1 ?? 'verdeckt';
       $('#qH2').textContent   = st.question?.hint2 ?? 'verdeckt';
@@ -191,7 +190,6 @@
       const me = playersByUid.get(UID); if (me) $('#chips').textContent = me.chips ?? 0;
     }
 
-    // Sockets
     socket.on('connect', ()=>{
       $('#pStatus').textContent='Verbunden.'; setTimeout(()=>$('#pStatus').textContent='',800);
       if (myRoom && (currentInputCode()==='' || currentInputCode()===myRoom)) socket.emit('hello', { uid:UID, room:myRoom });
@@ -237,14 +235,12 @@
         $('#qH2').textContent   = patch.question?.hint2 ?? 'verdeckt';
         $('#qSol').textContent  = patch.question?.solution ?? 'verdeckt';
       }
-      // Nach Partial die volle Liste refreshen, um Turn/Badges sicher zu zeichnen
+      // Frisches full für komplette Liste
       socket.emit('mod:sync-all');
     });
     socket.on('question:show',(q)=>{
       $('#qText').textContent = q.text || '–';
-      $('#qH1').textContent = 'verdeckt';
-      $('#qH2').textContent = 'verdeckt';
-      $('#qSol').textContent = 'verdeckt';
+      $('#qH1').textContent='verdeckt'; $('#qH2').textContent='verdeckt'; $('#qSol').textContent='verdeckt';
     });
     socket.on('status',(t)=>{ $('#pStatus').textContent=t; setTimeout(()=>$('#pStatus').textContent='',1500); });
   </script>
