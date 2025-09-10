@@ -1,5 +1,5 @@
 // server.js – QuizPoker, robust mit UID, State-Backfill & Versionierung (ESM)
-// + Sitzplätze (virtueller Tisch), eindeutige Namen, Anti-Doppelbeitritt
+// + Sitzplätze (virtueller Tisch), eindeutige Namen, Anti-Doppelbeitritt mit TAKEOVER
 
 import express from 'express';
 import http from 'http';
@@ -124,6 +124,7 @@ function nameTaken(room, name, byUid = null) {
 // Socket.IO
 // ─────────────────────────────────────────────────────────────
 io.on('connection', (socket) => {
+  console.log('[SOCKET] connected', socket.id);
 
   // Moderator erstellt Raum
   socket.on('mod:create-room', () => {
@@ -146,6 +147,7 @@ io.on('connection', (socket) => {
     socket.data = { role: 'moderator', room: code };
 
     io.to(socket.id).emit('mod:room-created', { code, state: roomState(room) });
+    console.log('[ROOM] created', code, 'by', socket.id);
   });
 
   // Moderator setzt Blinds (optional, per Name)
@@ -222,11 +224,13 @@ io.on('connection', (socket) => {
       }
       p = { uid, name: name || 'Spieler', chips: 100, connected: true, socketId: socket.id, seat };
       room.players.set(uid, p);
+      console.log('[HELLO] new', { code, uid, name, seat });
     } else {
       // Reconnect
       p.connected = true;
       p.socketId = socket.id;
       if (name && !nameTaken(room, name, uid)) p.name = name;
+      console.log('[HELLO] reconnect', { code, uid, name: p.name, seat: p.seat });
     }
     socket.join(code);
     socket.data = { role: 'player', room: code, uid };
@@ -236,27 +240,34 @@ io.on('connection', (socket) => {
     io.in(code).emit('players:update', { version: room.version, players: roomState(room).players });
   });
 
-  // Spieler tritt bei (Hauptpfad)
+  // Spieler tritt bei (Hauptpfad) – mit TAKEOVER
   socket.on('player:join', ({ code, uid, name }) => {
     code = String(code || '').toUpperCase().trim();
+    console.log('[JOIN] request', { code, uid, name, socket: socket.id });
     if (!rooms.has(code)) {
       return io.to(socket.id).emit('player:join-result', { ok: false, error: 'Raum nicht gefunden.' });
     }
     const room = rooms.get(code);
 
-    // Doppelbeitritt mit gleicher UID (bereits verbunden)?
+    // Falls gleiche UID bereits als connected gilt → alte Verbindung kicken (TAKEOVER)
     const existing = room.players.get(uid);
     if (existing && existing.connected) {
-      return io.to(socket.id).emit('player:join-result', { ok: false, error: 'Du bist bereits beigetreten (anderes Gerät/Tab?).' });
+      const oldSockId = existing.socketId;
+      const oldSock   = oldSockId && io.sockets.sockets.get(oldSockId);
+      if (oldSock) {
+        io.to(oldSockId).emit('status', 'Du wurdest durch eine neue Verbindung abgelöst.');
+        try { oldSock.disconnect(true); } catch {}
+        console.log('[JOIN] takeover', { code, uid, oldSockId, newSockId: socket.id });
+      }
     }
 
-    // Name prüfen (einzigartig im Raum, außer es ist derselbe UID beim Reconnect)
+    // Name prüfen (einzigartig im Raum, außer es ist dieselbe UID)
     const desiredName = String(name || 'Spieler').slice(0, 24);
     if (nameTaken(room, desiredName, existing?.uid ?? null)) {
       return io.to(socket.id).emit('player:join-result', { ok: false, error: 'Dieser Name ist bereits vergeben.' });
     }
 
-    // Spielerobjekt anlegen oder als Reconnect übernehmen
+    // Spielerobjekt anlegen oder übernehmen
     let p = existing;
     if (!p) {
       const seat = nextFreeSeat(room);
@@ -265,11 +276,12 @@ io.on('connection', (socket) => {
       }
       p = { uid, name: desiredName, chips: 100, connected: true, socketId: socket.id, seat };
       room.players.set(uid, p);
+      console.log('[JOIN] new', { code, uid, name: p.name, seat: p.seat });
     } else {
       p.connected = true;
       p.socketId = socket.id;
       p.name = desiredName;
-      // Seat bleibt erhalten
+      console.log('[JOIN] reconnect/updated', { code, uid, name: p.name, seat: p.seat });
     }
 
     socket.join(code);
@@ -296,8 +308,10 @@ io.on('connection', (socket) => {
   });
 
   // Disconnect
-  socket.on('disconnect', () => {
-    const c = socket.data?.room; if (!c || !rooms.has(c)) return;
+  socket.on('disconnect', (reason) => {
+    const c = socket.data?.room;
+    console.log('[SOCKET] disconnect', socket.id, reason);
+    if (!c || !rooms.has(c)) return;
     const room = rooms.get(c);
     const role = socket.data?.role;
 
@@ -305,6 +319,7 @@ io.on('connection', (socket) => {
       io.in(c).emit('status', 'Moderator hat den Raum verlassen. Spiel beendet.');
       io.in(c).socketsLeave(c);
       rooms.delete(c);
+      console.log('[ROOM] closed', c, 'moderator left');
       return;
     }
 
