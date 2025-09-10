@@ -1,21 +1,15 @@
 // server.js – QuizPoker (ESM)
-// Flow jetzt:
-//  - Frage starten -> Runde 1 (Aktionen). In R1 dürfen alle folden, AUSSER SB/BB.
-//  - Wenn alle in R1 eine Aktion gemacht haben -> Admin darf Hint 1 aufdecken -> Runde 2 (Aktionen, auch SB/BB dürfen jetzt folden).
-//  - Wenn alle in R2 eine Aktion gemacht haben -> Admin darf Hint 2 aufdecken -> Runde 3 (Aktionen).
-//  - Wenn alle in R3 eine Aktion gemacht haben -> Admin darf Lösung aufdecken -> Runde 4 (finale Aktionen + Schätzantworten).
-//  - Admin zahlt Pot an Gewinner (frei wählbar oder „nächstliegend“ falls Zielwert vorhanden).
+// Flow:
+//  - Frage starten -> Runde 1 (Aktionen). In R1 dürfen SB/BB NICHT folden.
+//  - Wenn Runde 1 komplett -> Admin kann Hinweis 1 aufdecken -> Runde 2.
+//  - Wenn Runde 2 komplett -> Admin kann Hinweis 2 aufdecken -> Runde 3.
+//  - Wenn Runde 3 komplett -> Admin kann Lösung aufdecken -> Runde 4 (finale Aktionen + Schätzwerte).
+//  - Pot an Gewinner (manuell oder auto-nächstliegend bei target).
 //
-// Features:
-// - Sitzplätze, eindeutige Namen, Reconnect/Takeover
-// - Blinds (small/big) als Seat-Index
-// - Turn-Order nach Seat (Start = links vom Big Blind; ohne Blinds = kleinster Seat)
-// - Pro Runde: currentBetRound + betRound (pro Spieler) + betTotal (gesamt für diese Frage)
-// - Bets fließen in room.pot
-// - Action-Gating: nur Spieler am Zug darf bet/call/allin/fold
-// - R1: SB/BB dürfen NICHT folden (wenn Blinds gesetzt)
-// - R2–R4: alle dürfen folden
-// - Verdeckte Hinweise: hint1/hint2/solution erst nach Admin-Click sichtbar
+// Neu:
+// - Turn-Logik mit "pending"-Set: Raise öffnet Action erneut für alle, die noch nicht auf das neue Bet-Level equalized sind.
+// - Striktes Rundenende: pending leer ODER ≤1 aktive Spieler.
+// - Admin-Controls: set-turn / next-turn / skip-fold.
 
 import express from 'express';
 import http from 'http';
@@ -50,16 +44,14 @@ app.get('/', (_req, res) => {
   else res.status(200).type('text').send('Lade /public/admin.html hoch oder rufe /player.html auf.');
 });
 
-// Fragen laden (optional Struktur mit Hints/Solution/Target)
+// Fragen laden
 function loadQuestions() {
   const p = path.join(__dirname, 'public', 'fragen.json');
   try {
     if (!fs.existsSync(p)) return [];
     const raw = fs.readFileSync(p, 'utf-8');
     const arr = JSON.parse(raw);
-    // Erwartete optionale Felder pro Frage:
-    // { text: string, hint1?: string, hint2?: string, solution?: string, target?: number }
-    if (Array.isArray(arr)) return arr;
+    return Array.isArray(arr) ? arr : [];
   } catch (e) { console.error('fragen.json laden fehlgeschlagen:', e.message); }
   return [];
 }
@@ -74,25 +66,21 @@ const MAX_SEATS = 8;
 const rooms = new Map();
 /*
   room = {
-    code,
-    moderatorId,
-    version,
-    players: Map<uid, {
-      uid, name, seat, connected, socketId,
-      chips, status,            // 'active' | 'folded' | 'allin'
-      betTotal,                 // Summe über alle Runden (für diese Frage)
-      betRound,                 // Einsatz in der aktuellen Runde
-      estimate                  // Schätzantwort (optional)
+    code, moderatorId, version,
+    players: Map<uid,{
+      uid,name,seat,connected,socketId,
+      chips,status,           // 'active' | 'folded' | 'allin'
+      betTotal, betRound,
+      estimate
     }>,
-    questions: [...],
-    qIndex,                     // -1 vor Start
-    pot,                        // Gesamtpot dieser Frage
-    blinds: { small: number|null, big: number|null },
-    turnUid: string|null,       // wer ist am Zug
-    // Rundensteuerung
-    roundIndex,                 // 1..4 (Aktionen), 0 = keine Runde aktiv
-    acted: Set<string>,         // UIDs, die in aktueller Runde bereits gehandelt haben
-    currentBetRound,            // Ziel-Bet für die aktuelle Runde
+    questions, qIndex,
+    pot,
+    blinds: { small:number|null, big:number|null },
+    // Round engine:
+    roundIndex,                   // 0 = keine, 1..4 = aktive Runde
+    currentBetRound,              // gefordertes Bet-Level dieser Runde
+    pending: Set<uid>,            // wer muss noch reagieren (diese Runde)
+    turnUid: string|null,         // am Zug
     reveals: { hint1:boolean, hint2:boolean, solution:boolean },
     closeTimer: Timeout|null
   }
@@ -117,9 +105,9 @@ const roomState = (room) => {
     blinds: room.blinds || { small: null, big: null },
     turnUid: room.turnUid || null,
     roundIndex: room.roundIndex || 0,
-    actedCount: room.acted ? room.acted.size : 0,
-    needCount: countActivePlayers(room),
     currentBetRound: room.currentBetRound || 0,
+    actedCount: countActionablePlayers(room) - (room.pending?.size || 0),
+    needCount: countActionablePlayers(room),
     reveals: room.reveals || { hint1:false, hint2:false, solution:false },
     players: Array.from(room.players.values()).map(p => ({
       uid: p.uid, name: p.name, seat: p.seat ?? null, connected: !!p.connected,
@@ -129,6 +117,7 @@ const roomState = (room) => {
     question
   };
 };
+
 const bump = (room) => { room.version = (room.version || 0) + 1; };
 const ensureRoom = (code) => rooms.get(code) || null;
 
@@ -137,41 +126,49 @@ const ensureRoom = (code) => rooms.get(code) || null;
 // ─────────────────────────────────────────────────────────────
 function seatIsFree(room, idx) { for (const p of room.players.values()) if (p.seat === idx) return false; return true; }
 function nextFreeSeat(room) { for (let i = 0; i < MAX_SEATS; i++) if (seatIsFree(room, i)) return i; return -1; }
-function findUidBySeat(room, seat) { for (const p of room.players.values()) if (p.seat === seat) return p.uid; return null; }
-function countActivePlayers(room) { let n=0; for (const p of room.players.values()) if (p.status!=='folded') n++; return n; }
+
 function listSeats(room, filterFn) {
   return Array.from(room.players.values())
-    .filter(p => typeof p.seat === 'number' && (!filterFn || filterFn(p)))
+    .filter(p => Number.isInteger(p.seat) && (!filterFn || filterFn(p)))
     .sort((a,b)=>a.seat-b.seat);
 }
-function firstSeatAfter(room, seat, filterFn) {
-  const seats = listSeats(room, filterFn);
-  if (seats.length===0) return null;
-  // zyklisch
-  const after = seats.filter(p => p.seat > seat);
-  return (after[0] || seats[0]).uid;
+function countActivePlayers(room) { // nicht gefoldet
+  let n=0; for (const p of room.players.values()) if (p.status !== 'folded') n++; return n;
 }
+function countActionablePlayers(room) { // nur 'active', nicht allin/folded
+  let n=0; for (const p of room.players.values()) if (p.status === 'active') n++; return n;
+}
+const isActionable = (p) => p.status === 'active';
+const isBlindSeat = (room, p) =>
+  (Number.isInteger(room.blinds?.small) && p.seat === room.blinds.small) ||
+  (Number.isInteger(room.blinds?.big)   && p.seat === room.blinds.big);
+
 function startSeatUid(room) {
-  // Start ist links vom Big Blind, wenn vorhanden; sonst kleinster Seat
+  const seatList = listSeats(room, isActionable);
+  if (seatList.length === 0) return null;
   if (Number.isInteger(room.blinds?.big)) {
     const bb = room.blinds.big;
-    const uid = firstSeatAfter(room, bb, p => p.status!=='folded');
-    if (uid) return uid;
+    const after = seatList.filter(p=>p.seat>bb);
+    return (after[0] || seatList[0]).uid;
   }
-  const first = listSeats(room, p=>p.status!=='folded')[0];
-  return first ? first.uid : null;
+  return seatList[0].uid;
 }
+
 function resetAllBets(room) {
   room.pot = room.pot || 0;
   room.currentBetRound = 0;
-  for (const p of room.players.values()) { p.betTotal = 0; p.betRound = 0; p.status = 'active'; p.estimate = undefined; }
+  for (const p of room.players.values()) {
+    p.betTotal = 0; p.betRound = 0; p.status = 'active'; p.estimate = undefined;
+  }
 }
+
 function resetRound(room) {
   room.currentBetRound = 0;
-  room.acted = new Set();
-  for (const p of room.players.values()) { p.betRound = 0; if (p.status==='active' || p.status==='allin') {/* keep */} }
+  room.pending = new Set(Array.from(room.players.values()).filter(isActionable).map(p=>p.uid));
+  for (const p of room.players.values()) { p.betRound = 0; }
   room.turnUid = startSeatUid(room);
 }
+
 function addToPot(room, p, amount) {
   const amt = Math.max(0, Math.min(Number(amount)||0, p.chips));
   if (!amt) return 0;
@@ -181,50 +178,36 @@ function addToPot(room, p, amount) {
   room.pot = (room.pot || 0) + amt;
   return amt;
 }
-function isBlindSeat(room, p) {
-  const s = p.seat;
-  return (Number.isInteger(room.blinds?.small) && s===room.blinds.small) ||
-         (Number.isInteger(room.blinds?.big)   && s===room.blinds.big);
-}
+
 function canFold(room, p) {
-  // In Runde 1 dürfen SB/BB NICHT folden (falls gesetzt)
-  if (room.roundIndex === 1 && isBlindSeat(room, p)) return false;
+  if (room.roundIndex === 1 && isBlindSeat(room, p)) return false; // SB/BB Schutz in Runde 1
   return true;
 }
-function nextTurn(room) {
-  if (!room.turnUid) return;
-  const cur = room.players.get(room.turnUid);
-  const startSeat = cur && Number.isInteger(cur.seat) ? cur.seat : -1;
-  // Nächster aktiver Spieler, der in dieser Runde noch keine Aktion hatte
-  let uid = firstSeatAfter(room, startSeat, pp => pp.status!=='folded' && !room.acted.has(pp.uid));
-  if (uid) { room.turnUid = uid; return; }
-  // Prüfe, ob es überhaupt noch einen offenen Spieler gibt
-  const openExists = Array.from(room.players.values()).some(pp => pp.status!=='folded' && !room.acted.has(pp.uid));
-  if (openExists) {
-    const firstActive = listSeats(room, pp => pp.status!=='folded' && !room.acted.has(pp.uid))[0];
-    room.turnUid = firstActive ? firstActive.uid : null;
-  } else {
-    // Runde ist fertig
-    room.turnUid = null;
-  }
+
+function nextFromPending(room, afterSeat) {
+  if (!room.pending || room.pending.size === 0) return null;
+  const cand = listSeats(room, q => room.pending.has(q.uid) && isActionable(q));
+  if (cand.length === 0) return null;
+  const after = cand.filter(p=>p.seat > afterSeat);
+  return (after[0] || cand[0]).uid;
 }
-function requireTurn(socket, room) {
-  const uid = socket.data?.uid;
-  if (!uid || !room.turnUid) return false;
-  return uid === room.turnUid;
+
+function advanceAfter(room, uidJustActed) {
+  const p = room.players.get(uidJustActed);
+  const seat = (p && Number.isInteger(p.seat)) ? p.seat : -1;
+  const next = nextFromPending(room, seat);
+  room.turnUid = next || null;
 }
-function broadcastFull(room, code) {
-  bump(room);
-  io.in(code).emit('state:full', roomState(room));
+
+function roundIsComplete(room) {
+  // Ende, wenn niemand mehr reagieren muss ODER ≤1 aktive Spieler übrig
+  if (!room.pending || room.pending.size === 0) return true;
+  if (countActionablePlayers(room) <= 1) return true;
+  return false;
 }
-function broadcastPartial(room, code, patch={}) {
-  bump(room);
-  io.in(code).emit('state:partial', { version: room.version, ...patch });
-}
-function markActedAndAdvance(room, uid) {
-  room.acted.add(uid);
-  nextTurn(room);
-}
+
+function broadcastFull(room, code) { bump(room); io.in(code).emit('state:full', roomState(room)); }
+function broadcastPartial(room, code, patch={}) { bump(room); io.in(code).emit('state:partial', { version: room.version, ...patch }); }
 
 // ─────────────────────────────────────────────────────────────
 // Socket.IO
@@ -239,8 +222,8 @@ io.on('connection', (socket) => {
       code, moderatorId: socket.id, version: 0,
       players: new Map(), questions: loadQuestions(), qIndex: -1,
       pot: 0, blinds: { small:null, big:null },
-      turnUid: null, roundIndex: 0, acted: new Set(),
-      currentBetRound: 0,
+      roundIndex: 0, currentBetRound: 0,
+      pending: new Set(), turnUid: null,
       reveals: { hint1:false, hint2:false, solution:false },
       closeTimer: null
     };
@@ -274,21 +257,17 @@ io.on('connection', (socket) => {
     broadcastPartial(room, c, { blinds: room.blinds });
   });
 
-  // Admin: nächste Frage starten -> Runde 1
+  // Admin: Frage starten -> Runde 1
   socket.on('mod:next-question', () => {
     const c = socket.data.room; const room = ensureRoom(c); if (!room) return;
     if (!room.questions || room.questions.length===0) return;
 
     if (room.qIndex + 1 < room.questions.length) {
       room.qIndex += 1;
-      // Reset Frage-Status
       room.reveals = { hint1:false, hint2:false, solution:false };
-      room.pot = 0;
-      for (const p of room.players.values()) { p.betTotal=0; p.betRound=0; p.status='active'; p.estimate=undefined; }
+      resetAllBets(room);
       room.roundIndex = 1;
       resetRound(room);
-      // Startspieler
-      room.turnUid = startSeatUid(room);
       broadcastFull(room, c);
       io.in(c).emit('status','Runde 1 gestartet. (SB/BB dürfen in R1 nicht folden)');
     } else {
@@ -296,49 +275,104 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Admin: Hinweise/Lösung aufdecken (mit Rundenfortschritt)
+  // Admin: Turn setzen / Nächster / Skip-Fold
+  socket.on('mod:set-turn', ({ uid, seat }) => {
+    const c = socket.data.room; const room = ensureRoom(c); if (!room) return;
+    let targetUid = null;
+    if (uid && room.players.has(uid)) targetUid = uid;
+    else if (Number.isInteger(seat)) {
+      const p = Array.from(room.players.values()).find(x => x.seat === seat);
+      if (p) targetUid = p.uid;
+    }
+    if (!targetUid) { io.to(socket.id).emit('status','Turn-Ziel nicht gefunden.'); return; }
+    if (room.pending && !room.pending.has(targetUid)) room.pending.add(targetUid);
+    room.turnUid = targetUid;
+    broadcastPartial(room, c, {
+      turnUid: room.turnUid,
+      actedCount: countActionablePlayers(room) - (room.pending?.size || 0),
+      needCount: countActionablePlayers(room)
+    });
+  });
+
+  socket.on('mod:next-turn', () => {
+    const c = socket.data.room; const room = ensureRoom(c); if (!room) return;
+    const cur = room.players.get(room.turnUid || '') || null;
+    const seat = (cur && Number.isInteger(cur.seat)) ? cur.seat : -1;
+    const next = nextFromPending(room, seat);
+    room.turnUid = next || null;
+    broadcastPartial(room, c, { turnUid: room.turnUid });
+  });
+
+  socket.on('mod:skip-fold', () => {
+    const c = socket.data.room; const room = ensureRoom(c); if (!room) return;
+    const uid = room.turnUid; if (!uid) return;
+    const p = room.players.get(uid); if (!p) return;
+    p.status = 'folded';
+    if (room.pending) room.pending.delete(uid);
+    if (roundIsComplete(room)) {
+      room.turnUid = null;
+      io.in(c).emit('status', `Runde ${room.roundIndex} komplett.`);
+    } else {
+      advanceAfter(room, uid);
+    }
+    broadcastPartial(room, c, {
+      turnUid: room.turnUid,
+      actedCount: countActionablePlayers(room) - (room.pending?.size || 0),
+      needCount: countActionablePlayers(room)
+    });
+    io.in(c).emit('players:update', { version: ++room.version, players: roomState(room).players });
+  });
+
+  // Admin: Reveal-Buttons beachten striktes Rundenende
   socket.on('mod:reveal-hint1', () => {
     const c = socket.data.room; const room = ensureRoom(c); if (!room) return;
-    if (room.roundIndex !== 1 || room.turnUid) { io.to(socket.id).emit('status','Runde 1 noch nicht fertig.'); return; }
+    if (room.roundIndex !== 1 || !roundIsComplete(room)) { io.to(socket.id).emit('status','Runde 1 noch nicht komplett.'); return; }
     room.reveals.hint1 = true;
     broadcastPartial(room, c, { reveals: room.reveals, question: roomState(room).question });
-    // Starte Runde 2
     room.roundIndex = 2; resetRound(room);
-    room.turnUid = startSeatUid(room);
-    broadcastPartial(room, c, { roundIndex: room.roundIndex, turnUid: room.turnUid, actedCount: 0, needCount: countActivePlayers(room), currentBetRound: room.currentBetRound });
+    broadcastPartial(room, c, {
+      roundIndex: room.roundIndex, turnUid: room.turnUid,
+      actedCount: 0, needCount: countActionablePlayers(room),
+      currentBetRound: room.currentBetRound
+    });
     io.in(c).emit('status','Hinweis 1 aufgedeckt. Runde 2 gestartet.');
   });
+
   socket.on('mod:reveal-hint2', () => {
     const c = socket.data.room; const room = ensureRoom(c); if (!room) return;
-    if (room.roundIndex !== 2 || room.turnUid) { io.to(socket.id).emit('status','Runde 2 noch nicht fertig.'); return; }
+    if (room.roundIndex !== 2 || !roundIsComplete(room)) { io.to(socket.id).emit('status','Runde 2 noch nicht komplett.'); return; }
     room.reveals.hint2 = true;
     broadcastPartial(room, c, { reveals: room.reveals, question: roomState(room).question });
-    // Starte Runde 3
     room.roundIndex = 3; resetRound(room);
-    room.turnUid = startSeatUid(room);
-    broadcastPartial(room, c, { roundIndex: room.roundIndex, turnUid: room.turnUid, actedCount: 0, needCount: countActivePlayers(room), currentBetRound: room.currentBetRound });
+    broadcastPartial(room, c, {
+      roundIndex: room.roundIndex, turnUid: room.turnUid,
+      actedCount: 0, needCount: countActionablePlayers(room),
+      currentBetRound: room.currentBetRound
+    });
     io.in(c).emit('status','Hinweis 2 aufgedeckt. Runde 3 gestartet.');
   });
+
   socket.on('mod:reveal-solution', () => {
     const c = socket.data.room; const room = ensureRoom(c); if (!room) return;
-    if (room.roundIndex !== 3 || room.turnUid) { io.to(socket.id).emit('status','Runde 3 noch nicht fertig.'); return; }
+    if (room.roundIndex !== 3 || !roundIsComplete(room)) { io.to(socket.id).emit('status','Runde 3 noch nicht komplett.'); return; }
     room.reveals.solution = true;
     broadcastPartial(room, c, { reveals: room.reveals, question: roomState(room).question });
-    // Starte Runde 4 (finale Aktionen + Schätzantworten)
     room.roundIndex = 4; resetRound(room);
-    room.turnUid = startSeatUid(room);
-    broadcastPartial(room, c, { roundIndex: room.roundIndex, turnUid: room.turnUid, actedCount: 0, needCount: countActivePlayers(room), currentBetRound: room.currentBetRound });
+    broadcastPartial(room, c, {
+      roundIndex: room.roundIndex, turnUid: room.turnUid,
+      actedCount: 0, needCount: countActionablePlayers(room),
+      currentBetRound: room.currentBetRound
+    });
     io.in(c).emit('status','Lösung aufgedeckt. Runde 4 (final) gestartet – jetzt schätzen & letzte Aktion!');
   });
 
-  // Admin: Pot an Gewinner auszahlen (manuell)
+  // Admin: Pot-Award
   socket.on('mod:award-pot', ({ uid }) => {
     const c = socket.data.room; const room = ensureRoom(c); if (!room) return;
     const p = room.players.get(uid);
     if (!p) { io.to(socket.id).emit('status','Gewinner nicht gefunden.'); return; }
     const pot = room.pot || 0;
     if (pot > 0) { p.chips = (p.chips||0) + pot; room.pot = 0; }
-    // Bets zurücksetzen (nur rundenweise)
     for (const pl of room.players.values()) { pl.betRound = 0; }
     room.currentBetRound = 0;
     broadcastPartial(room, c, { pot: room.pot, currentBetRound: room.currentBetRound });
@@ -346,11 +380,9 @@ io.on('connection', (socket) => {
     io.in(c).emit('status', `🏆 Pot (${pot}) geht an ${p.name}.`);
   });
 
-  // Admin: Nächstliegenden automatisch auszahlen (falls target vorhanden)
   socket.on('mod:award-nearest', () => {
     const c = socket.data.room; const room = ensureRoom(c); if (!room) return;
     const q = room.questions?.[room.qIndex]; if (!q || typeof q.target !== 'number') { io.to(socket.id).emit('status','Kein Zielwert (target) in Frage.'); return; }
-    // Nur aktive (nicht gefoldete) Spieler mit abgegebener estimate
     const cand = Array.from(room.players.values()).filter(p => p.status!=='folded' && typeof p.estimate === 'number');
     if (cand.length === 0) { io.to(socket.id).emit('status','Keine gültigen Schätzwerte vorhanden.'); return; }
     cand.sort((a,b)=> Math.abs(a.estimate - q.target) - Math.abs(b.estimate - q.target));
@@ -364,7 +396,7 @@ io.on('connection', (socket) => {
     io.in(c).emit('status', `🏆 Pot (${pot}) automatisch an ${winner.name} (Ziel ${q.target}).`);
   });
 
-  // Admin: Ergebnis/Chips manuell (bestehend)
+  // Admin: bestehende Chips-Controls
   socket.on('mod:mark', ({ uid, result, delta }) => {
     const c = socket.data.room; const room = ensureRoom(c); if (!room) return;
     const p = room.players.get(uid); if (!p) return;
@@ -421,6 +453,7 @@ io.on('connection', (socket) => {
       p = { uid, name: desiredName, seat, connected:true, socketId: socket.id, chips:100,
             status:'active', betTotal:0, betRound:0, estimate: undefined };
       room.players.set(uid, p);
+      if (room.roundIndex>0 && room.pending && isActionable(p)) room.pending.add(uid);
       if (!room.turnUid && room.roundIndex>0) room.turnUid = startSeatUid(room);
     } else {
       p.connected = true; p.socketId = socket.id; p.name = desiredName;
@@ -434,7 +467,7 @@ io.on('connection', (socket) => {
     io.in(code).emit('players:update', { version: ++room.version, players: roomState(room).players });
   });
 
-  // Spieler: „Chat“-Antwort an Admin (bleibt wie gehabt)
+  // Spieler: Nachricht an Admin (optional)
   socket.on('player:answer', ({ answer }) => {
     const c = socket.data.room; const uid = socket.data.uid;
     const room = ensureRoom(c); if (!room) return;
@@ -442,7 +475,7 @@ io.on('connection', (socket) => {
     if (room.moderatorId) io.to(room.moderatorId).emit('answer:received', { uid:p.uid, name:p.name, answer: String(answer||'') });
   });
 
-  // Spieler: Schätzantwort (finale Runde 4)
+  // Spieler: Schätzantwort (nur Runde 4)
   socket.on('player:estimate', ({ value }) => {
     const c = socket.data.room; const uid = socket.data.uid; const room = ensureRoom(c); if (!room) return;
     const p = room.players.get(uid); if (!p) return;
@@ -455,70 +488,109 @@ io.on('connection', (socket) => {
     }
   });
 
-  // ─────────── Spieler-Aktionen (nur am Zug!) ───────────
+  // ─────────── Aktionen mit pending/Turn ───────────
+  function ensureTurn(socket, room) {
+    const uid = socket.data?.uid;
+    return !!uid && uid === room.turnUid;
+  }
+  function afterAction(room, uidActed, code) {
+    // Ende prüfen
+    if (roundIsComplete(room)) {
+      room.turnUid = null;
+      broadcastPartial(room, code, {
+        turnUid: room.turnUid,
+        actedCount: countActionablePlayers(room) - (room.pending?.size || 0),
+        needCount: countActionablePlayers(room),
+        currentBetRound: room.currentBetRound,
+        pot: room.pot
+      });
+      io.in(code).emit('status', `Runde ${room.roundIndex} komplett.`);
+    } else {
+      advanceAfter(room, uidActed);
+      broadcastPartial(room, code, {
+        turnUid: room.turnUid,
+        actedCount: countActionablePlayers(room) - (room.pending?.size || 0),
+        needCount: countActionablePlayers(room),
+        currentBetRound: room.currentBetRound,
+        pot: room.pot
+      });
+    }
+    io.in(code).emit('players:update', { version: ++room.version, players: roomState(room).players });
+  }
+
   socket.on('player:bet', ({ amount }) => {
     const c = socket.data.room; const uid = socket.data.uid; const room = ensureRoom(c); if (!room) return;
-    if (!requireTurn(socket, room)) return;
-    const p = room.players.get(uid); if (!p || p.status==='folded') return;
+    if (!ensureTurn(socket, room)) return;
+    const p = room.players.get(uid); if (!p || p.status!=='active') return;
 
     const add = Math.max(1, parseInt(amount||'0',10)||0);
+    const prev = room.currentBetRound || 0;
     const added = addToPot(room, p, add);
     if (!added) return;
+
     // Raise?
     if (p.betRound > room.currentBetRound) room.currentBetRound = p.betRound;
-    markActedAndAdvance(room, uid);
-    if (!room.turnUid) io.in(c).emit('status', `Runde ${room.roundIndex} komplett.`);
-    broadcastPartial(room, c, {
-      pot: room.pot, currentBetRound: room.currentBetRound,
-      turnUid: room.turnUid, actedCount: room.acted.size, needCount: countActivePlayers(room)
-    });
-    io.in(c).emit('players:update', { version: ++room.version, players: roomState(room).players });
+    // Spieler hat gehandelt -> aus pending raus
+    if (room.pending) room.pending.delete(uid);
+
+    // Wenn Raise (neues Level), müssen alle aktiven (≠folded/≠allin) mit weniger betRound wieder in pending (außer Raiser)
+    const raised = room.currentBetRound > prev;
+    if (raised) {
+      for (const q of room.players.values()) {
+        if (q.uid === uid) continue;
+        if (isActionable(q) && (q.betRound || 0) < room.currentBetRound) room.pending.add(q.uid);
+      }
+    }
+
+    afterAction(room, uid, c);
   });
 
   socket.on('player:call', () => {
     const c = socket.data.room; const uid = socket.data.uid; const room = ensureRoom(c); if (!room) return;
-    if (!requireTurn(socket, room)) return;
-    const p = room.players.get(uid); if (!p || p.status==='folded') return;
+    if (!ensureTurn(socket, room)) return;
+    const p = room.players.get(uid); if (!p || p.status!=='active') return;
 
     const need = Math.max(0, (room.currentBetRound||0) - (p.betRound||0));
     if (need > 0) addToPot(room, p, need);
-    markActedAndAdvance(room, uid);
-    if (!room.turnUid) io.in(c).emit('status', `Runde ${room.roundIndex} komplett.`);
-    broadcastPartial(room, c, {
-      pot: room.pot, currentBetRound: room.currentBetRound,
-      turnUid: room.turnUid, actedCount: room.acted.size, needCount: countActivePlayers(room)
-    });
-    io.in(c).emit('players:update', { version: ++room.version, players: roomState(room).players });
+    if (room.pending) room.pending.delete(uid);
+
+    afterAction(room, uid, c);
   });
 
   socket.on('player:allin', () => {
     const c = socket.data.room; const uid = socket.data.uid; const room = ensureRoom(c); if (!room) return;
-    if (!requireTurn(socket, room)) return;
-    const p = room.players.get(uid); if (!p || p.status==='folded') return;
+    if (!ensureTurn(socket, room)) return;
+    const p = room.players.get(uid); if (!p || p.status!=='active') return;
 
-    const added = addToPot(room, p, p.chips);
+    const prev = room.currentBetRound || 0;
+    addToPot(room, p, p.chips);
     p.status = 'allin';
     if (p.betRound > room.currentBetRound) room.currentBetRound = p.betRound;
-    markActedAndAdvance(room, uid);
-    if (!room.turnUid) io.in(c).emit('status', `Runde ${room.roundIndex} komplett.`);
-    broadcastPartial(room, c, {
-      pot: room.pot, currentBetRound: room.currentBetRound,
-      turnUid: room.turnUid, actedCount: room.acted.size, needCount: countActivePlayers(room)
-    });
-    io.in(c).emit('players:update', { version: ++room.version, players: roomState(room).players });
+
+    if (room.pending) room.pending.delete(uid);
+
+    // All-in kann Raise sein -> pending reaktivieren
+    const raised = room.currentBetRound > prev;
+    if (raised) {
+      for (const q of room.players.values()) {
+        if (q.uid === uid) continue;
+        if (isActionable(q) && (q.betRound || 0) < room.currentBetRound) room.pending.add(q.uid);
+      }
+    }
+
+    afterAction(room, uid, c);
   });
 
   socket.on('player:fold', () => {
     const c = socket.data.room; const uid = socket.data.uid; const room = ensureRoom(c); if (!room) return;
-    if (!requireTurn(socket, room)) return;
+    if (!ensureTurn(socket, room)) return;
     const p = room.players.get(uid); if (!p) return;
-
     if (!canFold(room, p)) { io.to(socket.id).emit('status','SB/BB dürfen in Runde 1 nicht folden.'); return; }
+
     p.status = 'folded';
-    markActedAndAdvance(room, uid);
-    if (!room.turnUid) io.in(c).emit('status', `Runde ${room.roundIndex} komplett.`);
-    broadcastPartial(room, c, { turnUid: room.turnUid, actedCount: room.acted.size, needCount: countActivePlayers(room) });
-    io.in(c).emit('players:update', { version: ++room.version, players: roomState(room).players });
+    if (room.pending) room.pending.delete(uid);
+
+    afterAction(room, uid, c);
   });
 
   // Disconnect Handling
@@ -548,7 +620,14 @@ io.on('connection', (socket) => {
       if (p.socketId === socket.id) p.socketId = null;
       p.connected = false;
       io.in(c).emit('players:update', { version: ++room.version, players: roomState(room).players });
-      if (room.turnUid === uid) { markActedAndAdvance(room, uid); broadcastPartial(room, c, { turnUid: room.turnUid }); }
+
+      // wenn Spieler am Zug -> nur Turn weitergeben, pending bleibt
+      if (room.turnUid === uid) {
+        const seat = Number.isInteger(p.seat) ? p.seat : -1;
+        const next = nextFromPending(room, seat);
+        room.turnUid = next || null;
+        broadcastPartial(room, c, { turnUid: room.turnUid });
+      }
     }
   });
 });
