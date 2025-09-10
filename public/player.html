@@ -38,12 +38,6 @@
       <div class="status">Aktuelle Bet (Runde): <strong id="currentBet">0</strong></div>
       <div class="status" id="pStatus"></div>
 
-      <h3 class="h" style="margin-top:16px;">Frage & Hinweise</h3>
-      <div class="status"><strong>Frage:</strong> <span id="qText">–</span></div>
-      <div class="status"><strong>Hinweis 1:</strong> <span id="qH1" class="muted">verdeckt</span></div>
-      <div class="status"><strong>Hinweis 2:</strong> <span id="qH2" class="muted">verdeckt</span></div>
-      <div class="status"><strong>Lösung:</strong> <span id="qSol" class="muted">verdeckt</span></div>
-
       <h3 class="h" style="margin-top:16px;">Aktion</h3>
       <div class="small muted">Du kannst nur handeln, wenn du am Zug bist (goldener Rahmen).</div>
       <div class="row" style="margin-top:8px;">
@@ -94,6 +88,17 @@
           <div id="table-center2">💰 Pot: <strong id="pot">0</strong></div>
         </div>
       </div>
+
+      <!-- NEU: Frage & Hinweise groß unter dem Tisch -->
+      <section id="qaPanel" class="item" style="margin-top:12px;">
+        <h3 class="h">Frage & Hinweise</h3>
+        <div class="list">
+          <div class="item"><strong>Frage:</strong> <span id="qTextMain">–</span></div>
+          <div class="item"><strong>Hinweis 1:</strong> <span id="qH1Main" class="muted">verdeckt</span></div>
+          <div class="item"><strong>Hinweis 2:</strong> <span id="qH2Main" class="muted">verdeckt</span></div>
+          <div class="item"><strong>Lösung:</strong> <span id="qSolMain" class="muted">verdeckt</span></div>
+        </div>
+      </section>
     </main>
 
     <aside class="right">
@@ -212,10 +217,11 @@
       if (typeof st.pot==='number') $('#pot').textContent = st.pot;
       $('#currentBet').textContent = st.currentBetRound || 0;
 
-      $('#qText').textContent = st.question?.text || '–';
-      $('#qH1').textContent   = st.question?.hint1 ?? 'verdeckt';
-      $('#qH2').textContent   = st.question?.hint2 ?? 'verdeckt';
-      $('#qSol').textContent  = st.question?.solution ?? 'verdeckt';
+      // NEU: große Frage/Hinweise unter dem Tisch
+      $('#qTextMain').textContent = st.question?.text || '–';
+      $('#qH1Main').textContent   = st.question?.hint1 ?? 'verdeckt';
+      $('#qH2Main').textContent   = st.question?.hint2 ?? 'verdeckt';
+      $('#qSolMain').textContent  = st.question?.solution ?? 'verdeckt';
 
       playersByUid.clear(); (st.players||[]).forEach(p=>playersByUid.set(p.uid,p));
       renderSeats(); renderList();
@@ -262,17 +268,19 @@
       if ('currentBetRound' in patch) { current.currentBetRound = patch.currentBetRound; $('#currentBet').textContent = current.currentBetRound; }
       if (typeof patch.pot==='number') $('#pot').textContent = patch.pot;
       if (patch.question) {
-        $('#qText').textContent = patch.question?.text || '–';
-        $('#qH1').textContent   = patch.question?.hint1 ?? 'verdeckt';
-        $('#qH2').textContent   = patch.question?.hint2 ?? 'verdeckt';
-        $('#qSol').textContent  = patch.question?.solution ?? 'verdeckt';
+        // NEU: große Frage/Hinweise unter dem Tisch
+        $('#qTextMain').textContent = patch.question?.text || '–';
+        $('#qH1Main').textContent   = patch.question?.hint1 ?? 'verdeckt';
+        $('#qH2Main').textContent   = patch.question?.hint2 ?? 'verdeckt';
+        $('#qSolMain').textContent  = patch.question?.solution ?? 'verdeckt';
       }
       // Frisches full für komplette Liste
       socket.emit('mod:sync-all');
     });
     socket.on('question:show',(q)=>{
-      $('#qText').textContent = q.text || '–';
-      $('#qH1').textContent='verdeckt'; $('#qH2').textContent='verdeckt'; $('#qSol').textContent='verdeckt';
+      // NEU
+      $('#qTextMain').textContent = q.text || '–';
+      $('#qH1Main').textContent='verdeckt'; $('#qH2Main').textContent='verdeckt'; $('#qSolMain').textContent='verdeckt';
     });
 
     // DMs: Admin → Spieler & Clear
