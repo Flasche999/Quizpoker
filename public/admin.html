@@ -5,31 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>QuizPoker – Admin</title>
   <link rel="stylesheet" href="/style.css?v=4" />
-  <!-- Socket.IO-Client über CDN (robust auf Render) -->
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
-
-  <!-- Badges + Turn-Highlight -->
   <style>
-    .badge {
-      display:inline-block;
-      font-weight:700;
-      color:#000;
-      background:#fff;
-      border-radius:50%;
-      width:20px; height:20px;
-      line-height:20px;
-      text-align:center;
-      margin-left:6px;
-      font-size:12px;
-    }
-    .badge-s { border:2px solid #1363ff; } /* blau */
-    .badge-b { border:2px solid #ff2b2b; } /* rot */
-
-    .seat.turn, .player.turn {
-      border:3px solid gold !important;
-      box-shadow:0 0 10px rgba(255,215,0,.7);
-      border-radius:10px;
-    }
+    .badge{display:inline-block;font-weight:700;color:#000;background:#fff;border-radius:50%;width:20px;height:20px;line-height:20px;text-align:center;margin-left:6px;font-size:12px}
+    .badge-s{border:2px solid #1363ff}.badge-b{border:2px solid #ff2b2b}
+    .seat.turn,.player.turn{border:3px solid gold!important;box-shadow:0 0 10px rgba(255,215,0,.7);border-radius:10px}
+    .seat.folded{opacity:.5;filter:saturate(.5)}
+    .betline{font-size:12px;opacity:.9}
   </style>
 </head>
 <body>
@@ -40,6 +22,7 @@
         <div class="item">
           <div>Code: <strong id="roomCode">—</strong></div>
           <div class="small">Frage: <span id="qIndex">–</span></div>
+          <div class="small">Aktuelle Bet: <strong id="currentBet">0</strong></div>
         </div>
       </div>
       <div class="row" style="margin-top:8px;">
@@ -51,6 +34,23 @@
         <div>Small Blind (Seat #): <input id="inpSB" placeholder="0–7" style="width:100%;margin-top:6px;"></div>
         <div>Big Blind (Seat #): <input id="inpBB" placeholder="0–7" style="width:100%;margin-top:6px;"></div>
         <button id="btnSetBlinds" style="margin-top:6px;">Blinds setzen</button>
+      </div>
+
+      <div class="status" style="margin-top:12px;">
+        <div>Turn an (UID oder Seat#):</div>
+        <div class="row">
+          <input id="inpTurnUid" placeholder="UID" style="flex:1;">
+          <input id="inpTurnSeat" placeholder="Seat 0–7" style="width:120px;">
+        </div>
+        <button id="btnSetTurn" style="margin-top:6px;">Zug setzen</button>
+      </div>
+
+      <div class="status" style="margin-top:12px;">
+        <div>Gewinner-UID für Pot:</div>
+        <div class="row">
+          <input id="inpWinnerUid" placeholder="UID" style="flex:1;">
+          <button id="btnAwardPot" class="ok">🏆 Pot auszahlen</button>
+        </div>
       </div>
 
       <div class="status" id="adminStatus"></div>
@@ -107,218 +107,190 @@
   </div>
 
   <script>
-    // ————————————————— Socket.IO: robust verbinden (WebSocket + Polling Fallback)
-    const socket = io({
-      path: '/socket.io',
-      transports: ['websocket', 'polling']
-    });
-    const el = (s) => document.querySelector(s);
+    const socket = io({ path: '/socket.io', transports: ['websocket','polling'] });
+    const el = (s)=>document.querySelector(s);
 
-    // hilfreiche Status-Logs/Feedback
-    socket.on('connect', () => {
-      console.log('[socket] connected', socket.id);
+    socket.on('connect', ()=>{
       el('#adminStatus').textContent = 'Verbunden: ' + socket.id;
-
-      // Nach Reconnect: letzten Raum automatisch „claimen“
       const last = localStorage.getItem('qp_admin_room');
-      if (last) socket.emit('mod:claim-room', { code: last });
+      if (last) socket.emit('mod:claim-room', { code:last });
     });
-    socket.on('connect_error', (err) => {
-      console.warn('[socket] connect_error', err?.message || err);
-      el('#adminStatus').textContent = 'Verbindungsfehler: ' + (err?.message || err);
-    });
-    socket.on('disconnect', (r) => {
-      console.log('[socket] disconnected', r);
-      el('#adminStatus').textContent = 'Getrennt: ' + r;
-    });
+    socket.on('connect_error',(err)=>{ el('#adminStatus').textContent='Verbindungsfehler: '+(err?.message||err); });
+    socket.on('disconnect',(r)=>{ el('#adminStatus').textContent='Getrennt: '+r; });
 
-    // kleiner Helfer: nur senden, wenn verbunden
-    function emitIfConnected(event, payload) {
-      if (!socket.connected) {
-        el('#adminStatus').textContent = 'Nicht verbunden – bitte kurz warten oder neu laden.';
-        return false;
-      }
-      socket.emit(event, payload);
-      return true;
+    function emitIfConnected(evt, payload){
+      if(!socket.connected){ el('#adminStatus').textContent='Nicht verbunden – neu laden?'; return false; }
+      socket.emit(evt, payload); return true;
     }
 
-    // ——— globaler UI-State (für Badges/Turn)
-    const currentState = {
-      blinds: { small: null, big: null }, // seats (0–7)
-      turnUid: null
+    const currentState = { blinds:{small:null,big:null}, turnUid:null, currentBet:0 };
+
+    // Buttons
+    el('#btnCreate').onclick = ()=> emitIfConnected('mod:create-room');
+    el('#btnNextQ').onclick  = ()=> emitIfConnected('mod:next-question');
+    el('#btnSetBlinds').onclick = ()=>{
+      const sb=el('#inpSB').value.trim(), bb=el('#inpBB').value.trim();
+      emitIfConnected('mod:set-blinds',{ small: sb===''?null:Number(sb), big: bb===''?null:Number(bb) });
+    };
+    el('#btnSetTurn').onclick = ()=>{
+      const uid = el('#inpTurnUid').value.trim();
+      const seatStr = el('#inpTurnSeat').value.trim();
+      const seat = seatStr===''?null:Number(seatStr);
+      emitIfConnected('mod:set-turn',{ uid: uid||undefined, seat: Number.isInteger(seat)?seat:undefined });
+    };
+    el('#btnSyncAll').onclick = ()=> emitIfConnected('mod:sync-all');
+    el('#btnAwardPot').onclick = ()=>{
+      const uid = el('#inpWinnerUid').value.trim(); if(!uid) return;
+      emitIfConnected('mod:award-pot',{ uid });
     };
 
-    // ————————————————— UI: Buttons
-    el('#btnCreate').onclick    = () => emitIfConnected('mod:create-room');
-    el('#btnNextQ').onclick     = () => emitIfConnected('mod:next-question');
-    el('#btnSetBlinds').onclick = () => {
-      const sb = el('#inpSB').value.trim();
-      const bb = el('#inpBB').value.trim();
-      const small = sb === '' ? null : Number(sb);
-      const big   = bb === '' ? null : Number(bb);
-      emitIfConnected('mod:set-blinds', { small, big });
+    el('#btnMarkCorrect').onclick = ()=>{
+      const uid=el('#uidTarget').value.trim(); if(!uid) return;
+      const delta = parseInt(el('#deltaChips').value||'0',10)||0;
+      emitIfConnected('mod:mark',{ uid, result:'correct', delta });
     };
-    el('#btnSyncAll').onclick   = () => emitIfConnected('mod:sync-all');
-
-    el('#btnMarkCorrect').onclick = () => {
-      const uid = el('#uidTarget').value.trim(); if (!uid) return;
-      const delta = parseInt(el('#deltaChips').value || '0', 10) || 0;
-      emitIfConnected('mod:mark', { uid, result: 'correct', delta });
+    el('#btnMarkWrong').onclick = ()=>{
+      const uid=el('#uidTarget').value.trim(); if(!uid) return;
+      const delta = parseInt(el('#deltaChips').value||'0',10)||0;
+      emitIfConnected('mod:mark',{ uid, result:'wrong', delta:-Math.abs(delta) });
     };
-    el('#btnMarkWrong').onclick = () => {
-      const uid = el('#uidTarget').value.trim(); if (!uid) return;
-      const delta = parseInt(el('#deltaChips').value || '0', 10) || 0;
-      emitIfConnected('mod:mark', { uid, result: 'wrong', delta: -Math.abs(delta) });
+    el('#btnPlus').onclick = ()=>{
+      const uid=el('#uidTarget').value.trim(); if(!uid) return;
+      const delta = Math.abs(parseInt(el('#deltaChips').value||'0',10)||0);
+      emitIfConnected('mod:adjust',{ uid, delta });
     };
-    el('#btnPlus').onclick = () => {
-      const uid = el('#uidTarget').value.trim(); if (!uid) return;
-      const delta = Math.abs(parseInt(el('#deltaChips').value || '0', 10) || 0);
-      emitIfConnected('mod:adjust', { uid, delta });
-    };
-    el('#btnMinus').onclick = () => {
-      const uid = el('#uidTarget').value.trim(); if (!uid) return;
-      const delta = -Math.abs(parseInt(el('#deltaChips').value || '0', 10) || 0);
-      emitIfConnected('mod:adjust', { uid, delta });
+    el('#btnMinus').onclick = ()=>{
+      const uid=el('#uidTarget').value.trim(); if(!uid) return;
+      const delta = -Math.abs(parseInt(el('#deltaChips').value||'0',10)||0);
+      emitIfConnected('mod:adjust',{ uid, delta });
     };
 
-    // ————————————————— State
-    let lastVersion = -1;
+    // State
+    let lastVersion=-1;
     const playersMap = new Map();
 
-    function renderPlayersPanel() {
-      const wrap = el('#players'); wrap.innerHTML = '';
-      const arr = Array.from(playersMap.values()).sort((a,b)=> (a.seat ?? 99) - (b.seat ?? 99));
-
-      arr.forEach(p => {
+    function renderPlayersPanel(){
+      const wrap=el('#players'); wrap.innerHTML='';
+      const arr=Array.from(playersMap.values()).sort((a,b)=>(a.seat??99)-(b.seat??99));
+      arr.forEach(p=>{
         const isSB = (p.seat === (currentState.blinds?.small ?? null));
         const isBB = (p.seat === (currentState.blinds?.big ?? null));
-        const sBadge = isSB ? '<span class="badge badge-s">S</span>' : '';
-        const bBadge = isBB ? '<span class="badge badge-b">B</span>' : '';
+        const sBadge = isSB?'<span class="badge badge-s">S</span>':'';
+        const bBadge = isBB?'<span class="badge badge-b">B</span>':'';
 
-        const div = document.createElement('div');
-        div.className = 'player' + (p.uid === currentState.turnUid ? ' turn' : '');
-        div.innerHTML = `
-          <span title="UID: ${p.uid}">${p.name} ${p.connected? '🟢':'🔴'} ${sBadge} ${bBadge}</span>
-          <strong>${p.chips || 0}</strong>
+        const div=document.createElement('div');
+        div.className='player'+(p.uid===currentState.turnUid?' turn':'')+(p.status==='folded'?' folded':'');
+        div.innerHTML=`
+          <span title="UID: ${p.uid}">${p.name} ${p.connected?'🟢':'🔴'} ${sBadge} ${bBadge}</span>
+          <strong>${p.chips||0}</strong>
           <div class="pm">
             <button class="score-btn" data-uid="${p.uid}" data-d="+10">+10</button>
             <button class="score-btn" data-uid="${p.uid}" data-d="-10">-10</button>
-          </div>`;
+          </div>
+          <div class="small">Bet: 🪙 ${p.bet||0} ${p.status==='folded'?'· (Fold)':''}${p.status==='allin'?' · (All-in)':''}</div>
+        `;
         wrap.appendChild(div);
       });
     }
 
-    function renderSeats() {
-      for (let i=0;i<8;i++) {
-        const slot = document.querySelector(`.seat[data-seat="${i}"]`);
-        if (!slot) continue;
-        slot.className = `seat s${i}`;
-        slot.innerHTML = '<div class="avatar">—</div><div class="name">Frei</div><div class="chips">🪙 0</div>';
+    function renderSeats(){
+      for(let i=0;i<8;i++){
+        const slot=document.querySelector(`.seat[data-seat="${i}"]`);
+        if(!slot) continue;
+        slot.className=`seat s${i}`;
+        slot.innerHTML='<div class="avatar">—</div><div class="name">Frei</div><div class="chips">🪙 0</div><div class="betline">Bet: 🪙 0</div>';
       }
-      const arr = Array.from(playersMap.values());
-      arr.forEach(p => {
-        if (typeof p.seat !== 'number') return;
-        const slot = document.querySelector(`.seat[data-seat="${p.seat}"]`);
-        if (!slot) return;
+      const arr=Array.from(playersMap.values());
+      arr.forEach(p=>{
+        if(typeof p.seat!=='number') return;
+        const slot=document.querySelector(`.seat[data-seat="${p.seat}"]`); if(!slot) return;
 
         const isSB = (p.seat === (currentState.blinds?.small ?? null));
         const isBB = (p.seat === (currentState.blinds?.big ?? null));
-        const sBadge = isSB ? '<span class="badge badge-s">S</span>' : '';
-        const bBadge = isBB ? '<span class="badge badge-b">B</span>' : '';
+        const sBadge = isSB?'<span class="badge badge-s">S</span>':'';
+        const bBadge = isBB?'<span class="badge badge-b">B</span>':'';
 
-        slot.innerHTML = `<div class="avatar">🙂</div><div class="name">${p.name} ${sBadge} ${bBadge}</div><div class="chips">🪙 ${p.chips ?? 0}</div>`;
-        if (!p.connected) slot.classList.add('disconnected');
-        if (p.uid === currentState.turnUid) slot.classList.add('turn');
+        slot.innerHTML = `<div class="avatar">🙂</div><div class="name">${p.name} ${sBadge} ${bBadge}</div><div class="chips">🪙 ${p.chips??0}</div><div class="betline">Bet: 🪙 ${p.bet||0} ${p.status==='folded'?'· (Fold)':''}${p.status==='allin'?' · (All-in)':''}</div>`;
+        if(!p.connected) slot.classList.add('disconnected');
+        if(p.status==='folded') slot.classList.add('folded');
+        if(p.uid===currentState.turnUid) slot.classList.add('turn');
       });
     }
 
-    el('#players').addEventListener('click', (e) => {
-      const btn = e.target.closest('.score-btn'); if (!btn) return;
-      const uid = btn.dataset.uid; const delta = parseInt(btn.dataset.d, 10);
+    el('#players').addEventListener('click',(e)=>{
+      const btn=e.target.closest('.score-btn'); if(!btn) return;
+      const uid=btn.dataset.uid; const delta=parseInt(btn.dataset.d,10);
       emitIfConnected('mod:adjust', { uid, delta });
     });
 
-    // ————————————————— Socket Events vom Server
-    socket.on('mod:room-created', ({ code, state }) => {
-      // Raumcode merken, damit wir ihn nach Reconnect claimen können
+    // Socket Events
+    socket.on('mod:room-created',({code,state})=>{
       localStorage.setItem('qp_admin_room', code);
+      el('#roomCode').textContent=code;
+      el('#adminStatus').textContent='Raum erstellt: '+code;
+      lastVersion=-1; playersMap.clear();
+      currentState.blinds=state?.blinds||{small:null,big:null};
+      currentState.turnUid=state?.turnUid||null;
+      (state.players||[]).forEach(p=>playersMap.set(p.uid,p));
+      el('#qIndex').textContent = state.qIndex>=0 ? (state.qIndex+1) : '–';
+      el('#questionBox').textContent = state.question?.text || '–';
+      el('#pot').textContent = state.pot||0;
+      el('#currentBet').textContent = state.currentBet||0;
+      renderPlayersPanel(); renderSeats();
+    });
 
-      el('#roomCode').textContent = code;
-      el('#adminStatus').textContent = 'Raum erstellt: ' + code;
-      lastVersion = -1;
-      playersMap.clear();
+    socket.on('state:full',(state)=>{
+      const ver=(state.version??-1); if (ver<=lastVersion) return; lastVersion=ver;
+      currentState.blinds=state.blinds||{small:null,big:null};
+      currentState.turnUid=state.turnUid||null;
+      el('#pot').textContent = state.pot||0;
+      el('#currentBet').textContent = state.currentBet||0;
 
-      // Blinds/Turn übernehmen, falls vorhanden
-      currentState.blinds = state?.blinds || { small:null, big:null };
-      currentState.turnUid = state?.turnUid || null;
-
-      (state.players || []).forEach(p => playersMap.set(p.uid, p));
-      el('#qIndex').textContent = state.qIndex >= 0 ? (state.qIndex + 1) : '–';
+      playersMap.clear(); (state.players||[]).forEach(p=>playersMap.set(p.uid,p));
+      el('#qIndex').textContent = state.qIndex>=0 ? (state.qIndex+1) : '–';
       el('#questionBox').textContent = state.question?.text || '–';
       renderPlayersPanel(); renderSeats();
     });
 
-    socket.on('state:full', (state) => {
-      const ver = (state.version ?? -1);
-      if (ver <= lastVersion) return;
-      lastVersion = ver;
-
-      currentState.blinds = state.blinds || { small:null, big:null };
-      currentState.turnUid = state.turnUid || null;
-
-      playersMap.clear();
-      (state.players || []).forEach(p => playersMap.set(p.uid, p));
-      el('#qIndex').textContent = state.qIndex >= 0 ? (state.qIndex + 1) : '–';
-      el('#questionBox').textContent = state.question?.text || '–';
+    socket.on('players:update',(msg)=>{
+      const ver=(msg.version??-1); if (ver<=lastVersion) return; lastVersion=ver;
+      (msg.players||[]).forEach(p=>playersMap.set(p.uid,p));
       renderPlayersPanel(); renderSeats();
     });
 
-    socket.on('players:update', (msg) => {
-      const ver = (msg.version ?? -1);
-      if (ver <= lastVersion) return;
-      lastVersion = ver;
-      (msg.players || []).forEach(p => playersMap.set(p.uid, p));
-      renderPlayersPanel(); renderSeats();
-    });
-
-    // Partial-Updates (z. B. geänderte Blinds / Zugwechsel)
-    socket.on('state:partial', (patch) => {
-      const ver = (patch.version ?? -1);
-      if (ver <= lastVersion) return;
-      lastVersion = ver;
-
+    socket.on('state:partial',(patch)=>{
+      const ver=(patch.version??-1); if (ver<=lastVersion) return; lastVersion=ver;
       if (patch.blinds) currentState.blinds = patch.blinds;
       if ('turnUid' in patch) currentState.turnUid = patch.turnUid;
+      if (typeof patch.pot==='number') el('#pot').textContent = patch.pot;
+      if (typeof patch.currentBet==='number') el('#currentBet').textContent = patch.currentBet;
       renderPlayersPanel(); renderSeats();
     });
 
-    socket.on('question:show', (q) => {
-      const ver = (q.version ?? -1);
-      if (ver <= lastVersion) return;
-      lastVersion = ver;
-      el('#qIndex').textContent = (q.index + 1);
-      el('#questionBox').textContent = q.text || '–';
-      el('#answers').innerHTML = '';
+    socket.on('question:show',(q)=>{
+      const ver=(q.version??-1); if (ver<=lastVersion) return; lastVersion=ver;
+      el('#qIndex').textContent=(q.index+1);
+      el('#questionBox').textContent=q.text||'–';
+      el('#answers').innerHTML='';
     });
 
-    socket.on('answer:received', ({ uid, name, answer }) => {
-      const div = document.createElement('div');
-      div.className = 'item';
-      div.textContent = `${name}: ${answer}`;
+    socket.on('answer:received',({uid,name,answer})=>{
+      const div=document.createElement('div');
+      div.className='item'; div.textContent=`${name}: ${answer}`;
       document.querySelector('#answers').prepend(div);
-      el('#uidTarget').value = uid;
+      el('#uidTarget').value=uid;
     });
 
-    socket.on('result:correct', ({ name, delta }) => {
-      el('#status').textContent = `✅ ${name} +${Math.abs(delta||0)} Chips`;
-      setTimeout(() => el('#status').textContent = '', 1500);
+    socket.on('result:correct',({name,delta})=>{
+      el('#status').textContent=`✅ ${name} +${Math.abs(delta||0)} Chips`;
+      setTimeout(()=>el('#status').textContent='',1500);
     });
-    socket.on('result:wrong', ({ name, delta }) => {
-      el('#status').textContent = `❌ ${name} ${delta||0} Chips`;
-      setTimeout(() => el('#status').textContent = '', 1500);
+    socket.on('result:wrong',({name,delta})=>{
+      el('#status').textContent=`❌ ${name} ${delta||0} Chips`;
+      setTimeout(()=>el('#status').textContent='',1500);
     });
 
-    socket.on('status', (t) => { el('#adminStatus').textContent = t; });
+    socket.on('status',(t)=>{ el('#adminStatus').textContent=t; });
   </script>
 </body>
 </html>
