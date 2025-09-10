@@ -108,13 +108,11 @@ button:disabled { opacity:.6; pointer-events:none; }
   background: radial-gradient(closest-side, #11213a 0%, #0d172a 60%, #0b1220 100%);
   border: 1px solid var(--border);
   box-shadow: 0 0 0 2px #1d2636 inset, 0 10px 30px rgba(0,0,0,.5);
+  aspect-ratio: 1 / 1;         /* ← ersetzt ::before-Hack */
 }
-/* erzeugt eine quadratische Fläche -> immer runder Bereich */
-.table-circle::before {
-  content: "";
-  display: block;
-  padding-bottom: 100%;
-}
+
+/* Falls irgendwo noch der alte ::before-Hack steht, deaktivieren */
+.table-circle::before { display: none !important; content: ""; }
 
 .seat {
   --angle: 0deg; /* wird pro Sitz über Klasse gesetzt */
@@ -139,6 +137,7 @@ button:disabled { opacity:.6; pointer-events:none; }
   gap: 6px;
   padding: 8px;
   text-align: center;
+  will-change: transform;
 }
 .seat .avatar {
   width: 44px; height: 44px;
@@ -171,6 +170,16 @@ button:disabled { opacity:.6; pointer-events:none; }
 .s5 { --angle: 135deg; }
 .s6 { --angle: 180deg; }
 .s7 { --angle: -135deg; }
+
+/* Legacy-Reset: alte top/left-Festpositionen sicher überschreiben */
+.seat.s0, .seat.s1, .seat.s2, .seat.s3,
+.seat.s4, .seat.s5, .seat.s6, .seat.s7 {
+  top: 50% !important;
+  left: 50% !important;
+  right: auto !important;
+  bottom: auto !important;
+  margin: 0 !important;
+}
 
 /* Pot in der Mitte */
 #table-center2 {
