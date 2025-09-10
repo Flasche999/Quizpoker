@@ -7,6 +7,31 @@
   <link rel="stylesheet" href="/style.css?v=4" />
   <!-- Socket.IO-Client über CDN -->
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+
+  <!-- Badges + Turn-Highlight (kannst du auch in style.css kopieren) -->
+  <style>
+    .badge {
+      display:inline-block;
+      font-weight:700;
+      color:#000;
+      background:#fff;
+      border-radius:50%;
+      width:20px; height:20px;
+      line-height:20px;
+      text-align:center;
+      margin-left:6px;
+      font-size:12px;
+    }
+    .badge-s { border:2px solid #1363ff; } /* blau */
+    .badge-b { border:2px solid #ff2b2b; } /* rot */
+
+    /* Goldener Rahmen für den Spieler, der am Zug ist */
+    .seat.turn, .spieler-box.turn {
+      border:3px solid gold !important;
+      box-shadow:0 0 10px rgba(255,215,0,.7);
+      border-radius:10px;
+    }
+  </style>
 </head>
 <body>
   <div class="layout">
@@ -87,6 +112,12 @@
     let joinedOnce  = false;
     let lastVersion = -1;
 
+    // ——— NEU: globaler State für Blinds + Turn
+    const currentState = {
+      blinds: { small: null, big: null }, // seats (Zahlen)
+      turnUid: null                       // UID des Spielers am Zug
+    };
+
     if (myName) inpName.value = myName;
     if (myRoom) inpCode.value = myRoom;
 
@@ -149,27 +180,47 @@
         if (typeof p.seat !== 'number') return;
         const slot = document.querySelector(`.seat[data-seat="${p.seat}"]`);
         if (!slot) return;
+
+        const isSB = (p.seat === (currentState.blinds?.small ?? null));
+        const isBB = (p.seat === (currentState.blinds?.big ?? null));
+        const sBadge = isSB ? '<span class="badge badge-s">S</span>' : '';
+        const bBadge = isBB ? '<span class="badge badge-b">B</span>' : '';
+
         slot.innerHTML = `
           <div class="avatar">🙂</div>
-          <div class="name">${p.name}</div>
+          <div class="name">${escapeHtml(p.name)} ${sBadge} ${bBadge}</div>
           <div class="chips">🪙 ${p.chips ?? 0}</div>
         `;
         if (!p.connected) slot.classList.add('disconnected');
+        // Goldener Rahmen für den, der am Zug ist
+        if (p.uid === currentState.turnUid) slot.classList.add('turn');
       });
     }
+
     function renderList() {
       const list = $('#playerList'); list.innerHTML = '';
       const arr = Array.from(playersByUid.values()).sort((a,b)=> (a.seat ?? 99) - (b.seat ?? 99));
       arr.forEach(p => {
+        const isSB = (p.seat === (currentState.blinds?.small ?? null));
+        const isBB = (p.seat === (currentState.blinds?.big ?? null));
+        const sBadge = isSB ? '<span class="badge badge-s">S</span>' : '';
+        const bBadge = isBB ? '<span class="badge badge-b">B</span>' : '';
+
         const div = document.createElement('div');
         div.className = 'spieler-box' + (p.connected ? '' : ' disconnected');
-        div.innerHTML = `<strong>Sitz ${(p.seat ?? -1) + 1}:</strong> ${p.name} – 🪙 ${p.chips ?? 0}`;
+        div.innerHTML = `<strong>Sitz ${(p.seat ?? -1) + 1}:</strong> ${escapeHtml(p.name)} ${sBadge} ${bBadge} – 🪙 ${p.chips ?? 0}`;
+        if (p.uid === currentState.turnUid) div.classList.add('turn');
         list.appendChild(div);
       });
     }
+
     function renderAll() {
       renderSeats(); renderList();
       const me = playersByUid.get(UID); if (me) $('#chips').textContent = me.chips ?? 0;
+    }
+
+    function escapeHtml(s='') {
+      return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
     }
 
     // Socket Events
@@ -199,6 +250,11 @@
       const ver = (state.version ?? -1);
       if (ver <= lastVersion) return;
       lastVersion = ver;
+
+      // Blinds + Turn übernehmen
+      currentState.blinds = state.blinds || { small:null, big:null };
+      currentState.turnUid = state.turnUid || null;
+
       $('#roomCode').textContent = state.code || '—';
       $('#question').textContent = state.question?.text || '–';
       if (typeof state.pot === 'number') $('#pot').textContent = state.pot;
@@ -219,6 +275,17 @@
       if (ver <= lastVersion) return;
       lastVersion = ver;
       (msg.players || []).forEach(p => playersByUid.set(p.uid, p));
+      renderAll();
+    });
+
+    // ——— NEU: Partial-Updates (z. B. wenn Admin Blinds/Turn ändert)
+    socket.on('state:partial', (patch) => {
+      const ver = (patch.version ?? -1);
+      if (ver <= lastVersion) return;
+      lastVersion = ver;
+
+      if (patch.blinds) currentState.blinds = patch.blinds;
+      if ('turnUid' in patch) currentState.turnUid = patch.turnUid;
       renderAll();
     });
 
