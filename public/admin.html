@@ -4,12 +4,14 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>QuizPoker – Admin</title>
+  <!-- Wichtig: deine globale style.css enthält die runde Tisch-Ansicht -->
   <link rel="stylesheet" href="/style.css?v=5" />
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
   <style>
+    /* ——— Basis-UI (ohne Tisch-Styles, damit style.css greift) ——— */
     :root{--bg:#0e0f12;--card:#151821;--line:#262b36;--ok:#2a5e3b;--err:#5b2730;--pri:#1363ff}
     body{background:var(--bg);color:#e7e9ee;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;margin:0}
-    .layout{display:grid;grid-template-columns:320px 1fr 360px;gap:12px;padding:12px}
+    .layout{display:grid;grid-template-columns:320px 1fr 360px;gap:12px;padding:12px;min-height:100vh}
     .sidebar,.main,.right{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px}
     .h{margin:0 0 8px;font-size:16px}
     .list{display:flex;flex-direction:column;gap:8px}
@@ -30,33 +32,19 @@
     .badge{display:inline-block;font-weight:700;color:#000;background:#fff;border-radius:50%;width:20px;height:20px;line-height:20px;text-align:center;margin-left:6px;font-size:12px}
     .badge-s{border:2px solid #1363ff}
     .badge-b{border:2px solid #ff2b2b}
-    .table-wrap{position:relative;height:280px}
-    .table-circle{position:relative;width:100%;height:100%;border:1px solid var(--line);border-radius:16px;display:grid;place-items:center;background:#0f1118}
-    .seat{position:absolute;width:120px;background:#10131b;border:1px solid var(--line);border-radius:10px;padding:6px}
-    .seat .name{font-size:13px;margin-top:4px}
-    .seat .chips,.seat .betline{font-size:12px;opacity:.9}
-    .seat.folded{opacity:.55}
-    .seat.turn{border:3px solid gold!important;box-shadow:0 0 10px rgba(255,215,0,.7)}
-    .s0{top:8px;left:calc(50% - 60px)}
-    .s1{top:36px;right:8px}
-    .s2{top:calc(50% - 60px);right:8px}
-    .s3{bottom:36px;right:8px}
-    .s4{bottom:8px;left:calc(50% - 60px)}
-    .s5{bottom:36px;left:8px}
-    .s6{top:calc(50% - 60px);left:8px}
-    .s7{top:36px;left:8px}
-    #table-center2{font-weight:700;text-align:center}
-    .chatlog{height:220px;overflow:auto;border:1px solid var(--line);border-radius:10px;background:#0f1118;padding:8px}
-    .chatrow{margin-bottom:6px}
-    .pill{display:inline-block;border:1px solid var(--line);border-radius:999px;padding:2px 8px;font-size:12px;margin-right:6px}
-    .pill.admin{background:#3b2a5e}
-    .pill.player{background:#283046}
-    .pill.me{background:#2a5e3b}
-    .two-col{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+
+    /* ——— WICHTIG: KEINE lokalen .table-* oder .seat-* Styles mehr hier!
+       Wir nutzen die runde Tisch-Ansicht aus /public/style.css (s0..s7, --ring, --seat) ——— */
+
+    /* Platz nach oben rechts schön machen */
+    .right { display:flex; flex-direction:column; gap:12px; }
+    .table-wrap { display:flex; justify-content:center; } /* nur leichte Hülle */
+    #table-center2 .small { display:block; margin-top:4px; }
   </style>
 </head>
 <body>
   <div class="layout">
+    <!-- Linke Spalte: Raum/Steuerung -->
     <aside class="sidebar">
       <h3 class="h">Raum</h3>
       <div class="list">
@@ -74,7 +62,7 @@
         <button id="btnNextQ">🆕 Frage starten</button>
       </div>
 
-      <!-- NEU: Blinds inkl. Betrag + Rotation -->
+      <!-- Blinds (Sitze + Werte + Rotation) -->
       <div class="status" style="margin-top:12px;">
         <div>Small Blind (Seat #): <input id="inpSB" placeholder="0–7" style="width:100%;margin-top:6px;"></div>
         <div>Big Blind (Seat #): <input id="inpBB" placeholder="0–7" style="width:100%;margin-top:6px;"></div>
@@ -109,7 +97,7 @@
         </div>
       </div>
 
-      <!-- CHIPS MANAGEMENT -->
+      <!-- Chips Mgmt (belässt du, wenn du es nutzt) -->
       <div class="status" style="margin-top:12px;">
         <div class="row">
           <input id="chipsSetAll" type="number" placeholder="Startchips (z. B. 1000)" style="flex:1;">
@@ -142,6 +130,7 @@
       </div>
     </aside>
 
+    <!-- Mitte: Frage/DMs -->
     <main class="main">
       <h3 class="h">Frage & Hinweise</h3>
       <div class="list">
@@ -170,26 +159,32 @@
       <div id="answers" class="list" style="max-height:160px;overflow:auto;"></div>
     </main>
 
+    <!-- RECHTS: Oben Virtueller Tisch, darunter Lobby -->
     <aside class="right">
-      <h3 class="h">Lobby – Spieler</h3>
-      <div id="players" class="score"></div>
-
-      <h3 class="h" style="margin-top:12px;">Virtueller Tisch</h3>
-      <div class="table-wrap">
-        <div class="table-circle">
-          <div class="seat s0" data-seat="0"></div>
-          <div class="seat s1" data-seat="1"></div>
-          <div class="seat s2" data-seat="2"></div>
-          <div class="seat s3" data-seat="3"></div>
-          <div class="seat s4" data-seat="4"></div>
-          <div class="seat s5" data-seat="5"></div>
-          <div class="seat s6" data-seat="6"></div>
-          <div class="seat s7" data-seat="7"></div>
-          <div id="table-center2">
-            💰 Pot: <strong id="pot2">0</strong>
-            <div class="small muted" id="blindVals">SB — / BB —</div>
+      <div>
+        <h3 class="h">Virtueller Tisch</h3>
+        <!-- runde Tisch-Ansicht: nutzt Klassen/Variablen aus style.css -->
+        <div class="table-wrap">
+          <div class="table-circle">
+            <div class="seat s0" data-seat="0"></div>
+            <div class="seat s1" data-seat="1"></div>
+            <div class="seat s2" data-seat="2"></div>
+            <div class="seat s3" data-seat="3"></div>
+            <div class="seat s4" data-seat="4"></div>
+            <div class="seat s5" data-seat="5"></div>
+            <div class="seat s6" data-seat="6"></div>
+            <div class="seat s7" data-seat="7"></div>
+            <div id="table-center2">
+              💰 Pot: <strong id="pot2">0</strong>
+              <span class="small muted" id="blindVals">SB — / BB —</span>
+            </div>
           </div>
         </div>
+      </div>
+
+      <div>
+        <h3 class="h" style="margin-top:8px;">Lobby – Spieler</h3>
+        <div id="players" class="score"></div>
       </div>
     </aside>
   </div>
@@ -201,18 +196,18 @@
 
     const emitOk = (evt, payload)=>{ if(!socket.connected){ el('#adminStatus').textContent='Nicht verbunden.'; return false; } socket.emit(evt,payload); return true; };
 
-    // ───────── Connect / Restore ─────────
+    // Connect / Restore
     socket.on('connect', ()=>{
       el('#adminStatus').textContent = 'Verbunden: '+socket.id;
       const last = localStorage.getItem('qp_admin_room'); if (last) socket.emit('mod:claim-room', { code:last });
     });
     socket.on('disconnect', ()=>{ el('#adminStatus').textContent='Getrennt.'; });
 
-    // ───────── Buttons Grundfunktionen ─────────
+    // Buttons
     el('#btnCreate').onclick=()=>emitOk('mod:create-room');
     el('#btnNextQ').onclick =()=>emitOk('mod:next-question');
 
-    // NEU: Blinds speichern (Seats + Werte + Rotation)
+    // Blinds speichern (Seats + Werte + Rotation)
     el('#btnSetBlinds').onclick = ()=>{
       const sbSeatStr=el('#inpSB').value.trim();
       const bbSeatStr=el('#inpBB').value.trim();
@@ -244,15 +239,9 @@
     el('#btnAwardNearest').onclick=()=>emitOk('mod:award-nearest');
     el('#btnSyncAll').onclick=()=>emitOk('mod:sync-all');
 
-    // ───────── Chips Management ─────────
-    el('#btnChipsSetAll').onclick=()=>{
-      const amount = Number(el('#chipsSetAll').value || 0);
-      emitOk('mod:chips-set-all', { amount });
-    };
-    el('#btnChipsAddAll').onclick=()=>{
-      const delta = Number(el('#chipsDeltaAll').value || 0);
-      emitOk('mod:chips-add-all', { delta });
-    };
+    // Chips Mgmt
+    el('#btnChipsSetAll').onclick=()=>emitOk('mod:chips-set-all', { amount: Number(el('#chipsSetAll').value || 0) });
+    el('#btnChipsAddAll').onclick=()=>emitOk('mod:chips-add-all', { delta: Number(el('#chipsDeltaAll').value || 0) });
     el('#btnChipsAddOne').onclick=()=>{
       const uid = el('#chipsOneUid').value;
       const delta = Number(el('#chipsDeltaOne').value || 0);
@@ -260,7 +249,7 @@
       emitOk('mod:chips-add-one', { uid, delta });
     };
 
-    // ───────── DMs ─────────
+    // DMs (Admin-Seite)
     const dmSelect = el('#dmSelect');
     const dmLog = el('#dmLog');
     function dmAppend(html){
@@ -268,7 +257,6 @@
       dmLog.appendChild(d); dmLog.scrollTop = dmLog.scrollHeight;
     }
     function escapeHtml(s){return String(s||'').replace(/[&<>"]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[m]));}
-
     function renderDmFor(uid){
       dmLog.innerHTML='';
       const thread = state.chats.get(uid) || [];
@@ -278,32 +266,27 @@
       });
     }
     dmSelect.onchange = ()=>{ if(dmSelect.value) renderDmFor(dmSelect.value); };
-
     function ensureChat(uid){ if(!state.chats.has(uid)) state.chats.set(uid,[]); return state.chats.get(uid); }
-
     el('#btnDmSend').onclick = ()=>{
       const uid = dmSelect.value; const msg = el('#dmMessage').value.trim();
       if(!uid || !msg) return;
       emitOk('mod:dm', { uid, message: msg });
-      // lokales Echo:
       const thr = ensureChat(uid);
       thr.push({ from:'admin', message:msg, ts:Date.now() });
       renderDmFor(uid);
       el('#dmMessage').value = '';
     };
-    el('#dmMessage').addEventListener('keydown',(e)=>{ if(e.key==='Enter'){ e.preventDefault(); el('#btnDmSend').click(); }});
-
     el('#btnDmClearOne').onclick = ()=>{ const uid = dmSelect.value; if(!uid) return; emitOk('mod:chat-clear-one', { uid }); };
     el('#btnDmClearAll').onclick = ()=>emitOk('mod:chat-clear-all');
+    el('#dmMessage').addEventListener('keydown',(e)=>{ if(e.key==='Enter'){ e.preventDefault(); el('#btnDmSend').click(); }});
 
-    // ───────── Render Helfer ─────────
+    // Render-Helfer
     function badge(p){
       const isSB = (p.seat === (state.blinds?.small ?? null));
       const isBB = (p.seat === (state.blinds?.big ?? null));
       return (isSB?'<span class="badge badge-s">S</span>':'') + (isBB?'<span class="badge badge-b">B</span>':'');
     }
     function refreshSelects(players){
-      // DM-Select & Chips-Einzel-Select
       const keeps = new Set();
       const curDm = dmSelect.value;
       const curChip = el('#chipsOneUid').value;
@@ -338,9 +321,10 @@
       state.turnUid = st.turnUid || null;
       state.roundIndex = st.roundIndex||0;
 
-      // Anzeige Blind-Werte im Tischzentrum
+      // Blind-Werte im Tischzentrum
       el('#blindVals').textContent = `SB ${state.blinds.sbValue ?? 0} / BB ${state.blinds.bbValue ?? 0}`;
-      // Panel-Felder (falls leer, nichts überschreiben)
+
+      // Panel-Felder
       if (st.blinds){
         el('#inpSB').value = Number.isInteger(st.blinds.small) ? st.blinds.small : '';
         el('#inpBB').value = Number.isInteger(st.blinds.big) ? st.blinds.big : '';
@@ -371,6 +355,7 @@
       refreshSelects(arr);
     }
     function renderSeats(st){
+      // setzt die Sitzkarten in die runde Tisch-UI (nutzt CSS aus style.css)
       for(let i=0;i<8;i++){
         const slot = document.querySelector(`.seat[data-seat="${i}"]`);
         if(!slot) continue;
@@ -392,13 +377,12 @@
       });
     }
 
-    // ───────── Socket Events vom Server ─────────
+    // Socket-Events
     socket.on('mod:room-created', ({ code, state:st })=>{
       localStorage.setItem('qp_admin_room', code);
       renderTop(st); renderPlayers(st); renderSeats(st);
       el('#adminStatus').textContent = 'Raum erstellt: '+code;
     });
-
     socket.on('state:full', (st)=>{ renderTop(st); renderPlayers(st); renderSeats(st); });
     socket.on('players:update', (msg)=>{ if(!msg?.players) return; renderPlayers({players:msg.players, blinds:state.blinds, turnUid:state.turnUid}); renderSeats({players:msg.players, blinds:state.blinds, turnUid:state.turnUid}); });
     socket.on('state:partial', (patch)=>{
@@ -426,19 +410,17 @@
       }
       socket.emit('mod:sync-all');
     });
-
     socket.on('question:show', (q)=>{
       el('#qIndex').textContent = (q.index+1);
       el('#qText').textContent = q.text || '–';
       el('#qH1').textContent='verdeckt'; el('#qH2').textContent='verdeckt'; el('#qSol').textContent='verdeckt';
     });
-
     socket.on('answer:received', ({ uid, name, answer })=>{
       const div=document.createElement('div'); div.className='item'; div.textContent = `${name}: ${answer}`;
       el('#answers').prepend(div);
     });
 
-    // DMs vom Server
+    // DMs von Spielern
     socket.on('dm:from-player', ({ uid, name, message, ts })=>{
       const thr = ensureChat(uid); thr.push({ from:'player', message, ts });
       if (dmSelect.value === uid) renderDmFor(uid);
