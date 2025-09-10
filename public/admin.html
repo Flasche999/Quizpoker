@@ -4,8 +4,11 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>QuizPoker – Admin</title>
-  <link rel="stylesheet" href="/style.css?v=6" />
+  <!-- Cache-Bust -->
+  <link rel="stylesheet" href="/style.css?v=9" />
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+
+  <!-- HARTER FIX gegen überlappende Sitze (falls altes CSS gecacht ist) -->
   <style>
     :root{--bg:#0e0f12;--card:#151821;--line:#262b36;--ok:#2a5e3b;--err:#5b2730;}
     body{background:var(--bg);color:#e7e9ee;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;margin:0}
@@ -29,6 +32,25 @@
     .pill.admin{background:#3b2a5e}
     .pill.player{background:#283046}
     .two-col{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+
+    /* ─── Tisch-Fixes: verhindert Überlappung ─── */
+    .table-circle{
+      position:relative;
+      width:100%;
+      max-width:560px;
+      margin:6px auto;
+      border:1px solid var(--line);
+      border-radius:16px;
+      background:#0f1118;
+      aspect-ratio:1/1;                 /* immer quadratisch */
+    }
+    .table-circle::before{ display:none !important; content:""; }
+
+    /* Sitze ZWINGEND in die Mitte setzen; Verteilung erfolgt via transform in style.css */
+    .seat.s0,.seat.s1,.seat.s2,.seat.s3,.seat.s4,.seat.s5,.seat.s6,.seat.s7{
+      top:50% !important; left:50% !important; right:auto !important; bottom:auto !important; margin:0 !important;
+      position:absolute;
+    }
   </style>
 </head>
 <body>
@@ -161,7 +183,7 @@
   </div>
 
   <script>
-    // robuste Socket-Init (fällt von WS auf Polling zurück)
+    // robuste Socket-Init (Fallback Polling)
     const socket = io({
       path:'/socket.io',
       transports:['polling','websocket'],
@@ -223,7 +245,7 @@
     // DMs
     const dmSelect = el('#dmSelect');
     const dmLog = el('#dmLog');
-    const escapeHtml = (s)=>String(s||'').replace(/[&<>"]/g, m => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[m]));
+    const escapeHtml = (s)=>String(s||'').replace(/[&<>"]/g, m => ({"&":"&amp;","<":"&lt;","&gt;":"&gt;","\"":"&quot;"}[m]));
     function dmAppend(html){ const d=document.createElement('div'); d.className='chatrow'; d.innerHTML=html; dmLog.appendChild(d); dmLog.scrollTop = dmLog.scrollHeight; }
     function renderDmFor(uid){
       dmLog.innerHTML='';
@@ -338,7 +360,6 @@
         el('#qH2').textContent   = patch.question?.hint2 ?? 'verdeckt';
         el('#qSol').textContent  = patch.question?.solution ?? 'verdeckt';
       }
-      // Sitz-Render aktualisieren, wenn wir Spieler kennen
       if (state.players?.length) {
         renderSeats({players: state.players, blinds: state.blinds, turnUid: state.turnUid});
         refreshSelects(state.players);
