@@ -1,196 +1,83 @@
+/* ─────────────────────────────────────────────
+   NEU: Stabiler runder Tisch (Admin & Player)
+   ───────────────────────────────────────────── */
 :root {
-  --bg: #0a0f1a;
-  --panel: #121a2a;
-  --panel-2: #0f1730;
-  --text: #e9eefb;
-  --muted: #98a3b8;
-  --accent: #7aa2ff;
-  --ok: #29c17e;
-  --err: #ff5978;
-  --border: #213055;
+  --seat-size: 96px;           /* Sitzgröße Desktop */
+  --seat-gap: 8px;             /* Abstand zum Rand */
 }
 
-* { box-sizing: border-box; }
-html, body { margin:0; height:100%; }
-body {
-  background: radial-gradient(1200px 800px at 20% -10%, #1a2644, transparent), var(--bg);
-  color: var(--text);
-  font: 15px/1.5 system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, "Helvetica Neue", Arial, "Apple Color Emoji", "Segoe UI Emoji";
+@media (max-width: 900px) {
+  :root { --seat-size: 88px; }
+}
+@media (max-width: 560px) {
+  :root { --seat-size: 80px; }
 }
 
-/* Layout-Container */
-.layout {
-  .table-circle { 
-  /* ...bestehend... */
-  overflow: visible;              /* NEU: nichts abschneiden */
+.table-wrap {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  width: 100%;
 }
 
-.seat {
-  /* ...bestehend... */
-  height: auto;                   /* NEU: Box darf wachsen */
-  min-height: var(--seat);        /* Mindesthöhe bleibt */
-  padding: 10px;                  /* etwas mehr Innenabstand */
-}
-
-.seat .name { 
-  font-size: 13px; 
-  line-height: 1.25; 
-  white-space: normal;            /* NEU: darf umbrechen */
-}
-
-.seat .chips { 
-  font-size: 13px;                /* etwas größer */
-}
-
-.sidebar, .main, .right {
-  background: linear-gradient(180deg, var(--panel), var(--panel-2));
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  padding: 14px;
-  box-shadow: 0 10px 24px rgba(0,0,0,.25);
-}
-
-/* Headlines & Text */
-.h { margin: 0 0 10px; font-size: 14px; color: var(--muted); letter-spacing: .08em; text-transform: uppercase; }
-.status { margin-top: 8px; color: var(--muted); }
-.small { font-size: 12px; color: var(--muted); }
-.muted { opacity:.7; color: var(--muted); }
-
-/* Lists / Items */
-.list .item {
-  padding: 10px 12px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  margin-bottom: 8px;
-  cursor: pointer;
-}
-.list .item.active {
-  background: #17254b;
-  border-color: #2a4aa1;
-}
-
-/* Controls */
-.row { display:flex; gap:8px; flex-wrap: wrap; }
-button, input, select, textarea {
-  background: #0b1224;
-  color: var(--text);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 10px 12px;
-}
-button.primary { background: #1b2d66; border-color:#3353b8; }
-button.ok { background:#103822; border-color:#1e6a42; }
-button.err { background:#3a1420; border-color:#7e2a44; }
-button:disabled { opacity:.6; pointer-events:none; }
-
-/* Score Panel */
-#players { display:flex; flex-direction: column; gap:8px; }
-.player {
-  display:flex; align-items:center; justify-content: space-between;
-  gap:10px; border:1px solid var(--border); border-radius:10px; padding:10px 12px;
-}
-.player .pm { display:flex; gap:6px; }
-.player .pm .score-btn { width:28px; height:28px; border-radius:8px; padding:0; }
-
-/* Allgemeine Mini-Infozeile */
-.betline { font-size:12px; opacity:.9; }
-
-/* ─────────────────────────────────────────────
-   Alte (Grid) Tisch-Ansicht – weiterhin vorhanden
-   ───────────────────────────────────────────── */
-.table {
-  display:grid; gap:10px;
-  grid-template-areas:
-    "left top right"
-    "left center right"
-    "left bottom right";
-  grid-template-columns: 1fr 2fr 1fr;
-  grid-template-rows: auto 1fr auto;
-  min-height: 380px;
-  border:1px dashed var(--border); border-radius:12px; padding:10px;
-}
-#players-left   { grid-area: left;   display:flex; flex-direction:column; gap:8px; }
-#players-right  { grid-area: right;  display:flex; flex-direction:column; gap:8px; }
-#players-top    { grid-area: top;    display:flex; justify-content:center; gap:8px; flex-wrap:wrap; }
-#players-bottom { grid-area: bottom; display:flex; justify-content:center; gap:8px; flex-wrap:wrap; }
-#table-center   { grid-area: center; display:flex; align-items:center; justify-content:center; }
-
-.spieler-box {
-  background:#0b1224; border:1px solid var(--border); border-radius:12px; padding:8px 10px; min-width: 160px;
-}
-.small-blind { outline: 2px dashed #6aa6ff; }
-.big-blind   { outline: 2px dashed #ffcf6a; }
-
-/* Buzz/Markierung optional */
-.buzzing { background: #3a1a21; border-color: #8a3b4c; }
-
-/* ─────────────────────────────────────────────
-   Runde Tisch-Ansicht (player.html/admin.html)
-   ───────────────────────────────────────────── */
-:root { --ring: 460px; --seat: 96px; }
-
-.table-wrap { display:flex; justify-content:center; }
+/* Quadratischer, immer runder Bereich durch padding-bottom:100% */
 .table-circle {
-  position:relative; width:var(--ring); height:var(--ring);
-  margin:10px auto; border-radius:50%;
+  position: relative;
+  width: 100%;
+  max-width: 560px;            /* kannst du anpassen */
+  margin: 6px auto;
+  border-radius: 16px;
   background: radial-gradient(closest-side, #11213a 0%, #0d172a 60%, #0b1220 100%);
+  border: 1px solid var(--border, #213055);
   box-shadow: 0 0 0 2px #1d2636 inset, 0 10px 30px rgba(0,0,0,.5);
 }
+
+/* erzeugt die quadratische Fläche */
+.table-circle::before {
+  content: "";
+  display: block;
+  padding-bottom: 100%;
+}
+
 .seat {
-  position:absolute; width:var(--seat); height:var(--seat);
-  border-radius:14px; border:1px solid var(--border); background:#0b1220;
-  display:flex; flex-direction:column; align-items:center; justify-content:center;
-  gap:6px; padding:8px; text-align:center;
-  transform: translate(-50%, -50%);
+  --angle: 0deg; /* wird pro Sitz über Klasse gesetzt */
+  --radius: calc(50% - (var(--seat-size) / 2) - var(--seat-gap));
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: var(--seat-size);
+  height: var(--seat-size);
+  transform:
+    translate(-50%, -50%)
+    rotate(var(--angle))
+    translate(var(--radius))
+    rotate(calc(-1 * var(--angle)));
+  border-radius: 14px;
+  border: 1px solid var(--border, #213055);
+  background: #0b1220;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px;
+  text-align: center;
 }
+
 .seat .avatar {
-  width:48px; height:48px; border-radius:50%; background:#141a2a;
-  display:flex; align-items:center; justify-content:center; border:1px solid #283552;
-  font-weight:700; overflow:hidden;
+  width: 44px; height: 44px;
+  border-radius: 50%;
+  background: #141a2a;
+  display:flex; align-items:center; justify-content:center;
+  border:1px solid #283552; font-weight:700; overflow:hidden;
 }
-.seat .name { font-size:13px; line-height:1.2; }
-.seat .chips { font-size:12px; opacity:.9; }
-.seat.disconnected { opacity:.5; filter:saturate(.5); }
+.seat .name { font-size: 13px; line-height: 1.2; }
+.seat .chips { font-size: 12px; opacity: .9; }
+.seat .betline { font-size: 12px; opacity: .9; }
 
-/* Sitzpositionen (0 oben, im Uhrzeigersinn) */
-.s0 { left:50%; top:7%; }
-.s1 { left:82%; top:20%; }
-.s2 { left:93%; top:50%; }
-.s3 { left:82%; top:80%; }
-.s4 { left:50%; top:93%; }
-.s5 { left:18%; top:80%; }
-.s6 { left:7%;  top:50%; }
-.s7 { left:18%; top:20%; }
+.seat.disconnected { opacity:.6; filter:saturate(.6); }
+.seat.folded { opacity:.55; }
 
-/* Center des runden Tisches */
-#table-center2 {
-  position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
-  padding:10px 14px; border-radius:12px; border:1px solid var(--border); background:#0f1420;
-  text-align:center; font-size:14px;
-}
-
-/* Responsive */
-@media (max-width: 560px) {
-  :root { --ring: 320px; --seat: 84px; }
-}
-
-/* ───────── Badges für Blinds + Zug-Markierung ───────── */
-.badge {
-  display:inline-block;
-  font-weight:700;
-  color:#000;                 /* schwarzer Buchstabe */
-  background:#fff;            /* weißer Kreis */
-  border-radius:50%;
-  width:20px; height:20px;
-  line-height:20px;
-  text-align:center;
-  margin-left:6px;
-  font-size:12px;
-}
-.badge-s { border:2px solid #6aa6ff; }  /* S: blau umranded */
-.badge-b { border:2px solid #ff4d4d; }  /* B: rot umranded */
-
-/* Goldener Rahmen für den Spieler, der am Zug ist */
 .seat.turn,
 .spieler-box.turn,
 .player.turn {
@@ -199,32 +86,37 @@ button:disabled { opacity:.6; pointer-events:none; }
   border-radius:12px;
 }
 
-/* Gefoldete/abwesende Zustände */
-.seat.folded,
-.spieler-box.folded,
-.player.folded { opacity:.55; filter:saturate(.6); }
+/* Sitzwinkel: 0 oben, im Uhrzeigersinn */
+.s0 { --angle: -90deg; }
+.s1 { --angle: -45deg; }
+.s2 { --angle:   0deg; }
+.s3 { --angle:  45deg; }
+.s4 { --angle:  90deg; }
+.s5 { --angle: 135deg; }
+.s6 { --angle: 180deg; }
+.s7 { --angle: -135deg; }
 
-/* ───────── Chat (Admin & Player DMs) ───────── */
-.chatlog {
-  height: 220px;
-  overflow: auto;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: #0f1422;
-  padding: 8px;
+/* Pot in der Mitte */
+#table-center2 {
+  position: absolute;
+  left: 50%; top: 50%;
+  transform: translate(-50%,-50%);
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--border, #213055);
+  background: #0f1420;
+  text-align: center;
+  font-size: 14px;
 }
-.chatrow { margin-bottom: 6px; }
-.pill{
+
+/* Badges für Blinds */
+.badge {
   display:inline-block;
-  border:1px solid var(--border);
-  border-radius:999px;
-  padding:2px 8px;
-  font-size:12px;
-  margin-right:6px;
+  font-weight:700;
+  color:#000; background:#fff;
+  border-radius:50%;
+  width:20px; height:20px; line-height:20px;
+  text-align:center; margin-left:6px; font-size:12px;
 }
-.pill.admin { background:#3b2a5e; }
-.pill.player { background:#283046; }
-.pill.me { background:#1e3a2b; }
-
-/* Kleine Helfer */
-code { background:#0f1422; border:1px solid var(--border); border-radius:6px; padding:2px 6px; }
+.badge-s { border:2px solid #6aa6ff; }
+.badge-b { border:2px solid #ff4d4d; }
