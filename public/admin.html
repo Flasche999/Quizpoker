@@ -5,7 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>QuizPoker – Admin</title>
   <link rel="stylesheet" href="/style.css?v=4" />
-  <script src="/socket.io/socket.io.js"></script>
+  <!-- Socket.IO-Client über CDN (robust auf Render) -->
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 </head>
 <body>
   <div class="layout">
@@ -167,17 +168,17 @@
 
     function renderSeats() {
       for (let i=0;i<8;i++) {
-        const slot = document.querySelector(\`.seat[data-seat="\${i}"]\`);
+        const slot = document.querySelector(`.seat[data-seat="${i}"]`);
         if (!slot) continue;
-        slot.className = \`seat s\${i}\`;
+        slot.className = `seat s${i}`;
         slot.innerHTML = '<div class="avatar">—</div><div class="name">Frei</div><div class="chips">🪙 0</div>';
       }
       const arr = Array.from(playersMap.values());
       arr.forEach(p => {
         if (typeof p.seat !== 'number') return;
-        const slot = document.querySelector(\`.seat[data-seat="\${p.seat}"]\`);
+        const slot = document.querySelector(`.seat[data-seat="${p.seat}"]`);
         if (!slot) return;
-        slot.innerHTML = \`<div class="avatar">🙂</div><div class="name">\${p.name}</div><div class="chips">🪙 \${p.chips ?? 0}</div>\`;
+        slot.innerHTML = `<div class="avatar">🙂</div><div class="name">${p.name}</div><div class="chips">🪙 ${p.chips ?? 0}</div>`;
         if (!p.connected) slot.classList.add('disconnected');
       });
     }
@@ -201,8 +202,9 @@
     });
 
     socket.on('state:full', (state) => {
-      if ((state.version ?? -1) <= lastVersion) return;
-      lastVersion = state.version ?? -1;
+      const ver = (state.version ?? -1);
+      if (ver <= lastVersion) return;
+      lastVersion = ver;
       playersMap.clear();
       (state.players || []).forEach(p => playersMap.set(p.uid, p));
       el('#qIndex').textContent = state.qIndex >= 0 ? (state.qIndex + 1) : '–';
@@ -211,15 +213,17 @@
     });
 
     socket.on('players:update', (msg) => {
-      if ((msg.version ?? -1) <= lastVersion) return;
-      lastVersion = msg.version ?? -1;
+      const ver = (msg.version ?? -1);
+      if (ver <= lastVersion) return;
+      lastVersion = ver;
       (msg.players || []).forEach(p => playersMap.set(p.uid, p));
       renderPlayersPanel(); renderSeats();
     });
 
     socket.on('question:show', (q) => {
-      if ((q.version ?? -1) <= lastVersion) return;
-      lastVersion = q.version ?? -1;
+      const ver = (q.version ?? -1);
+      if (ver <= lastVersion) return;
+      lastVersion = ver;
       el('#qIndex').textContent = (q.index + 1);
       el('#questionBox').textContent = q.text || '–';
       el('#answers').innerHTML = '';
