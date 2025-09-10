@@ -1,5 +1,6 @@
-// server.js – QuizPoker, robust mit UID, State-Backfill & Versionierung (ESM)
-// + Sitzplätze (virtueller Tisch), eindeutige Namen, Anti-Doppelbeitritt mit TAKEOVER
+// server.js – QuizPoker (ESM)
+// Features: Sitzplätze (0–7), Takeover bei Rejoin, eindeutige Namen,
+// persistente Lobby ("LOBBY"), Debug-Endpoints
 
 import express from 'express';
 import http from 'http';
@@ -27,11 +28,23 @@ app.use((req, _res, next) => { console.log('[REQ]', req.method, req.url); next()
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.get('/healthz', (_req, res) => res.status(200).type('text').send('OK'));
-
 app.get('/', (_req, res) => {
   const file = path.join(__dirname, 'public', 'admin.html');
   if (fs.existsSync(file)) res.sendFile(file);
   else res.status(200).type('text').send('Lade /public/admin.html hoch oder rufe /player.html auf.');
+});
+
+// Debug: bekannte Räume & Spieler kurz listen
+app.get('/debug/rooms', (_req, res) => {
+  const data = Array.from(rooms.values()).map(r => ({
+    code: r.code,
+    version: r.version || 0,
+    players: Array.from(r.players.values()).map(p => ({
+      uid: p.uid, name: p.name, seat: p.seat, connected: !!p.connected
+    })),
+    moderatorId: r.moderatorId || null
+  }));
+  res.json({ rooms: data, cwd: process.cwd(), dirname: __dirname });
 });
 
 // Fragen laden (optional)
@@ -54,17 +67,18 @@ function loadQuestions() {
 const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const genCode = () => Array.from({ length: 5 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
 
-const MAX_SEATS = 8;
+const MAX_SEATS   = 8;
+const LOBBY_CODE  = (process.env.LOBBY_CODE || 'LOBBY').toUpperCase();
 
 const rooms = new Map();
 /*
   room = {
     code,
-    moderatorId,
+    moderatorId,               // null in der Lobby
     version,
     players: Map<uid, { uid, name, chips, connected, socketId, seat }>,
     questions: [...],
-    qIndex: number, // -1 bevor gestartet
+    qIndex: number,            // -1 bevor gestartet
     pot: number,
     blinds: { small: null, big: null },
   }
@@ -92,23 +106,15 @@ function roomState(room) {
 }
 
 function bump(room) { room.version = (room.version || 0) + 1; }
-
-function ensureRoom(code) {
-  if (!rooms.has(code)) return null;
-  return rooms.get(code);
-}
+function ensureRoom(code) { return rooms.get(code) || null; }
 
 // Sitz-Utils
 function seatIsFree(room, idx) {
-  for (const p of room.players.values()) {
-    if (p.seat === idx) return false;
-  }
+  for (const p of room.players.values()) if (p.seat === idx) return false;
   return true;
 }
 function nextFreeSeat(room) {
-  for (let i = 0; i < MAX_SEATS; i++) {
-    if (seatIsFree(room, i)) return i;
-  }
+  for (let i = 0; i < MAX_SEATS; i++) if (seatIsFree(room, i)) return i;
   return -1;
 }
 function nameTaken(room, name, byUid = null) {
@@ -120,6 +126,25 @@ function nameTaken(room, name, byUid = null) {
   return false;
 }
 
+function createRoom(code, moderatorId) {
+  const room = {
+    code,
+    moderatorId: moderatorId || null,
+    version: 0,
+    players: new Map(),
+    questions: loadQuestions(),
+    qIndex: -1,
+    pot: 0,
+    blinds: { small: null, big: null }
+  };
+  rooms.set(code, room);
+  console.log('[ROOM] created', code, 'mod:', moderatorId || null);
+  return room;
+}
+
+// Persistente Lobby beim Start sicherstellen
+if (!rooms.has(LOBBY_CODE)) createRoom(LOBBY_CODE, null);
+
 // ─────────────────────────────────────────────────────────────
 // Socket.IO
 // ─────────────────────────────────────────────────────────────
@@ -130,27 +155,13 @@ io.on('connection', (socket) => {
   socket.on('mod:create-room', () => {
     let code;
     do { code = genCode(); } while (rooms.has(code));
-
-    const room = {
-      code,
-      moderatorId: socket.id,
-      version: 0,
-      players: new Map(),
-      questions: loadQuestions(),
-      qIndex: -1,
-      pot: 0,
-      blinds: { small: null, big: null }
-    };
-    rooms.set(code, room);
-
+    const room = createRoom(code, socket.id);
     socket.join(code);
     socket.data = { role: 'moderator', room: code };
-
     io.to(socket.id).emit('mod:room-created', { code, state: roomState(room) });
-    console.log('[ROOM] created', code, 'by', socket.id);
   });
 
-  // Moderator setzt Blinds (optional, per Name)
+  // Moderator setzt Blinds
   socket.on('mod:set-blinds', ({ small, big }) => {
     const c = socket.data.room; const room = ensureRoom(c); if (!room) return;
     room.blinds = { small: small || null, big: big || null };
@@ -158,7 +169,7 @@ io.on('connection', (socket) => {
     io.in(c).emit('state:partial', { version: room.version, blinds: room.blinds });
   });
 
-  // Moderator setzt nächste Frage
+  // Moderator nächste Frage
   socket.on('mod:next-question', () => {
     const c = socket.data.room; const room = ensureRoom(c); if (!room) return;
     if (!room.questions || room.questions.length === 0) return;
@@ -176,14 +187,12 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Moderator markiert Ergebnis (korrekt/falsch) & Chips delta
+  // Moderator markiert Ergebnis
   socket.on('mod:mark', ({ uid, result, delta }) => {
     const c = socket.data.room; const room = ensureRoom(c); if (!room) return;
     const p = room.players.get(uid); if (!p) return;
-
     const d = Number(delta);
     if (Number.isFinite(d) && d !== 0) p.chips = Math.max(0, (p.chips || 0) + d);
-
     bump(room);
     io.in(c).emit('players:update', { version: room.version, players: roomState(room).players });
     io.in(c).emit(result === 'correct' ? 'result:correct' : 'result:wrong', { uid, name: p.name, delta: d||0 });
@@ -199,34 +208,25 @@ io.on('connection', (socket) => {
     io.in(c).emit('players:update', { version: room.version, players: roomState(room).players });
   });
 
-  // Moderator: alle synchronisieren (State-Backfill an alle)
+  // Moderator: Full-State an alle
   socket.on('mod:sync-all', () => {
     const c = socket.data.room; const room = ensureRoom(c); if (!room) return;
-    const state = roomState(room);
-    io.in(c).emit('state:full', state);
+    io.in(c).emit('state:full', roomState(room));
   });
 
-  // Spieler sagt Hallo (optionaler Reconnect-Pfad)
+  // Spieler sagt Hallo (optional – Reconnect)
   socket.on('hello', ({ uid, name, room: code }) => {
     if (!code) return;
     if (!rooms.has(code)) return;
-
     const room = rooms.get(code);
     let p = room.players.get(uid);
     if (!p) {
-      // Neuer Spieler über hello → nur zulassen, wenn Platz frei & Name unique
-      if (nameTaken(room, name)) {
-        return io.to(socket.id).emit('status', 'Name bereits vergeben.');
-      }
-      const seat = nextFreeSeat(room);
-      if (seat === -1) {
-        return io.to(socket.id).emit('status', 'Tisch ist voll (8/8).');
-      }
+      if (nameTaken(room, name)) return io.to(socket.id).emit('status', 'Name bereits vergeben.');
+      const seat = nextFreeSeat(room); if (seat === -1) return io.to(socket.id).emit('status', 'Tisch ist voll (8/8).');
       p = { uid, name: name || 'Spieler', chips: 100, connected: true, socketId: socket.id, seat };
       room.players.set(uid, p);
       console.log('[HELLO] new', { code, uid, name, seat });
     } else {
-      // Reconnect
       p.connected = true;
       p.socketId = socket.id;
       if (name && !nameTaken(room, name, uid)) p.name = name;
@@ -234,22 +234,24 @@ io.on('connection', (socket) => {
     }
     socket.join(code);
     socket.data = { role: 'player', room: code, uid };
-
     io.to(socket.id).emit('state:full', roomState(room));
     bump(room);
     io.in(code).emit('players:update', { version: room.version, players: roomState(room).players });
   });
 
-  // Spieler tritt bei (Hauptpfad) – mit TAKEOVER
+  // Spieler tritt bei (Takeover + Auto-Lobby)
   socket.on('player:join', ({ code, uid, name }) => {
     code = String(code || '').toUpperCase().trim();
     console.log('[JOIN] request', { code, uid, name, socket: socket.id });
+
+    // Wenn Raum nicht existiert: Lobby ggf. anlegen, andere Codes ablehnen
     if (!rooms.has(code)) {
-      return io.to(socket.id).emit('player:join-result', { ok: false, error: 'Raum nicht gefunden.' });
+      if (code === LOBBY_CODE) createRoom(LOBBY_CODE, null);
+      else return io.to(socket.id).emit('player:join-result', { ok: false, error: 'Raum nicht gefunden.' });
     }
     const room = rooms.get(code);
 
-    // Falls gleiche UID bereits als connected gilt → alte Verbindung kicken (TAKEOVER)
+    // Takeover: alte Verbindung gleicher UID trennen
     const existing = room.players.get(uid);
     if (existing && existing.connected) {
       const oldSockId = existing.socketId;
@@ -261,19 +263,17 @@ io.on('connection', (socket) => {
       }
     }
 
-    // Name prüfen (einzigartig im Raum, außer es ist dieselbe UID)
+    // Name prüfen (nur bei anderer UID blocken)
     const desiredName = String(name || 'Spieler').slice(0, 24);
     if (nameTaken(room, desiredName, existing?.uid ?? null)) {
       return io.to(socket.id).emit('player:join-result', { ok: false, error: 'Dieser Name ist bereits vergeben.' });
     }
 
-    // Spielerobjekt anlegen oder übernehmen
+    // Spielerobjekt anlegen / übernehmen
     let p = existing;
     if (!p) {
       const seat = nextFreeSeat(room);
-      if (seat === -1) {
-        return io.to(socket.id).emit('player:join-result', { ok: false, error: 'Tisch ist voll (8/8).' });
-      }
+      if (seat === -1) return io.to(socket.id).emit('player:join-result', { ok: false, error: 'Tisch ist voll (8/8).' });
       p = { uid, name: desiredName, chips: 100, connected: true, socketId: socket.id, seat };
       room.players.set(uid, p);
       console.log('[JOIN] new', { code, uid, name: p.name, seat: p.seat });
@@ -281,7 +281,7 @@ io.on('connection', (socket) => {
       p.connected = true;
       p.socketId = socket.id;
       p.name = desiredName;
-      console.log('[JOIN] reconnect/updated', { code, uid, name: p.name, seat: p.seat });
+      console.log('[JOIN] reconnect', { code, uid, name: p.name, seat: p.seat });
     }
 
     socket.join(code);
@@ -296,15 +296,14 @@ io.on('connection', (socket) => {
     io.in(code).emit('players:update', { version: room.version, players: roomState(room).players });
   });
 
-  // Spieler Antwort (nur an Moderator weiterleiten)
+  // Spieler Antwort (an Moderator – falls vorhanden)
   socket.on('player:answer', ({ answer }) => {
     const c = socket.data.room; const uid = socket.data.uid;
     const room = ensureRoom(c); if (!room) return;
     const p = room.players.get(uid); if (!p) return;
-
-    io.to(room.moderatorId).emit('answer:received', {
-      uid: p.uid, name: p.name, answer: String(answer || '')
-    });
+    if (room.moderatorId) {
+      io.to(room.moderatorId).emit('answer:received', { uid: p.uid, name: p.name, answer: String(answer || '') });
+    }
   });
 
   // Disconnect
@@ -323,7 +322,7 @@ io.on('connection', (socket) => {
       return;
     }
 
-    // Spieler: nicht löschen – nur als offline markieren (Seat bleibt reserviert)
+    // Spieler offline markieren (Seat bleibt reserviert)
     const uid = socket.data?.uid;
     if (uid && room.players.has(uid)) {
       const p = room.players.get(uid);
@@ -339,4 +338,8 @@ io.on('connection', (socket) => {
 // Start
 // ─────────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 10000;
-server.listen(PORT, () => console.log('QuizPoker listening on :' + PORT));
+server.listen(PORT, () => {
+  console.log('QuizPoker listening on :' + PORT);
+  console.log('Static dir:', path.join(__dirname, 'public'));
+  console.log('Lobby:', LOBBY_CODE, '→ /debug/rooms zeigt aktive Räume');
+});
