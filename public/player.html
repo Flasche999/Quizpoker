@@ -65,6 +65,9 @@
         <input id="inpName" placeholder="Dein Name" />
         <button id="btnJoin" class="primary">Beitreten</button>
       </div>
+      <div class="row" style="margin-top:8px;">
+        <button id="btnReset">🚪 Raum wechseln / Reset</button>
+      </div>
       <div class="status">Du bist in Raum: <code id="roomCode" class="small">—</code></div>
       <div class="status">UID: <code id="uidLbl" class="small">—</code></div>
       <div class="status">Chips: <strong id="chips">0</strong></div>
@@ -120,17 +123,22 @@
     const inpCode   = $('#inpCode');
     const inpName   = $('#inpName');
     const btnJoin   = $('#btnJoin');
+    const btnReset  = $('#btnReset');
     const inpAnswer = $('#inpAnswer');
     const btnSend   = $('#btnSend');
 
     // Lokaler State
     let myName      = localStorage.getItem('qp_name') || '';
     let myRoom      = localStorage.getItem('qp_room') || '';
-    let joinedOnce  = false;      // Clientseitige Blockade
-    let lastVersion = 0;
+    let joinedOnce  = false;      // Clientseitige Blockade NUR nach echtem Join
+    let lastVersion = -1;         // wichtig: -1, damit Version 0 gerendert wird
 
     if (myName) inpName.value = myName;
     if (myRoom) inpCode.value = myRoom;
+
+    function currentInputCode() {
+      return (inpCode.value || '').toUpperCase().trim();
+    }
 
     function setJoinUI(disabled) {
       inpCode.disabled = disabled;
@@ -140,10 +148,23 @@
 
     btnJoin.onclick = () => {
       if (joinedOnce) { $('#pStatus').textContent = 'Du bist bereits beigetreten.'; return; }
-      const code = (inpCode.value || '').toUpperCase().trim();
+      const code = currentInputCode();
       const name = (inpName.value || '').trim() || 'Spieler';
       if (!code) { $('#pStatus').textContent = 'Bitte Raumcode eingeben.'; return; }
       socket.emit('player:join', { code, uid: UID, name });
+    };
+
+    // Reset / Raum wechseln
+    btnReset.onclick = () => {
+      localStorage.removeItem('qp_room');
+      myRoom = '';
+      joinedOnce = false;
+      setJoinUI(false);
+      $('#roomCode').textContent = '—';
+      $('#pStatus').textContent = 'Reset – du kannst einem neuen Raum beitreten.';
+      try { socket.disconnect(); } catch {}
+      socket.connect();
+      setTimeout(()=>$('#pStatus').textContent = '', 1200);
     };
 
     btnSend.onclick = () => {
@@ -209,8 +230,10 @@
 
     // Socket Events
     socket.on('connect', () => {
-      // Falls wir Raum & Name schon kennen → hello (Reconnect)
-      if (myRoom) socket.emit('hello', { uid: UID, name: myName, room: myRoom });
+      // Reconnect nur dann, wenn der gespeicherte Raum dem Eingabecode entspricht (oder leer ist)
+      if (myRoom && (currentInputCode() === '' || currentInputCode() === myRoom)) {
+        socket.emit('hello', { uid: UID, name: myName, room: myRoom });
+      }
     });
 
     socket.on('player:join-result', (r) => {
@@ -231,8 +254,8 @@
     });
 
     socket.on('state:full', (state) => {
-      if ((state.version ?? 0) <= lastVersion) return;
-      lastVersion = state.version ?? 0;
+      if ((state.version ?? -1) <= lastVersion) return;
+      lastVersion = state.version ?? -1;
 
       $('#roomCode').textContent = state.code || '—';
       $('#question').textContent = state.question?.text || '–';
@@ -242,24 +265,27 @@
       (state.players || []).forEach(p => playersByUid.set(p.uid, p));
       renderAll();
 
-      // Falls wir bereits im State drin sind → UI sperren (verhindert Re-Join)
-      if (playersByUid.has(UID)) {
+      // UI nur sperren, wenn wir wirklich in DIESEM Raum sind
+      const me = playersByUid.get(UID);
+      if (me && state.code && state.code === (localStorage.getItem('qp_room') || '')) {
         joinedOnce = true;
         setJoinUI(true);
+      } else {
+        setJoinUI(false);
       }
     });
 
     socket.on('players:update', (msg) => {
-      if ((msg.version ?? 0) <= lastVersion) return;
-      lastVersion = msg.version ?? 0;
+      if ((msg.version ?? -1) <= lastVersion) return;
+      lastVersion = msg.version ?? -1;
 
       (msg.players || []).forEach(p => playersByUid.set(p.uid, p));
       renderAll();
     });
 
     socket.on('question:show', (q) => {
-      if ((q.version ?? 0) <= lastVersion) return;
-      lastVersion = q.version ?? 0;
+      if ((q.version ?? -1) <= lastVersion) return;
+      lastVersion = q.version ?? -1;
       $('#question').textContent = q.text || '–';
     });
 
