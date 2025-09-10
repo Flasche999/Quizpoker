@@ -6,6 +6,7 @@
 // - Kein Doppelplatz: UID wird einmalig geführt
 // - Reconnect erlaubt, Takeover kickt alte Verbindung derselben UID
 // - NEU: blinds (small/big) + turnUid im State, Admin-Event mod:set-turn
+// - NEU: Soft-Handling, wenn Moderator disconnectet + mod:claim-room
 
 import express from 'express';
 import http from 'http';
@@ -22,7 +23,8 @@ const server = http.createServer(app);
 const io     = new Server(server, {
   cors: { origin: '*' },
   pingInterval: 20000,
-  pingTimeout: 20000
+  pingTimeout: 60000,              // etwas großzügiger
+  connectionStateRecovery: {}      // hilft bei kurzen Verbindungsabbrüchen
 });
 
 // ─────────────────────────────────────────────────────────────
@@ -70,8 +72,9 @@ const rooms = new Map();
     questions: [...],
     qIndex: number,            // -1 bevor gestartet
     pot: number,
-    blinds: { small: null, big: null }, // seats (0–7) oder null
-    turnUid: string|null,               // UID des Spielers am Zug
+    blinds: { small: number|null, big: number|null },
+    turnUid: string|null,
+    closeTimer?: NodeJS.Timeout|null
   }
 */
 
@@ -143,7 +146,8 @@ io.on('connection', (socket) => {
       qIndex: -1,
       pot: 0,
       blinds: { small: null, big: null },
-      turnUid: null
+      turnUid: null,
+      closeTimer: null
     };
     rooms.set(code, room);
 
@@ -152,6 +156,24 @@ io.on('connection', (socket) => {
 
     io.to(socket.id).emit('mod:room-created', { code, state: roomState(room) });
     console.log('[ROOM] created', code);
+  });
+
+  // Moderator übernimmt (erneut) einen bestehenden Raum
+  // payload: { code: string }
+  socket.on('mod:claim-room', ({ code }) => {
+    code = String(code || '').toUpperCase().trim();
+    const room = rooms.get(code);
+    if (!room) { io.to(socket.id).emit('status', 'Raum nicht gefunden.'); return; }
+
+    room.moderatorId = socket.id;
+    if (room.closeTimer) { clearTimeout(room.closeTimer); room.closeTimer = null; }
+
+    socket.join(code);
+    socket.data = { role: 'moderator', room: code };
+
+    io.to(socket.id).emit('state:full', roomState(room));
+    io.in(code).emit('status', 'Moderator ist wieder da.');
+    console.log('[ROOM] moderator claimed', code, '->', socket.id);
   });
 
   // Admin setzt Blinds (optional) – erwartet seats (Zahlen) oder null
@@ -165,7 +187,7 @@ io.on('connection', (socket) => {
     console.log('[BLINDS]', c, room.blinds);
   });
 
-  // NEU: Admin setzt „wer ist am Zug“
+  // Admin setzt „wer ist am Zug“
   // payload: { uid?: string, seat?: number }
   socket.on('mod:set-turn', ({ uid, seat }) => {
     const c = socket.data.room; const room = ensureRoom(c); if (!room) return;
@@ -293,7 +315,6 @@ io.on('connection', (socket) => {
       // Falls noch niemand am Zug ist, ersten Spieler setzen (optional)
       if (!room.turnUid) {
         room.turnUid = uid;
-        // kein bump hier; gleich unten wird gebumpt
       }
     } else {
       p.connected = true;
@@ -335,10 +356,23 @@ io.on('connection', (socket) => {
     const role = socket.data?.role;
 
     if (role === 'moderator') {
-      io.in(c).emit('status', 'Moderator hat den Raum verlassen. Spiel beendet.');
-      io.in(c).socketsLeave(c);
-      rooms.delete(c);
-      console.log('[ROOM] closed', c, 'moderator left');
+      // Soft-Handling: Raum bleibt bestehen; optionaler Cleanup-Timer
+      const was = room.moderatorId;
+      room.moderatorId = null;
+
+      io.in(c).emit('status', 'Moderator kurz weg – Raum bleibt bestehen.');
+
+      if (room.closeTimer) clearTimeout(room.closeTimer);
+      room.closeTimer = setTimeout(() => {
+        if (!room.moderatorId) {
+          io.in(c).emit('status', 'Raum wurde beendet (Moderator nicht zurückgekehrt).');
+          io.in(c).socketsLeave(c);
+          rooms.delete(c);
+          console.log('[ROOM] closed (timeout)', c);
+        }
+      }, 5 * 60 * 1000);
+
+      console.log('[ROOM] moderator left (soft)', c, 'prev=', was);
       return;
     }
 
