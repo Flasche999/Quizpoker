@@ -108,7 +108,14 @@
   </div>
 
   <script>
-    const socket = io();
+    // Verbesserte Socket.io-Initialisierung (stabilere Verbindungen + klares Fehlerbild)
+    const socket = io({
+      transports: ['websocket'],
+      path: '/socket.io',
+      reconnectionAttempts: 5,
+      timeout: 15000
+    });
+
     const $ = (s) => document.querySelector(s);
 
     // Stabile UID auf Gerät
@@ -146,11 +153,21 @@
       btnJoin.disabled = disabled;
     }
 
+    // Enter-Shortcut
+    [inpCode, inpName].forEach(input => {
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') btnJoin.click();
+      });
+    });
+
+    // Join
     btnJoin.onclick = () => {
-      if (joinedOnce) { $('#pStatus').textContent = 'Du bist bereits beigetreten.'; return; }
       const code = currentInputCode();
       const name = (inpName.value || '').trim() || 'Spieler';
+      console.log('[UI] join click', { code, UID, name, joinedOnce });
+      if (joinedOnce) { $('#pStatus').textContent = 'Du bist bereits beigetreten.'; return; }
       if (!code) { $('#pStatus').textContent = 'Bitte Raumcode eingeben.'; return; }
+      $('#pStatus').textContent = 'Beitreten...';
       socket.emit('player:join', { code, uid: UID, name });
     };
 
@@ -167,6 +184,7 @@
       setTimeout(()=>$('#pStatus').textContent = '', 1200);
     };
 
+    // Antworten senden
     btnSend.onclick = () => {
       const a = inpAnswer.value.trim();
       if (!a) return;
@@ -228,15 +246,33 @@
       if (me) $('#chips').textContent = me.chips ?? 0;
     }
 
-    // Socket Events
+    // Socket Events – Status/Fehler sichtbar machen
     socket.on('connect', () => {
+      console.log('[socket] connected', socket.id);
+      $('#pStatus').textContent = 'Verbunden.';
+      setTimeout(()=>$('#pStatus').textContent='', 1000);
+
       // Reconnect nur dann, wenn der gespeicherte Raum dem Eingabecode entspricht (oder leer ist)
       if (myRoom && (currentInputCode() === '' || currentInputCode() === myRoom)) {
         socket.emit('hello', { uid: UID, name: myName, room: myRoom });
       }
     });
+    socket.on('disconnect', (reason) => {
+      console.warn('[socket] disconnected', reason);
+      $('#pStatus').textContent = 'Verbindung getrennt.';
+    });
+    socket.on('connect_error', (err) => {
+      console.error('[socket] connect_error', err?.message || err);
+      $('#pStatus').textContent = 'Socket-Fehler: ' + (err?.message || err);
+    });
+    socket.on('error', (err) => {
+      console.error('[socket] error', err);
+      $('#pStatus').textContent = 'Fehler: ' + (err?.message || err);
+    });
 
+    // Join-Ergebnis
     socket.on('player:join-result', (r) => {
+      console.log('[player:join-result]', r);
       if (!r.ok) {
         $('#pStatus').textContent = r.error || 'Fehler beim Beitritt.';
         return;
@@ -253,6 +289,7 @@
       setTimeout(() => $('#pStatus').textContent = '', 1200);
     });
 
+    // Vollständiger State
     socket.on('state:full', (state) => {
       if ((state.version ?? -1) <= lastVersion) return;
       lastVersion = state.version ?? -1;
@@ -275,6 +312,7 @@
       }
     });
 
+    // Teil-Update: Spieler
     socket.on('players:update', (msg) => {
       if ((msg.version ?? -1) <= lastVersion) return;
       lastVersion = msg.version ?? -1;
@@ -283,12 +321,14 @@
       renderAll();
     });
 
+    // Neue Frage
     socket.on('question:show', (q) => {
       if ((q.version ?? -1) <= lastVersion) return;
       lastVersion = q.version ?? -1;
       $('#question').textContent = q.text || '–';
     });
 
+    // Status-Meldungen
     socket.on('status', (t) => {
       $('#pStatus').textContent = t;
       setTimeout(()=>$('#pStatus').textContent='', 1500);
