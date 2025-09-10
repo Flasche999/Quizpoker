@@ -20,12 +20,28 @@ body {
 
 /* Layout-Container */
 .layout {
-  display:grid;
-  grid-template-columns: 260px 1fr 320px;
-  gap: 14px;
-  padding: 16px;
-  min-height: 100vh;
+  .table-circle { 
+  /* ...bestehend... */
+  overflow: visible;              /* NEU: nichts abschneiden */
 }
+
+.seat {
+  /* ...bestehend... */
+  height: auto;                   /* NEU: Box darf wachsen */
+  min-height: var(--seat);        /* Mindesthöhe bleibt */
+  padding: 10px;                  /* etwas mehr Innenabstand */
+}
+
+.seat .name { 
+  font-size: 13px; 
+  line-height: 1.25; 
+  white-space: normal;            /* NEU: darf umbrechen */
+}
+
+.seat .chips { 
+  font-size: 13px;                /* etwas größer */
+}
+
 .sidebar, .main, .right {
   background: linear-gradient(180deg, var(--panel), var(--panel-2));
   border: 1px solid var(--border);
