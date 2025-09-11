@@ -7,7 +7,7 @@
   <link rel="stylesheet" href="/style.css" />
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
   <style>
-    /* Nur UI-Controls – Tisch/Seats kommen aus /style.css */
+    /* UI-Controls – Tisch/Seats kommen aus /style.css */
     .tbl { width:100%; border-collapse:collapse; font-size:14px }
     .tbl th,.tbl td{ border:1px solid #2a2f3a; padding:6px 8px; text-align:left }
     .badge{ display:inline-block; padding:1px 6px; border-radius:6px; font-size:11px; border:1px solid #2a2f3a; margin-left:6px }
@@ -23,14 +23,13 @@
     .btn.ok{ border-color:#14532d; background:#0f2f1f }
     .btn.warn{ border-color:#7c2d12; background:#2b140f }
     .btn.bad{ border-color:#7f1d1d; background:#2b0f0f }
-    .btn.ghost{ background:transparent }
     .btn:disabled{ opacity:.6; cursor:not-allowed }
     input[type=number]{ width:90px }
     .w120{ width:120px }
 
-    /* Kleine Overlays direkt am Sitz (ergänzend zum Skin) */
+    /* Sitz-Overlays */
     .turn { outline:3px solid var(--accent); box-shadow:0 0 0 6px rgba(124,58,237,.2), 0 0 24px rgba(124,58,237,.35); position:relative }
-    .turn-pill{ position:absolute; left:50%; top:-10px; transform:translate(-50%,-100%); background:var(--accent); color:#fff; font-weight:700; font-size:11px; padding:3px 8px; border-radius:999px; box-shadow:0 2px 8px rgba(0,0,0,.35) }
+    .turn-pill{ position:absolute; left:50%; top:-10px; transform:translate(-50%,-100%); background:var(--accent); color:#fff; font-weight:700; font-size:11px; padding:3px 8px; border-radius:999px }
     .out { opacity:.6; filter:saturate(.4) }
     .out-pill{ position:absolute; left:8px; top:8px; background:#991b1b; color:#fff; font-size:11px; padding:2px 6px; border-radius:999px }
     .folded { opacity:.6 }
@@ -41,15 +40,12 @@
     .act-flag.allin{ background:#4a1e1e; border-color:#6b2b2b; font-weight:700 }
     .act-flag.fold{ background:#3a1111; border-color:#5b1a1a; font-weight:700 }
     .guess-chip{ position:absolute; left:50%; bottom:-8px; transform:translate(-50%,100%); font-size:11px; padding:3px 8px; border-radius:999px; border:1px solid #334155; background:#0b1324 }
-    .guess-chip.dim{ opacity:.6 }
-
-    /* Hinweis: die Sitzpositionen/Dealer/Pot etc. kommen aus /style.css */
   </style>
 </head>
 <body>
   <div class="container">
     <div class="row">
-      <div class="card" style="flex:2">
+      <div class="card" style="flex:2;min-width:520px">
         <h2 class="h">Runde steuern</h2>
         <div class="row controls">
           <div>
@@ -60,33 +56,33 @@
           <button class="btn" id="lockGuesses">Schätzen sperren (weiter zu Bet1)</button>
           <button class="btn" id="revealHint1">Hinweis 1</button>
           <button class="btn" id="revealHint2">Hinweis 2</button>
-          <button class="btn warn" id="goReveal">Lösung zeigen</button>
+          <button class="btn warn" id="goReveal">Lösung zeigen + Letzte Bet</button>
           <button class="btn ok" id="resolveWinner">Gewinner ermitteln</button>
         </div>
 
         <div class="row" style="margin-top:8px">
           <div>
             <div class="tiny">Small Blind</div>
-            <input id="sbVal" type="number" min="1" value="10" />
+            <input class="input" id="sbVal" type="number" min="1" value="10" />
           </div>
           <div>
             <div class="tiny">Big Blind</div>
-            <input id="bbVal" type="number" min="1" value="20" />
+            <input class="input" id="bbVal" type="number" min="1" value="20" />
           </div>
           <button class="btn" id="setBlinds">Blinds setzen</button>
           <button class="btn" id="assignBlinds">SB/BB zuweisen (nach Dealer)</button>
-          <label class="tiny" style="margin-left:10px"><input type="checkbox" id="revealAll"> Alle Schätzungen sichtbar</label>
+          <label class="tiny" style="margin-left:10px"><input type="checkbox" id="revealAll"> Alle Schätzungen sichtbar (Playersicht)</label>
         </div>
 
         <p class="tiny" style="margin-top:6px">
-          Ablauf: Start → Schätzwert (sofort & einmalig) → Bet1 → Hinweis1/Bet2 → Hinweis2/Bet3 → Lösung → Gewinner.
-          SB/BB dürfen in Bet1 nicht folden. Admin kann Schätzungen für alle sichtbar machen.
+          Ablauf: Start → Schätzen → Bet1 → Hinweis1/Bet2 → Hinweis2/Bet3 → <b>Lösung</b> → <b>Letzte Bet</b> → Showdown.
+          Admin sieht Schätzungen immer im Klartext; Playersicht pro Spieler aufdeckbar.
         </p>
 
         <div id="questionBox" class="card" style="margin-top:8px">Keine Frage aktiv.</div>
       </div>
 
-      <div class="card" style="flex:1">
+      <div class="card" style="flex:1;min-width:320px">
         <h2 class="h">Sounds</h2>
         <div class="row">
           <button class="btn" data-snd="buzzer">Buzzer</button>
@@ -100,15 +96,15 @@
     </div>
 
     <div class="row">
-      <div class="card" style="flex:1">
-        <h2 class="h">Schätzungen (Admin)</h2>
+      <div class="card" style="flex:1;min-width:420px">
+        <h2 class="h">Schätzungen (Admin – immer Klartext)</h2>
         <table class="tbl" id="guessTable">
-          <thead><tr><th>Spieler</th><th>Schätzung</th><th>Sichtbar</th></tr></thead>
+          <thead><tr><th>Spieler</th><th>Schätzung</th><th>Playersicht sichtbar</th></tr></thead>
           <tbody></tbody>
         </table>
       </div>
 
-      <div class="card" style="flex:1">
+      <div class="card" style="flex:1;min-width:420px">
         <h2 class="h">Chips & Rebuy (Admin)</h2>
         <table class="tbl" id="chipTable">
           <thead><tr><th>Spieler</th><th>Chips</th><th>Aktionen</th></tr></thead>
@@ -117,7 +113,6 @@
       </div>
     </div>
 
-    <!-- KI / Testspieler -->
     <div class="card">
       <h2 class="h">KI-Testspieler</h2>
       <div class="row">
@@ -134,7 +129,6 @@
       <div class="table-wrap">
         <div class="table"></div>
         <div id="dealer" class="dealer" style="display:none">D</div>
-        <!-- #seats: Skin/Positionen aus /style.css -->
         <div id="seats"></div>
         <div class="pot">Pot: <span id="pot">0</span></div>
       </div>
@@ -146,21 +140,18 @@ const adminSock = io('/admin');
 const clientSock = io();
 let GLOBAL_STATE = null;
 
-// Helpers
 function el(id){ return document.getElementById(id); }
 function h(html){ const d=document.createElement('div'); d.innerHTML=html.trim(); return d.firstElementChild; }
 function fmt(n){ return Number(n||0).toString(); }
 
-// Fragen laden
-async function fillQuestions(){
+// Fragen
+(async function fillQuestions(){
   const sel = el('questionSelect'); sel.innerHTML='';
   try{
-    const res = await fetch('/fragen.json');
-    const data = await res.json();
+    const res = await fetch('/fragen.json'); const data = await res.json();
     data.forEach(item=>{
       const o = document.createElement('option');
-      o.value = item.id;
-      o.textContent = `${item.id} – ${item.frage?.slice(0,60) || 'Frage'}`;
+      o.value = item.id; o.textContent = `${item.id} – ${item.frage?.slice(0,60) || 'Frage'}`;
       sel.appendChild(o);
     });
     if (!data.length){
@@ -175,16 +166,17 @@ async function fillQuestions(){
       sel.appendChild(o);
     }
   }
-}
-fillQuestions();
+})();
 
 // Sounds
 function playSound(key){
   const m = { buzzer:'/sounds/buzzer.mp3', correct:'/sounds/correct.mp3', wrong:'/sounds/wrong.mp3' };
   const src = m[key]; if(src){ const a=new Audio(src); a.play().catch(()=>{}); }
 }
+adminSock.on('sound', ({key})=> playSound(key));
+clientSock.on('sound', ({key})=> playSound(key));
 
-// Action-Flag direkt am Sitz zeigen
+// Action-Flag am Sitz
 function showActionFlag(seatEl, type, amount){
   if (!seatEl) return;
   seatEl.querySelectorAll('.act-flag').forEach(n=>n.remove());
@@ -198,11 +190,8 @@ function showActionFlag(seatEl, type, amount){
   if (type === 'fold') seatEl.classList.add('folded');
 }
 
-// Rendering
 function renderState(st){
   GLOBAL_STATE = st;
-
-  // Frage/Hinweise/Lösung
   const q = st.round?.question;
   el('questionBox').innerHTML = q ? `
     <div><b>Frage:</b> ${q.frage}</div>
@@ -211,7 +200,6 @@ function renderState(st){
     <div><b>Lösung:</b> ${q.loesung ?? '—'}</div>
   ` : 'Keine Frage aktiv.';
 
-  // Status
   el('status').innerHTML = `
     <div>Phase: <b>${st.round.phase}</b></div>
     <div>Pot: <b>${fmt(st.table.pot)}</b> | Current Bet: <b>${fmt(st.table.currentBet)}</b> | Min Raise: <b>${fmt(st.table.minRaise)}</b></div>
@@ -222,15 +210,13 @@ function renderState(st){
     }).join(', ')}</div>
   `;
 
-  // SB/BB Inputs spiegeln
   el('sbVal').value = st.table.smallBlind ?? el('sbVal').value;
   el('bbVal').value = st.table.bigBlind ?? el('bbVal').value;
 
-  // Seats – Seitenplätze (2 & 6) auslassen
+  // Seats – Seitenplätze 2 & 6 auslassen
   const seatsWrap = el('seats'); seatsWrap.innerHTML='';
   st.seats.forEach((sid,i)=>{
-    if (i === 2 || i === 6) return; // rechts/links entfernt
-
+    if (i===2 || i===6) return;
     const p = sid ? st.players[sid] : null;
     const seat = h(`<div class="seat s${i}"></div>`);
     if (p){
@@ -241,31 +227,16 @@ function renderState(st){
         <div class="chips">${fmt(p.chips)} Chips</div>
         <div class="tiny">Committed: ${fmt(p.committed||0)}</div>
       `;
-
-      // Turn-Badge
       if(st.table.actingSeat === p.seat){
         seat.classList.add('turn');
-        if(!seat.querySelector('.turn-pill')){
-          seat.appendChild(h('<div class="turn-pill">DRAN</div>'));
-        }
+        if(!seat.querySelector('.turn-pill')) seat.appendChild(h('<div class="turn-pill">DRAN</div>'));
       }
-
-      // OUT/Fold visuell
       if (p.isOut) {
         seat.classList.add('out');
         if(!seat.querySelector('.out-pill')) seat.appendChild(h('<div class="out-pill">OUT</div>'));
       }
       if (p.lastAction?.type === 'fold') seat.classList.add('folded');
-
-      // Guess-Info am Sitz (Admin sieht Werte – über admin:guesses wird Text gesetzt)
-      if (st.round?.hasAnyGuesses && p.hasGuessed){
-        seat.appendChild(h('<div class="guess-chip dim">Guess abgegeben</div>'));
-      }
-
-      // Letzte Action am Sitz anzeigen, falls vorhanden
-      if (p.lastAction){
-        showActionFlag(seat, p.lastAction.type, p.lastAction.amount);
-      }
+      if (p.lastAction) showActionFlag(seat, p.lastAction.type, p.lastAction.amount);
     } else {
       seat.innerHTML = `<div class="name">(frei)</div><div class="chips">—</div>`;
     }
@@ -286,28 +257,28 @@ function renderState(st){
   el('pot').textContent = fmt(st.table.pot);
 }
 
+// Admin sieht Guesses (Klartext) + pro Spieler Reveal-Schalter (Playersicht)
 function renderAdminGuesses(rows){
   const tb = el('guessTable').querySelector('tbody');
   tb.innerHTML = '';
   rows.forEach(r=>{
     const tr = h(`<tr>
       <td>${r.name}</td>
-      <td>${r.value}</td>
-      <td><input type="checkbox" ${r.revealed?'checked':''} data-sid="${r.sid}" /></td>
+      <td><b>${r.value}</b></td>
+      <td style="text-align:center"><input type="checkbox" ${r.revealed?'checked':''} data-sid="${r.sid}" /></td>
     </tr>`);
     tr.querySelector('input[type=checkbox]').onchange = (e)=>{
       adminSock.emit('admin:revealGuess', { sid: e.target.dataset.sid, reveal: e.target.checked });
     };
     tb.appendChild(tr);
 
-    // Guess-Chip am Sitz aktualisieren (dim ↔ normal und Text)
+    // Sitz-Overlay „Guess: Wert“ (nicht zensiert im Admin)
     const st = GLOBAL_STATE; if (!st) return;
     const p = st.players?.[r.sid]; if (!p) return;
     const seatEl = el('seats').querySelector('.seat.s'+p.seat);
     if (seatEl){
       seatEl.querySelectorAll('.guess-chip').forEach(n=>n.remove());
-      const txt = r.revealed ? `Guess: ${r.value}` : 'Guess: •••';
-      const chip = h(`<div class="guess-chip${r.revealed?'':' dim'}">${txt}</div>`);
+      const chip = h(`<div class="guess-chip">Guess: ${r.value}</div>`);
       seatEl.appendChild(chip);
     }
   });
@@ -352,19 +323,20 @@ function renderChipTable(st){
   });
 }
 
-// Socket verdrahten
-adminSock.on('state', (st)=>{ renderState(st); renderChipTable(st); });
+// Verdrahten
+function onState(st){ renderState(st); renderChipTable(st); }
+adminSock.on('state', onState);
 clientSock.on('state', renderState);
 
 adminSock.on('admin:guesses', renderAdminGuesses);
+
+// Gewinner Popup (optional)
 adminSock.on('winner', ({ winnerSid, solution }) => {
   const p = GLOBAL_STATE?.players?.[winnerSid];
   alert(`Gewinner: ${p?.name || '—'} (Lösung: ${solution})`);
 });
-function onSound({key}){ playSound(key); }
-adminSock.on('sound', onSound); clientSock.on('sound', onSound);
 
-// Live-Action-Flags (check/call/raise/allin/fold)
+// Live-Action-Flags
 function onActionInfo({sid, type, amount}){
   const st = GLOBAL_STATE; if(!st) return;
   const p = st.players?.[sid]; if(!p) return;
@@ -388,7 +360,7 @@ el('assignBlinds').onclick = ()=> adminSock.emit('admin:assignBlinds');
 
 el('revealAll').onchange   = (e)=> adminSock.emit('admin:revealAllGuesses', { reveal: e.target.checked });
 
-// KI-Testspieler – Buttons
+// KI-Buttons
 el('addBot').onclick = ()=>{
   const name = (el('botName').value||'').trim() || undefined;
   adminSock.emit('admin:addBot', { name });
@@ -401,7 +373,6 @@ el('addBot3').onclick = ()=>{
 };
 el('removeBots').onclick = ()=>{
   if (!confirm('Wirklich alle Bots entfernen?')) return;
-  // Dieses Event muss serverseitig unterstützt werden (siehe server.js Vorschlag)
   adminSock.emit('admin:removeAllBots');
 };
 </script>
