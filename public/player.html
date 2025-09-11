@@ -4,315 +4,133 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>QuizPoker – Spieler</title>
-  <!-- Cache-Bust, damit die neue style.css sicher geladen wird -->
-  <link rel="stylesheet" href="/style.css?v=9" />
+  <link rel="stylesheet" href="/style.css" />
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
-
-  <style>
-    .betline{font-size:12px;opacity:.9}
-    .muted{opacity:.7}
-    .chatlog{height:180px;overflow:auto;border:1px solid #262b36;border-radius:10px;background:#0f1118;padding:8px;margin-top:6px}
-    .chatrow{margin-bottom:6px}
-    .pill{display:inline-block;border:1px solid #262b36;border-radius:999px;padding:2px 8px;font-size:12px;margin-right:6px}
-    .pill.admin{background:#3b2a5e}
-    .pill.me{background:#2a5e3b}
-
-    /* ─── Harter Fix gegen überlappende Sitze ─── */
-    .table-circle{
-      position:relative;
-      width:100%;
-      max-width:560px;
-      margin:6px auto;
-      border:1px solid var(--border, #213055);
-      border-radius:16px;
-      background:#0f1118;
-      aspect-ratio:1/1;               /* immer quadratisch */
-    }
-    .table-circle::before{ display:none !important; content:""; }
-
-    /* Sitze zwingend zentrieren – Verteilung erfolgt über transform (style.css) */
-    .seat.s0,.seat.s1,.seat.s2,.seat.s3,.seat.s4,.seat.s5,.seat.s6,.seat.s7{
-      top:50% !important; left:50% !important; right:auto !important; bottom:auto !important; margin:0 !important;
-      position:absolute;
-    }
-  </style>
 </head>
 <body>
-  <div class="layout">
-    <aside class="sidebar">
-      <h3 class="h">Beitreten (Lobby)</h3>
-      <div class="row" style="margin-top:8px;">
-        <input id="inpCode" placeholder="Raumcode" />
-        <input id="inpName" placeholder="Dein Name" />
-        <button id="btnJoin" class="primary">Beitreten</button>
+  <div class="container">
+    <div class="card">
+      <h2 class="h">Beitreten</h2>
+      <div class="row">
+        <input class="input" id="name" placeholder="Dein Name" style="width:220px" />
+        <input class="input" id="avatar" placeholder="Avatar-URL (optional)" style="width:320px" />
+        <button class="btn ok" id="joinBtn">Beitreten</button>
+        <button class="btn bad" id="leaveBtn">Verlassen</button>
+        <button class="btn" id="rebuyBtn" title="+Startchips hinzufügen">Rebuy</button>
       </div>
-      <div class="row" style="margin-top:8px;">
-        <button id="btnReset">🚪 Raum wechseln / Reset</button>
-      </div>
-      <div class="status">Du bist in Raum: <code id="roomCode" class="small">—</code></div>
-      <div class="status">UID: <code id="uidLbl" class="small">—</code></div>
-      <div class="status">Chips: <strong id="chips">0</strong></div>
-      <div class="status">Aktuelle Bet (Runde): <strong id="currentBet">0</strong></div>
-      <div class="status" id="pStatus"></div>
+      <div class="small">Ohne Avatar-URL bekommst du automatisch einen generierten Avatar.</div>
+    </div>
 
-      <h3 class="h" style="margin-top:16px;">Aktion</h3>
-      <div class="small muted">Du kannst nur handeln, wenn du am Zug bist (goldener Rahmen).</div>
-      <div class="row" style="margin-top:8px;">
-        <input id="betAmount" type="number" placeholder="Betrag" min="1" style="width:120px;">
-        <button id="btnBet" class="primary">Setzen/Raise</button>
-        <button id="btnCall">Mitgehen</button>
-      </div>
-      <div class="row" style="margin-top:8px;">
-        <button id="btnAllin" class="ok">All-in</button>
-        <button id="btnFold"  class="err">Passen (Fold)</button>
-      </div>
+    <div class="card">
+      <h2 class="h">Aktuelle Runde</h2>
+      <div id="questionBox">Warte auf neue Runde…</div>
+    </div>
 
-      <h3 class="h" style="margin-top:16px;">Schätzen (ab Frage-Start)</h3>
-      <div class="row" style="margin-top:8px;">
-        <input id="inpEstimate" type="number" placeholder="Dein Wert">
-        <button id="btnEstimate">Schätzwert senden</button>
-      </div>
-      <div class="small muted">Du kannst deinen Schätzwert mehrfach senden – der letzte zählt.</div>
-
-      <h3 class="h" style="margin-top:16px;">Privater Chat mit Admin</h3>
-      <div id="dmLog" class="chatlog"></div>
-      <div class="row" style="margin-top:6px;">
-        <input id="dmInput" placeholder="Nachricht an Admin…" style="flex:1;">
-        <button id="dmSend" class="primary">Senden</button>
-      </div>
-
-      <div class="row" style="margin-top:8px;">
-        <input id="inpAnswer" placeholder="Kurze Nachricht (optional)" style="flex:1;">
-        <button id="btnSend">Senden</button>
-      </div>
-    </aside>
-
-    <main class="main">
-      <h3 class="h">Virtueller Tisch</h3>
+    <div class="card">
+      <h2 class="h">Virtueller Tisch</h2>
       <div class="table-wrap">
-        <div class="table-circle" id="table">
-          <div class="seat s0" data-seat="0"></div>
-          <div class="seat s1" data-seat="1"></div>
-          <div class="seat s2" data-seat="2"></div>
-          <div class="seat s3" data-seat="3"></div>
-          <div class="seat s4" data-seat="4"></div>
-          <div class="seat s5" data-seat="5"></div>
-          <div class="seat s6" data-seat="6"></div>
-          <div class="seat s7" data-seat="7"></div>
-          <div id="table-center2">💰 Pot: <strong id="pot">0</strong></div>
+        <div class="table"></div>
+        <div id="dealer" class="dealer">D</div>
+        <div id="seats"></div>
+        <div class="pot">Pot: <span id="pot">0</span></div>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="card" style="flex:1">
+        <h2 class="h">Deine Schätzantwort</h2>
+        <div id="guessBox">
+          <div class="small">Gib sofort nach Start deine Zahl ein (nur in Phase "Schätzung").</div>
+          <div class="row">
+            <input class="input" id="guess" type="number" placeholder="z. B. 123" style="width:160px" />
+            <button class="btn ok" id="sendGuess">Abschicken</button>
+          </div>
+          <div class="small" id="guessInfo">Warte auf Frage…</div>
         </div>
       </div>
 
-      <section id="qaPanel" class="item" style="margin-top:12px;">
-        <h3 class="h">Frage & Hinweise</h3>
-        <div class="list">
-          <div class="item"><strong>Frage:</strong> <span id="qTextMain">–</span></div>
-          <div class="item"><strong>Hinweis 1:</strong> <span id="qH1Main" class="muted">verdeckt</span></div>
-          <div class="item"><strong>Hinweis 2:</strong> <span id="qH2Main" class="muted">verdeckt</span></div>
-          <div class="item"><strong>Lösung:</strong> <span id="qSolMain" class="muted">verdeckt</span></div>
+      <div class="card" style="flex:1">
+        <h2 class="h">Aktionen</h2>
+        <div class="row">
+          <button class="btn" data-act="check">Check</button>
+          <button class="btn" data-act="call">Call</button>
+          <button class="btn" data-act="raise">Raise</button>
+          <input class="input" id="raiseAmt" type="number" placeholder="Betrag" style="width:120px" />
+          <button class="btn" data-act="allin">All-In</button>
+          <button class="btn bad" data-act="fold">Fold</button>
         </div>
-      </section>
-    </main>
-
-    <aside class="right">
-      <h3 class="h">Spieler (Liste)</h3>
-      <div id="playerList"></div>
-    </aside>
+        <div class="small">Aktionen sind nur in den Bet-Phasen möglich und wenn du dran bist.</div>
+      </div>
+    </div>
   </div>
 
-  <script>
-    const socket = io({
-      path:'/socket.io',
-      transports:['polling','websocket'],
-      upgrade:true,
-      reconnection:true,
-      reconnectionAttempts: Infinity,
-      reconnectionDelay:500,
-      reconnectionDelayMax:3000,
-      timeout:20000
-    });
+<script>
+const sock = io();
+let MY_ID = null, GLOBAL_STATE = null;
 
-    const $ = (s)=>document.querySelector(s);
-    let UID = localStorage.getItem('qp_uid'); if(!UID){ UID=(crypto?.randomUUID?.()|| (Date.now()+Math.random().toString(16).slice(2))); localStorage.setItem('qp_uid',UID); }
-    $('#uidLbl').textContent = UID;
+function el(id){return document.getElementById(id)}
+function h(html){const d=document.createElement('div');d.innerHTML=html;return d.firstElementChild}
 
-    const inpCode=$('#inpCode'), inpName=$('#inpName'), btnJoin=$('#btnJoin'), btnReset=$('#btnReset');
-    const inpAnswer=$('#inpAnswer'), btnSend=$('#btnSend');
-    const betAmount=$('#betAmount'), btnBet=$('#btnBet'), btnCall=$('#btnCall'), btnAllin=$('#btnAllin'), btnFold=$('#btnFold');
-    const inpEstimate=$('#inpEstimate'), btnEstimate=$('#btnEstimate');
+sock.on('connect', ()=>{ MY_ID = sock.id; });
 
-    const dmLog = $('#dmLog'), dmInput = $('#dmInput'), dmSend = $('#dmSend');
-    const dmAppend = (html)=>{ const d=document.createElement('div'); d.className='chatrow'; d.innerHTML=html; dmLog.appendChild(d); dmLog.scrollTop = dmLog.scrollHeight; };
-    const escapeHtml = (s)=>String(s||'').replace(/[&<>"]/g,m=>({"&":"&amp;","<":"&lt;","&gt;":"&gt;","\"":"&quot;"}[m]));
+el('joinBtn').onclick = ()=> sock.emit('join', { name: el('name').value, avatar: el('avatar').value });
+el('leaveBtn').onclick = ()=> sock.emit('leaveTable');
+el('rebuyBtn').onclick = ()=> sock.emit('rebuy');
 
-    let myName = localStorage.getItem('qp_name')||''; if (myName) inpName.value=myName;
-    let myRoom = localStorage.getItem('qp_room')||''; if (myRoom) inpCode.value=myRoom;
-    let joinedOnce=false, lastVersion=-1;
+el('sendGuess').onclick = ()=>{
+  const v = Number(el('guess').value);
+  if(Number.isFinite(v)) sock.emit('submitGuess', { value: v });
+};
 
-    const current = { blinds:{small:null,big:null}, turnUid:null, roundIndex:0, currentBetRound:0 };
-    const playersByUid = new Map();
+document.querySelectorAll('[data-act]').forEach(btn=>{
+  btn.onclick = ()=>{
+    const type = btn.getAttribute('data-act');
+    const amount = Number(el('raiseAmt').value);
+    sock.emit('action', { type, amount });
+  };
+});
 
-    const currentInputCode = ()=> (inpCode.value||'').toUpperCase().trim();
-    const setJoinUI = (d)=>{ inpCode.disabled=d; inpName.disabled=d; btnJoin.disabled=d; };
+function renderState(st){
+  GLOBAL_STATE = st; const me = st.players[MY_ID];
+  const q = st.round?.question;
+  el('questionBox').innerHTML = q ? `
+    <div><b>Frage:</b> ${q.frage}</div>
+    <div><b>Hinweis 1:</b> ${q.hinweis1 ?? '—'}</div>
+    <div><b>Hinweis 2:</b> ${q.hinweis2 ?? '—'}</div>
+    <div><b>Lösung:</b> ${q.loesung ?? '—'}</div>
+    <div><b>Phase:</b> ${st.round.phase}</div>
+  ` : 'Warte auf neue Runde…';
 
-    [inpCode, inpName].forEach(el=>el.addEventListener('keydown', e=>{ if(e.key==='Enter') btnJoin.click(); }));
+  const canGuess = st.round.phase === 'collect_guesses' && me;
+  el('guess').disabled = !canGuess || me?.hasGuessed;
+  el('sendGuess').disabled = !canGuess || me?.hasGuessed;
+  el('guessInfo').textContent = canGuess ? (me?.hasGuessed ? 'Schätzung abgegeben. Warte auf andere…' : 'Gib jetzt deine Schätzung ab!') : 'Warte auf nächste Frage…';
 
-    btnJoin.onclick = ()=>{
-      const code=currentInputCode(); const name=(inpName.value||'').trim()||'Spieler';
-      if (joinedOnce) { $('#pStatus').textContent='Du bist bereits in der Lobby.'; return; }
-      if (!code) { $('#pStatus').textContent='Bitte Raumcode eingeben.'; return; }
-      if (!socket.connected) { $('#pStatus').textContent='Nicht verbunden.'; return; }
-      $('#pStatus').textContent='Beitreten...';
-      socket.emit('player:join', { code, uid:UID, name });
-    };
-    btnReset.onclick = ()=>{
-      localStorage.removeItem('qp_room'); myRoom=''; joinedOnce=false; setJoinUI(false);
-      $('#roomCode').textContent='—'; $('#pStatus').textContent='Reset – neuer Raum möglich.';
-      try{ socket.disconnect(); }catch{} socket.connect(); setTimeout(()=>$('#pStatus').textContent='', 1000);
-    };
+  const seatsWrap = el('seats'); seatsWrap.innerHTML='';
+  st.seats.forEach((sid,i)=>{
+    const p = sid ? st.players[sid] : null;
+    const seat = h(`<div class="seat s${i}"></div>`);
+    seat.innerHTML = p ? `
+      ${p.avatar?`<img src="${p.avatar}" alt="avatar"/>`:`<img src="https://api.dicebear.com/7.x/thumbs/svg?seed=${encodeURIComponent(p?.name||'X')}" alt="avatar"/>`}
+      <div class="name">${p.name}</div>
+      <div class="chips">${p.chips} Chips</div>
+    ` : `<div class="name">(frei)</div><div class="chips">—</div>`;
+    if(p && st.round.actingSeat===p.seat){ seat.classList.add('turn'); }
+    seatsWrap.appendChild(seat);
+  });
+  el('pot').textContent = st.round.pot;
 
-    btnSend.onclick = ()=>{
-      const a=inpAnswer.value.trim(); if(!a) return;
-      socket.emit('player:answer', { answer:a }); inpAnswer.value=''; $('#pStatus').textContent='Gesendet.'; setTimeout(()=>$('#pStatus').textContent='',800);
-    };
+  const dealer = el('dealer'); dealer.style.display='none';
+  const dSeat = st.table.dealerSeat; const dEl = seatsWrap.querySelector('.seat.s'+dSeat);
+  if(dEl){ dealer.style.display='block'; dealer.style.left=(dEl.offsetLeft + 8)+'px'; dealer.style.top=(dEl.offsetTop - 12)+'px'; }
+}
 
-    const sendDM = ()=>{
-      const msg = dmInput.value.trim(); if(!msg) return;
-      socket.emit('player:dm', { message: msg });
-      dmAppend(`<span class="pill me">Ich</span> ${new Date().toLocaleTimeString()} — ${escapeHtml(msg)}`);
-      dmInput.value='';
-    };
-    dmSend.onclick = sendDM;
-    dmInput.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); sendDM(); }});
-
-    btnBet.onclick   = ()=>{ const amt=Math.max(1,parseInt(betAmount.value||'0',10)||0); socket.emit('player:bet',{ amount:amt }); };
-    btnCall.onclick  = ()=> socket.emit('player:call');
-    btnAllin.onclick = ()=> socket.emit('player:allin');
-    btnFold.onclick  = ()=> socket.emit('player:fold');
-
-    btnEstimate.onclick = ()=>{
-      const v = inpEstimate.value;
-      if (v==='' || v===null) socket.emit('player:estimate',{ value:null });
-      else socket.emit('player:estimate',{ value:Number(v) });
-      $('#pStatus').textContent='Schätzwert gesendet.'; setTimeout(()=>$('#pStatus').textContent='',800);
-    };
-
-    function badge(p){
-      const isSB = (p.seat === (current.blinds?.small ?? null));
-      const isBB = (p.seat === (current.blinds?.big ?? null));
-      return (isSB?'<span class="badge badge-s">S</span>':'') + (isBB?'<span class="badge badge-b">B</span>':'');
-    }
-
-    function renderSeats(){
-      const wrap = document.querySelector('.table-circle');
-      // reset Inhalte
-      wrap.querySelectorAll('.seat').forEach(slot=>{
-        slot.className = slot.className.replace(/\bturn\b|\bfolded\b|\bdisconnected\b/g,'').trim();
-        slot.innerHTML='<div class="avatar">—</div><div class="name">Frei</div><div class="chips">🪙 0</div><div class="betline">Runde: 🪙 0 · Gesamt: 🪙 0</div>';
-      });
-      const arr=Array.from(playersByUid.values()).sort((a,b)=>(a.seat??99)-(b.seat??99));
-      arr.forEach(p=>{
-        if (typeof p.seat!=='number') return;
-        const slot=document.querySelector(`.seat[data-seat="${p.seat}"]`); if(!slot) return;
-        slot.innerHTML = `<div class="avatar">🙂</div>
-          <div class="name">${p.name} ${badge(p)}</div>
-          <div class="chips">🪙 ${p.chips??0}</div>
-          <div class="betline">Runde: 🪙 ${p.betRound||0} · Gesamt: 🪙 ${p.betTotal||0} ${p.status==='allin'?' · (All-in)':''}${p.status==='folded'?' · (Fold)':''}</div>`;
-        if (!p.connected) slot.classList.add('disconnected');
-        if (p.status==='folded') slot.classList.add('folded');
-        if (p.uid===current.turnUid) slot.classList.add('turn');
-      });
-    }
-
-    function renderList(){
-      const list=$('#playerList'); list.innerHTML='';
-      const arr=Array.from(playersByUid.values()).sort((a,b)=>(a.seat??99)-(b.seat??99));
-      arr.forEach(p=>{
-        const div=document.createElement('div');
-        div.className='spieler-box'+(p.connected?'':' disconnected')+(p.status==='folded'?' folded':'')+(p.uid===current.turnUid?' turn':'');
-        div.innerHTML = `<strong>Sitz ${(p.seat??-1)+1}:</strong> ${p.name} ${badge(p)} – 🪙 ${p.chips??0} · Bet: 🪙 ${p.betRound||0} / ${p.betTotal||0} ${p.status==='allin'?' · (All-in)':''}${p.status==='folded'?' · (Fold)':''}`;
-        list.appendChild(div);
-      });
-    }
-
-    function renderAll(st){
-      $('#roomCode').textContent = st.code || '—';
-      if (typeof st.pot==='number') $('#pot').textContent = st.pot;
-      $('#currentBet').textContent = st.currentBetRound || 0;
-
-      $('#qTextMain').textContent = st.question?.text || '–';
-      $('#qH1Main').textContent   = st.question?.hint1 ?? 'verdeckt';
-      $('#qH2Main').textContent   = st.question?.hint2 ?? 'verdeckt';
-      $('#qSolMain').textContent  = st.question?.solution ?? 'verdeckt';
-
-      playersByUid.clear(); (st.players||[]).forEach(p=>playersByUid.set(p.uid,p));
-      renderSeats(); renderList();
-      const me = playersByUid.get(UID); if (me) $('#chips').textContent = me.chips ?? 0;
-    }
-
-    socket.on('connect', ()=>{
-      $('#pStatus').textContent='Verbunden.'; setTimeout(()=>$('#pStatus').textContent='',800);
-      if (myRoom && (currentInputCode()==='' || currentInputCode()===myRoom)) socket.emit('hello', { uid:UID, room:myRoom });
-    });
-    socket.on('disconnect', ()=>{ $('#pStatus').textContent='Verbindung getrennt.'; });
-
-    socket.on('player:join-result',(r)=>{
-      if (!r.ok) { $('#pStatus').textContent = r.error || 'Fehler beim Beitritt.'; return; }
-      myRoom=r.code; myName=r.name;
-      localStorage.setItem('qp_room', myRoom);
-      localStorage.setItem('qp_name', myName);
-      $('#roomCode').textContent = myRoom;
-      $('#chips').textContent = r.chips ?? 0;
-      $('#pStatus').textContent = `In Lobby: ${myName}`;
-      joinedOnce = true; setJoinUI(true);
-      setTimeout(()=>$('#pStatus').textContent='', 1000);
-    });
-
-    socket.on('state:full',(st)=>{
-      const ver=(st.version??-1); if (ver<=lastVersion) return; lastVersion=ver;
-      current.blinds = st.blinds || {small:null,big:null};
-      current.turnUid = st.turnUid || null;
-      current.roundIndex = st.roundIndex || 0;
-      current.currentBetRound = st.currentBetRound || 0;
-      renderAll(st);
-    });
-
-    socket.on('players:update',(msg)=>{
-      const ver=(msg.version??-1); if (ver<=lastVersion) return; lastVersion=ver;
-      (msg.players||[]).forEach(p=>playersByUid.set(p.uid,p));
-      renderSeats(); renderList();
-      const me = playersByUid.get(UID); if (me) $('#chips').textContent = me.chips ?? 0;
-    });
-
-    socket.on('state:partial',(patch)=>{
-      const ver=(patch.version??-1); if (ver<=lastVersion) return; lastVersion=ver;
-      if (patch.blinds) current.blinds = patch.blinds;
-      if ('turnUid' in patch) current.turnUid = patch.turnUid;
-      if ('roundIndex' in patch) current.roundIndex = patch.roundIndex;
-      if ('currentBetRound' in patch) { current.currentBetRound = patch.currentBetRound; $('#currentBet').textContent = current.currentBetRound; }
-      if (typeof patch.pot==='number') $('#pot').textContent = patch.pot;
-      if (patch.question) {
-        $('#qTextMain').textContent = patch.question?.text || '–';
-        $('#qH1Main').textContent   = patch.question?.hint1 ?? 'verdeckt';
-        $('#qH2Main').textContent   = patch.question?.hint2 ?? 'verdeckt';
-        $('#qSolMain').textContent  = patch.question?.solution ?? 'verdeckt';
-      }
-    });
-
-    socket.on('question:show',(q)=>{
-      $('#qTextMain').textContent = q.text || '–';
-      $('#qH1Main').textContent='verdeckt'; $('#qH2Main').textContent='verdeckt'; $('#qSolMain').textContent='verdeckt';
-    });
-
-    socket.on('dm:from-admin', ({ message, ts })=>{
-      dmAppend(`<span class="pill admin">Admin</span> ${new Date(ts||Date.now()).toLocaleTimeString()} — ${escapeHtml(message)}`);
-    });
-    socket.on('dm:cleared', ()=>{
-      dmLog.innerHTML='';
-      dmAppend('<span class="muted">Chat wurde vom Admin geleert.</span>');
-    });
-
-    socket.on('status',(t)=>{ $('#pStatus').textContent=t; setTimeout(()=>$('#pStatus').textContent='',1500); });
-  </script>
+sock.on('state', renderState);
+sock.on('errorMsg', (m)=> alert(m));
+sock.on('sound', ({key})=>{
+  const m={buzzer:'/sounds/buzzer.mp3',correct:'/sounds/correct.mp3',wrong:'/sounds/wrong.mp3'};
+  const a=new Audio(m[key]); a&&a.play&&a.play().catch(()=>{});
+});
+</script>
 </body>
 </html>

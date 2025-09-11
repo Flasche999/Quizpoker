@@ -4,391 +4,126 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>QuizPoker – Admin</title>
-  <!-- Cache-Bust -->
-  <link rel="stylesheet" href="/style.css?v=9" />
+  <link rel="stylesheet" href="/style.css" />
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
-
-  <!-- HARTER FIX gegen überlappende Sitze (falls altes CSS gecacht ist) -->
-  <style>
-    :root{--bg:#0e0f12;--card:#151821;--line:#262b36;--ok:#2a5e3b;--err:#5b2730;}
-    body{background:var(--bg);color:#e7e9ee;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;margin:0}
-    .layout{display:grid;grid-template-columns:340px 1fr 420px;gap:12px;padding:12px}
-    .sidebar,.main,.right{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px}
-    .h{margin:0 0 8px;font-size:16px}
-    .list{display:flex;flex-direction:column;gap:8px}
-    .item{border:1px solid var(--line);border-radius:10px;padding:8px;background:#0f1118}
-    .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-    .row > input, .row > button, .row > select{border:1px solid var(--line);background:#0f1118;color:#e7e9ee;border-radius:8px;padding:8px}
-    .row > button{cursor:pointer}
-    .row > button.primary{background:#0f1627;border-color:#1e3a8a}
-    .row > button.ok{border-color:var(--ok)}
-    .row > button.err{border-color:var(--err)}
-    .status{border:1px dashed var(--line);border-radius:10px;padding:8px}
-    .small{font-size:12px;opacity:.85}
-    .muted{opacity:.7}
-    .chatlog{height:220px;overflow:auto;border:1px solid var(--line);border-radius:10px;background:#0f1118;padding:8px}
-    .chatrow{margin-bottom:6px}
-    .pill{display:inline-block;border:1px solid var(--line);border-radius:999px;padding:2px 8px;font-size:12px;margin-right:6px}
-    .pill.admin{background:#3b2a5e}
-    .pill.player{background:#283046}
-    .two-col{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-
-    /* ─── Tisch-Fixes: verhindert Überlappung ─── */
-    .table-circle{
-      position:relative;
-      width:100%;
-      max-width:560px;
-      margin:6px auto;
-      border:1px solid var(--line);
-      border-radius:16px;
-      background:#0f1118;
-      aspect-ratio:1/1;                 /* immer quadratisch */
-    }
-    .table-circle::before{ display:none !important; content:""; }
-
-    /* Sitze ZWINGEND in die Mitte setzen; Verteilung erfolgt via transform in style.css */
-    .seat.s0,.seat.s1,.seat.s2,.seat.s3,.seat.s4,.seat.s5,.seat.s6,.seat.s7{
-      top:50% !important; left:50% !important; right:auto !important; bottom:auto !important; margin:0 !important;
-      position:absolute;
-    }
-  </style>
 </head>
 <body>
-  <div class="layout">
-    <aside class="sidebar">
-      <h3 class="h">Raum</h3>
-      <div class="list">
-        <div class="item">
-          <div>Code: <strong id="roomCode">—</strong></div>
-          <div class="small">Frage: <span id="qIndex">–</span></div>
-          <div class="small">Runde: <strong id="roundIdx">0</strong> · Aktionen: <strong id="acted">0</strong>/<strong id="need">0</strong></div>
-          <div class="small">Aktuelle Bet (Runde): <strong id="currentBet">0</strong></div>
-          <div class="small">Pot: <strong id="pot">0</strong></div>
-        </div>
-      </div>
-
-      <div class="row" style="margin-top:8px;">
-        <button id="btnCreate" class="primary">Raum erstellen</button>
-        <button id="btnNextQ">🆕 Frage starten</button>
-      </div>
-
-      <div class="status" style="margin-top:12px;">
-        <div class="two-col">
-          <div>
-            <div>Small Blind (Seat #):</div>
-            <input id="inpSB" placeholder="0–7" style="width:100%;margin-top:6px;">
-          </div>
-          <div>
-            <div>Big Blind (Seat #):</div>
-            <input id="inpBB" placeholder="0–7" style="width:100%;margin-top:6px;">
-          </div>
-        </div>
-        <div class="two-col" style="margin-top:6px;">
-          <div>
-            <div>SB-Wert:</div>
-            <input id="inpSBv" type="number" placeholder="z. B. 50" style="width:100%;margin-top:6px;">
-          </div>
-          <div>
-            <div>BB-Wert:</div>
-            <input id="inpBBv" type="number" placeholder="z. B. 100" style="width:100%;margin-top:6px;">
-          </div>
-        </div>
-        <div class="row" style="margin-top:6px;">
-          <label><input type="checkbox" id="inpRotate" checked> Auto-Rotation</label>
-          <button id="btnSetBlinds" style="margin-left:auto;">Blinds setzen</button>
-        </div>
-      </div>
-
-      <div class="status" style="margin-top:12px;">
+  <div class="container">
+    <div class="row">
+      <div class="card" style="flex:2">
+        <h2 class="h">Runde steuern</h2>
         <div class="row">
-          <button id="btnRevealH1">🔓 Hinweis 1</button>
-          <button id="btnRevealH2">🔓 Hinweis 2</button>
-          <button id="btnRevealSol">🔓 Lösung</button>
+          <div>
+            <div class="small">Frage wählen</div>
+            <select id="questionSelect"></select>
+          </div>
+          <button class="btn ok" id="startRound">Runde starten</button>
+          <button class="btn" id="revealHint1">Hinweis 1</button>
+          <button class="btn" id="revealHint2">Hinweis 2</button>
+          <button class="btn warn" id="goReveal">Lösung zeigen</button>
+          <button class="btn ok" id="resolveWinner">Gewinner ermitteln</button>
         </div>
-        <div class="small muted">Nur möglich, wenn die jeweilige Aktionsrunde vollständig ist.</div>
+        <p class="small">Ablauf: Start → Schätzwert → Bet1 → Hinweis1/Bet2 → Hinweis2/Bet3 → Lösung → Gewinner.</p>
+        <div id="questionBox" class="card" style="margin-top:8px"></div>
       </div>
-
-      <div class="status" style="margin-top:12px;">
+      <div class="card" style="flex:1">
+        <h2 class="h">Sounds</h2>
         <div class="row">
-          <input id="inpTurnUid" placeholder="Turn: UID" style="flex:1;">
-          <input id="inpTurnSeat" placeholder="Seat 0–7" style="width:120px;">
+          <button class="btn" data-snd="buzzer">Buzzer</button>
+          <button class="btn ok" data-snd="correct">Correct</button>
+          <button class="btn bad" data-snd="wrong">Wrong</button>
         </div>
-        <div class="row" style="margin-top:6px;">
-          <button id="btnSetTurn">Turn setzen</button>
-          <button id="btnNextTurn">⏭️ Nächster Spieler</button>
-          <button id="btnSkipFold" class="err">⏳ Spieler überspringen (Fold)</button>
-        </div>
+        <h2 class="h" style="margin-top:16px">Status</h2>
+        <div id="status"></div>
       </div>
+    </div>
 
-      <div class="status" style="margin-top:12px;">
-        <div class="row">
-          <input id="inpWinnerUid" placeholder="Gewinner-UID (manuell)" style="flex:1;">
-          <button id="btnAwardPot" class="ok">🏆 Pot auszahlen</button>
-        </div>
-        <div class="row" style="margin-top:6px;">
-          <button id="btnAwardNearest">🏆 Nächstliegenden automatisch</button>
-        </div>
-      </div>
-
-      <div class="status" id="adminStatus" style="margin-top:12px;"></div>
-      <div class="row" style="margin-top:10px;">
-        <button id="btnSyncAll">🔄 Alle synchronisieren</button>
-      </div>
-    </aside>
-
-    <main class="main">
-      <h3 class="h">Frage & Hinweise</h3>
-      <div class="list">
-        <div class="item"><strong>Frage:</strong> <span id="qText">–</span></div>
-        <div class="item"><strong>Hinweis 1:</strong> <span id="qH1" class="muted">verdeckt</span></div>
-        <div class="item"><strong>Hinweis 2:</strong> <span id="qH2" class="muted">verdeckt</span></div>
-        <div class="item"><strong>Lösung:</strong> <span id="qSol" class="muted">verdeckt</span></div>
-      </div>
-
-      <h3 class="h" style="margin-top:16px;">Private DMs</h3>
-      <div class="item">
-        <div class="row">
-          <select id="dmSelect" style="flex:1;"><option value="">Spieler wählen…</option></select>
-          <button id="btnDmClearOne" class="err">Diesen Chat löschen</button>
-          <button id="btnDmClearAll" class="err">Alle Chats löschen</button>
-        </div>
-        <div class="chatlog" id="dmLog" style="margin-top:8px;"></div>
-        <div class="row" style="margin-top:8px;">
-          <input id="dmMessage" placeholder="Nachricht an Spieler… (Enter sendet)" style="flex:1;">
-          <button id="btnDmSend" class="primary">Senden</button>
-        </div>
-        <div class="small muted" style="margin-top:4px;">Hinweis: Der Verlauf ist pro Spieler. Auswahl oben ändert den sichtbaren Thread.</div>
-      </div>
-
-      <h3 class="h" style="margin-top:16px;">Antworten (live)</h3>
-      <div id="answers" class="list" style="max-height:160px;overflow:auto;"></div>
-    </main>
-
-    <aside class="right">
-      <h3 class="h">Virtueller Tisch</h3>
+    <div class="card">
+      <h2 class="h">Virtueller Tisch</h2>
       <div class="table-wrap">
-        <div class="table-circle">
-          <div class="seat s0" data-seat="0"></div>
-          <div class="seat s1" data-seat="1"></div>
-          <div class="seat s2" data-seat="2"></div>
-          <div class="seat s3" data-seat="3"></div>
-          <div class="seat s4" data-seat="4"></div>
-          <div class="seat s5" data-seat="5"></div>
-          <div class="seat s6" data-seat="6"></div>
-          <div class="seat s7" data-seat="7"></div>
-          <div id="table-center2">💰 Pot: <strong id="pot2">0</strong></div>
-        </div>
+        <div class="table"></div>
+        <div id="dealer" class="dealer">D</div>
+        <div id="seats"></div>
+        <div class="pot">Pot: <span id="pot">0</span></div>
       </div>
-    </aside>
+    </div>
   </div>
 
-  <script>
-    // robuste Socket-Init (Fallback Polling)
-    const socket = io({
-      path:'/socket.io',
-      transports:['polling','websocket'],
-      upgrade:true,
-      reconnection:true,
-      reconnectionAttempts: Infinity,
-      reconnectionDelay:500,
-      reconnectionDelayMax:3000,
-      timeout:20000
-    });
+<script>
+const adminSock = io('/admin');
+const clientSock = io();
+let GLOBAL_STATE = null;
 
-    const el = (s)=>document.querySelector(s);
-    const state = { blinds:{small:null,big:null}, turnUid:null, roundIndex:0, chats:new Map(), players:[] };
+function el(id){return document.getElementById(id)}
+function h(html){const d=document.createElement('div');d.innerHTML=html;return d.firstElementChild}
 
-    const emitOk = (evt, payload)=>{
-      if(!socket.connected){ el('#adminStatus').textContent='Nicht verbunden.'; return false; }
-      socket.emit(evt,payload); return true;
-    };
+function fillQuestions(){
+  const sel = el('questionSelect'); sel.innerHTML='';
+  for(let i=0;i<50;i++){ 
+    const o=document.createElement('option'); 
+    o.value=i+1; o.textContent='Frage '+(i+1); 
+    sel.appendChild(o); 
+  }
+}
+fillQuestions();
 
-    socket.on('connect', ()=>{
-      el('#adminStatus').textContent = 'Verbunden: '+socket.id;
-      const last = localStorage.getItem('qp_admin_room'); if (last) socket.emit('mod:claim-room', { code:last });
-    });
-    socket.on('disconnect', ()=>{ el('#adminStatus').textContent='Getrennt.'; });
+function renderState(st){
+  GLOBAL_STATE = st;
+  const q = st.round?.question;
+  el('questionBox').innerHTML = q ? `
+    <div><b>Frage:</b> ${q.frage}</div>
+    <div><b>Hinweis 1:</b> ${q.hinweis1 ?? '—'}</div>
+    <div><b>Hinweis 2:</b> ${q.hinweis2 ?? '—'}</div>
+    <div><b>Lösung:</b> ${q.loesung ?? '—'}</div>
+  ` : 'Keine Frage aktiv.';
 
-    // Grundfunktionen
-    el('#btnCreate').onclick=()=>emitOk('mod:create-room');
-    el('#btnNextQ').onclick =()=>emitOk('mod:next-question');
+  el('status').innerHTML = `
+    <div>Phase: <b>${st.round.phase}</b></div>
+    <div>Pot: <b>${st.round.pot}</b> | Current Bet: <b>${st.round.currentBet}</b></div>
+    <div>Hinweise: <b>${st.round.hintsRevealed}</b></div>
+    <div>Spieler: ${Object.values(st.players).map(p=>`${p.name}${p.hasGuessed?' ✅':''}`).join(', ')}</div>
+  `;
 
-    el('#btnSetBlinds').onclick = ()=>{
-      const sb=el('#inpSB').value.trim(), bb=el('#inpBB').value.trim();
-      const sbv=Number(el('#inpSBv').value||0), bbv=Number(el('#inpBBv').value||0);
-      const rot=el('#inpRotate').checked;
-      emitOk('mod:set-blinds',{
-        small: sb===''?null:Number(sb),
-        big:   bb===''?null:Number(bb),
-        sbValue: sbv, bbValue: bbv, autoRotate: rot
-      });
-    };
+  const seatsWrap = el('seats'); seatsWrap.innerHTML='';
+  st.seats.forEach((sid,i)=>{
+    const p = sid ? st.players[sid] : null;
+    const seat = h(`<div class="seat s${i}"></div>`);
+    seat.innerHTML = p ? `
+      ${p.avatar?`<img src="${p.avatar}" alt="avatar"/>`:`<img src="https://api.dicebear.com/7.x/thumbs/svg?seed=${encodeURIComponent(p.name)}" alt="avatar"/>`}
+      <div class="name">${p.name} <span class="badge">Sitz ${i}</span></div>
+      <div class="chips">${p.chips} Chips</div>
+    ` : `<div class="name">(frei)</div><div class="chips">—</div>`;
+    if(p && st.round.actingSeat===p.seat){ seat.classList.add('turn'); }
+    seatsWrap.appendChild(seat);
+  });
+  el('pot').textContent = st.round.pot;
 
-    el('#btnRevealH1').onclick=()=>emitOk('mod:reveal-hint1');
-    el('#btnRevealH2').onclick=()=>emitOk('mod:reveal-hint2');
-    el('#btnRevealSol').onclick=()=>emitOk('mod:reveal-solution');
+  const dealer = el('dealer'); dealer.style.display='none';
+  const dSeat = st.table.dealerSeat;
+  const dEl = seatsWrap.querySelector('.seat.s'+dSeat);
+  if(dEl){ dealer.style.display='block'; dealer.style.left=(dEl.offsetLeft + 8)+'px'; dealer.style.top=(dEl.offsetTop - 12)+'px'; }
+}
 
-    el('#btnSetTurn').onclick = ()=>{
-      const uid=el('#inpTurnUid').value.trim(); const seatStr=el('#inpTurnSeat').value.trim();
-      const seat = seatStr==='' ? undefined : Number(seatStr);
-      emitOk('mod:set-turn',{ uid: uid || undefined, seat: Number.isInteger(seat)?seat:undefined });
-    };
-    el('#btnNextTurn').onclick = ()=>emitOk('mod:next-turn');
-    el('#btnSkipFold').onclick = ()=>emitOk('mod:skip-fold');
+adminSock.on('state', renderState);
+clientSock.on('state', renderState);
+adminSock.on('winner', ({ winnerSid, solution }) => {
+  const p = GLOBAL_STATE?.players?.[winnerSid];
+  alert(`Gewinner: ${p?.name || '—'} (Lösung: ${solution})`);
+});
+adminSock.on('sound', ({key})=> playSound(key));
+clientSock.on('sound', ({key})=> playSound(key));
 
-    el('#btnAwardPot').onclick=()=>{
-      const uid=el('#inpWinnerUid').value.trim(); if(!uid) return; emitOk('mod:award-pot',{ uid });
-    };
-    el('#btnAwardNearest').onclick=()=>emitOk('mod:award-nearest');
-    el('#btnSyncAll').onclick=()=>emitOk('mod:sync-all');
+function playSound(key){
+  const m = { buzzer:'/sounds/buzzer.mp3', correct:'/sounds/correct.mp3', wrong:'/sounds/wrong.mp3' };
+  const src = m[key]; if(src){ const a=new Audio(src); a.play().catch(()=>{}); }
+}
 
-    // DMs
-    const dmSelect = el('#dmSelect');
-    const dmLog = el('#dmLog');
-    const escapeHtml = (s)=>String(s||'').replace(/[&<>"]/g, m => ({"&":"&amp;","<":"&lt;","&gt;":"&gt;","\"":"&quot;"}[m]));
-    function dmAppend(html){ const d=document.createElement('div'); d.className='chatrow'; d.innerHTML=html; dmLog.appendChild(d); dmLog.scrollTop = dmLog.scrollHeight; }
-    function renderDmFor(uid){
-      dmLog.innerHTML='';
-      const thread = state.chats.get(uid) || [];
-      thread.forEach(t=>{
-        const who = t.from==='admin' ? '<span class="pill admin">Admin</span>' : '<span class="pill player">Spieler</span>';
-        dmAppend(`${who} ${new Date(t.ts).toLocaleTimeString()} — ${escapeHtml(t.message)}`);
-      });
-    }
-    dmSelect.onchange = ()=>{ if(dmSelect.value) renderDmFor(dmSelect.value); };
-    function ensureChat(uid){ if(!state.chats.has(uid)) state.chats.set(uid,[]); return state.chats.get(uid); }
-
-    el('#btnDmSend').onclick = ()=>{
-      const uid = dmSelect.value; const msg = el('#dmMessage').value.trim();
-      if(!uid || !msg) return;
-      emitOk('mod:dm', { uid, message: msg });
-      const thr = ensureChat(uid); thr.push({ from:'admin', message:msg, ts:Date.now() });
-      renderDmFor(uid);
-      el('#dmMessage').value = '';
-    };
-    el('#btnDmClearOne').onclick = ()=>{ const uid = dmSelect.value; if(!uid) return; emitOk('mod:chat-clear-one', { uid }); };
-    el('#btnDmClearAll').onclick = ()=>emitOk('mod:chat-clear-all');
-
-    // Badges
-    function badge(p){
-      const isSB = (p.seat === (state.blinds?.small ?? null));
-      const isBB = (p.seat === (state.blinds?.big   ?? null));
-      return (isSB?'<span class="badge badge-s">S</span>':'') + (isBB?'<span class="badge badge-b">B</span>':'');
-    }
-
-    // Render
-    function renderTop(st){
-      el('#roomCode').textContent = st.code || '—';
-      el('#qIndex').textContent = st.qIndex>=0 ? (st.qIndex+1) : '–';
-      el('#roundIdx').textContent = st.roundIndex||0;
-      el('#acted').textContent = st.actedCount||0;
-      el('#need').textContent = st.needCount||0;
-      el('#currentBet').textContent = st.currentBetRound||0;
-      el('#pot').textContent = st.pot||0;
-      el('#pot2').textContent = st.pot||0;
-
-      el('#qText').textContent = st.question?.text || '–';
-      el('#qH1').textContent   = st.question?.hint1 ?? 'verdeckt';
-      el('#qH2').textContent   = st.question?.hint2 ?? 'verdeckt';
-      el('#qSol').textContent  = st.question?.solution ?? 'verdeckt';
-
-      state.blinds = st.blinds||{small:null,big:null};
-      state.turnUid = st.turnUid || null;
-      state.roundIndex = st.roundIndex||0;
-      state.players = (st.players||[]).slice();
-      renderSeats({ players: state.players, blinds: state.blinds, turnUid: state.turnUid });
-      refreshSelects(state.players);
-    }
-
-    function refreshSelects(players){
-      const keeps = new Set();
-      const curDm = dmSelect.value;
-      dmSelect.innerHTML = '<option value="">Spieler wählen…</option>';
-      players.forEach(p=>{
-        const opt=document.createElement('option'); opt.value=p.uid; opt.textContent=`${p.name} (${p.uid.slice(0,6)}…)`;
-        dmSelect.appendChild(opt);
-        keeps.add(p.uid);
-      });
-      if (keeps.has(curDm)) dmSelect.value = curDm;
-    }
-
-    function renderSeats(st){
-      const wrap = document.querySelector('.table-circle');
-      // Plätze leeren
-      wrap.querySelectorAll('.seat').forEach(slot=>{
-        slot.className = slot.className.replace(/\bturn\b|\bfolded\b|\bdisconnected\b/g,'').trim();
-        slot.innerHTML = '<div class="avatar">🙂</div><div class="name">Frei</div><div class="chips">🪙 0</div><div class="betline">Runde: 🪙 0 · Gesamt: 🪙 0</div>';
-      });
-      (st.players||[]).forEach(p=>{
-        if(typeof p.seat!=='number') return;
-        const slot=wrap.querySelector(`.seat[data-seat="${p.seat}"]`); if(!slot) return;
-        slot.innerHTML = `<div class="avatar">🙂</div>
-          <div class="name">${p.name} ${badge(p)}</div>
-          <div class="chips">🪙 ${p.chips??0}</div>
-          <div class="betline">Runde: 🪙 ${p.betRound||0} · Gesamt: 🪙 ${p.betTotal||0}</div>`;
-        if(!p.connected) slot.classList.add('disconnected');
-        if(p.status==='folded') slot.classList.add('folded');
-        if(p.uid===state.turnUid) slot.classList.add('turn');
-      });
-    }
-
-    // Socket Events
-    socket.on('mod:room-created', ({ code, state:st })=>{
-      localStorage.setItem('qp_admin_room', code);
-      renderTop(st);
-      el('#adminStatus').textContent = 'Raum erstellt: '+code;
-    });
-
-    socket.on('state:full', (st)=>{ renderTop(st); });
-    socket.on('players:update', (msg)=>{
-      if(!msg?.players) return;
-      state.players = msg.players;
-      renderSeats({players:msg.players, blinds: state.blinds, turnUid: state.turnUid});
-      refreshSelects(state.players);
-    });
-    socket.on('state:partial', (patch)=>{
-      if (patch.blinds) state.blinds = patch.blinds;
-      if ('turnUid' in patch) state.turnUid = patch.turnUid;
-      if ('roundIndex' in patch) state.roundIndex = patch.roundIndex;
-      if ('actedCount' in patch) el('#acted').textContent = patch.actedCount;
-      if ('needCount' in patch) el('#need').textContent = patch.needCount;
-      if ('currentBetRound' in patch) el('#currentBet').textContent = patch.currentBetRound;
-      if ('pot' in patch) { el('#pot').textContent = patch.pot; el('#pot2').textContent = patch.pot; }
-      if (patch.question) {
-        el('#qText').textContent = patch.question?.text || '–';
-        el('#qH1').textContent   = patch.question?.hint1 ?? 'verdeckt';
-        el('#qH2').textContent   = patch.question?.hint2 ?? 'verdeckt';
-        el('#qSol').textContent  = patch.question?.solution ?? 'verdeckt';
-      }
-      if (state.players?.length) {
-        renderSeats({players: state.players, blinds: state.blinds, turnUid: state.turnUid});
-        refreshSelects(state.players);
-      }
-    });
-
-    socket.on('answer:received', ({ uid, name, answer })=>{
-      const div=document.createElement('div'); div.className='item'; div.textContent = `${name}: ${answer}`;
-      el('#answers').prepend(div);
-    });
-
-    // DMs
-    socket.on('dm:from-player', ({ uid, name, message, ts })=>{
-      const thr = ensureChat(uid); thr.push({ from:'player', message, ts });
-      if (dmSelect.value === uid) renderDmFor(uid);
-    });
-    socket.on('dm:sent', ({ uid, name, message, ts })=>{
-      const thr = ensureChat(uid); thr.push({ from:'admin', message, ts });
-      if (dmSelect.value === uid) renderDmFor(uid);
-    });
-    socket.on('dm:cleared-one', ({ uid })=>{
-      state.chats.set(uid, []);
-      if (dmSelect.value === uid) renderDmFor(uid);
-    });
-    socket.on('dm:cleared-all', ()=>{
-      state.chats.clear(); dmLog.innerHTML='';
-    });
-
-    socket.on('status', (t)=>{ el('#adminStatus').textContent = t; });
-  </script>
+document.querySelectorAll('[data-snd]').forEach(b=> b.onclick=()=> adminSock.emit('playSound', { key: b.dataset.snd }));
+el('startRound').onclick = ()=> adminSock.emit('startRound', { questionId: el('questionSelect').value });
+el('revealHint1').onclick = ()=> adminSock.emit('revealHint', 1);
+el('revealHint2').onclick = ()=> adminSock.emit('revealHint', 2);
+el('goReveal').onclick   = ()=> adminSock.emit('goReveal');
+el('resolveWinner').onclick = ()=> adminSock.emit('resolveWinner');
+</script>
 </body>
 </html>
