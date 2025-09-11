@@ -144,6 +144,14 @@ function adminGuessesFull() {
   }));
 }
 
+// ── NEU: Admin-Emit, der BEIDE Wege bedient (Namespace /admin + Room 'admins')
+const ADMIN_ROOM = 'admins';
+const admin = io.of('/admin');
+function emitAdmin(event, payload){
+  try { admin.emit(event, payload); } catch {}
+  try { io.to(ADMIN_ROOM).emit(event, payload); } catch {}
+}
+
 function publicState() {
   return {
     players: publicPlayers(),
@@ -171,7 +179,7 @@ function publicState() {
 function broadcast(){
   io.emit('state', publicState());
   io.emit('guesses:public', publicGuessesForPlayers());
-  admin.emit('admin:guesses', adminGuessesFull());
+  emitAdmin('admin:guesses', adminGuessesFull());
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -331,7 +339,7 @@ function resolveWinnerAndShowdown(){
   state.round.phase = 'showdown';
 
   // Admin über Gewinner informieren (backwards-kompatibles winnerSid + neues winnerSids)
-  admin.emit('winner', { 
+  emitAdmin('winner', { 
     winnerSid: winners[0] || null, 
     winnerSids: winners, 
     solution: state.round.question?.loesung 
@@ -510,6 +518,13 @@ function playerAction(sid, type, amount){
 
 // ─────────────────────────────────────────────────────────────
 io.on('connection', socket => {
+  // ── NEU: Admin-Room im Default-Namespace ──
+  socket.on('joinAdmin', () => {
+    socket.join(ADMIN_ROOM);
+    socket.emit('state', publicState());
+    socket.emit('admin:guesses', adminGuessesFull());
+  });
+
   socket.on('join', ({ name, avatar }) => {
     name = String(name||'').trim().slice(0,20) || 'Spieler';
     avatar = String(avatar||'').trim().slice(0,200);
@@ -547,6 +562,10 @@ io.on('connection', socket => {
 
     state.round.guesses[socket.id] = num;
     state.round.guessRevealed[socket.id] = false; // standard zensiert (Playersicht)
+
+    // Live-Update an Admins (sofort)
+    emitAdmin('admin:guesses', adminGuessesFull());
+
     broadcast();
 
     const seatsNow = seated();
@@ -582,7 +601,6 @@ io.on('connection', socket => {
 // ─────────────────────────────────────────────────────────────
 // Admin-Namespace
 // ─────────────────────────────────────────────────────────────
-const admin = io.of('/admin');
 admin.on('connection', socket => {
   socket.emit('state', publicState());
   socket.emit('admin:guesses', adminGuessesFull());
@@ -608,7 +626,7 @@ admin.on('connection', socket => {
     if (n === 1 && state.round.phase === 'bet1') {
       state.round.hintsRevealed = 1;
       state.round.phase = 'hint1';
-      admin.emit('sound', { key: 'buzzer' });
+      emitAdmin('sound', { key: 'buzzer' });
       state.round.phase = 'bet2';
       resetBets();
       state.table.actingSeat = nextActiveSeat(state.table.dealerSeat);
@@ -616,7 +634,7 @@ admin.on('connection', socket => {
     if (n === 2 && state.round.phase === 'bet2') {
       state.round.hintsRevealed = 2;
       state.round.phase = 'hint2';
-      admin.emit('sound', { key: 'buzzer' });
+      emitAdmin('sound', { key: 'buzzer' });
       state.round.phase = 'bet3';
       resetBets();
       state.table.actingSeat = nextActiveSeat(state.table.dealerSeat);
@@ -639,13 +657,13 @@ admin.on('connection', socket => {
   // Gewinner bestimmen (manuell)
   socket.on('resolveWinner', () => {
     resolveWinnerAndShowdown();
-    admin.emit('sound', { key: 'correct' });
+    emitAdmin('sound', { key: 'correct' });
     broadcast();
   });
 
   // Sounds
   socket.on('playSound', ({ key }) => {
-    admin.emit('sound', { key });
+    emitAdmin('sound', { key });
     io.emit('sound', { key });
   });
 
