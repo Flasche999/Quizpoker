@@ -71,6 +71,7 @@
 <script>
 const sock = io({ autoConnect: true });
 let MY_ID = null, GLOBAL_STATE = null;
+let PUBLIC_GUESSES = []; // vom Server: [{sid,name,value,revealed}]
 
 const $ = (id)=>document.getElementById(id);
 const h = (html)=>{ const d=document.createElement('div'); d.innerHTML=html.trim(); return d.firstElementChild; };
@@ -88,6 +89,23 @@ Object.values(sounds).forEach(a=>{ a.preload='auto'; a.volume=1.0; });
 sock.on('connect', ()=>{ MY_ID = sock.id; });
 sock.on('sound', ({key})=>{ const a = sounds[key]; if(a){ try{ a.currentTime=0; a.play(); }catch(e){} }});
 sock.on('errorMsg', (m)=> alert(m));
+
+// Öffentliche Schätzungen (für alle Spieler sichtbar, abhängig vom Reveal pro Spieler)
+sock.on('guesses:public', rows => {
+  PUBLIC_GUESSES = Array.isArray(rows) ? rows : [];
+  // wenn bereits State gerendert ist, Sitz-Chips aktualisieren
+  if (GLOBAL_STATE) renderState(GLOBAL_STATE);
+});
+
+// Live-Action-Anzeige (Check/Call/Raise/All-In/Fold)
+sock.on('actionInfo', ({sid, type, amount})=>{
+  const st = GLOBAL_STATE; if(!st) return;
+  const p = st.players?.[sid]; if(!p) return;
+  const seatEl = $('seats').querySelector('.seat.s'+p.seat);
+  showActionFlag(seatEl, type, amount);
+});
+
+// Haupt-State
 sock.on('state', (st)=> renderState(st));
 
 $('joinBtn').onclick = ()=>{
@@ -116,6 +134,25 @@ document.querySelectorAll('.act[data-act]').forEach(btn=>{
   };
 });
 
+// ---------- UI-Helfer ----------
+function showActionFlag(seatEl, type, amount){
+  if (!seatEl) return;
+  seatEl.querySelectorAll('.act-flag').forEach(n=>n.remove());
+  const label = type==='raise' ? `Raise ${amount??''}` :
+                type==='allin' ? 'All-In' :
+                type==='call'  ? 'Call' :
+                type==='check' ? 'Check' :
+                type==='fold'  ? 'Fold'  : type;
+  const flag = h(`<div class="act-flag ${type}">${label}</div>`);
+  seatEl.appendChild(flag);
+  if (type === 'fold') seatEl.classList.add('folded');
+}
+
+function guessForSid(sid){
+  return PUBLIC_GUESSES.find(g=>g.sid===sid);
+}
+
+// ---------- Rendering ----------
 function renderState(st){
   GLOBAL_STATE = st;
   const me = st?.players?.[MY_ID] || null;
@@ -127,10 +164,11 @@ function renderState(st){
     `<div><b>Frage:</b> ${q.frage ?? '—'}</div>`,
     `<div class="small"><b>Hinweis 1:</b> ${round?.hintsRevealed >= 1 ? (q.hinweis1 ?? '—') : '• • •'}</div>`,
     `<div class="small"><b>Hinweis 2:</b> ${round?.hintsRevealed >= 2 ? (q.hinweis2 ?? '—') : '• • •'}</div>`,
-    `<div class="small"><b>Lösung:</b> ${round?.phase === 'showdown' || round?.showSolution ? (q.loesung ?? '—') : '• • •'}</div>`,
+    `<div class="small"><b>Lösung:</b> ${['reveal','showdown'].includes(round?.phase) ? (q.loesung ?? '—') : '• • •'}</div>`,
     `<div><b>Phase:</b> ${round?.phase ?? '—'}</div>`
   ].join('') : 'Warte auf neue Runde…';
 
+  // Guess-UI
   const canGuess = !!(round && round.phase === 'collect_guesses' && me && !me.hasGuessed);
   $('guess').disabled = !canGuess;
   $('sendGuess').disabled = !canGuess;
@@ -140,9 +178,21 @@ function renderState(st){
         : 'Schätz-Phase vorbei.')
     : 'Warte auf nächste Frage…';
 
+  // Action-Buttons aktivieren, wenn Bet-Phase & „dran“ & in Hand
+  const isBet = ['bet1','bet2','bet3'].includes(round?.phase);
+  const iAmActing = isBet && me && (table.actingSeat === me.seat) && me.inHand;
+  setDisabled('.act', !iAmActing);
+  $('actInfo').textContent = iAmActing
+    ? 'Du bist dran.'
+    : 'Aktionen sind nur in Bet-Phasen möglich und wenn du dran bist.';
+
+  // Seats rendern
   const seatsWrap = $('seats'); seatsWrap.innerHTML='';
   const seats = Array.isArray(st?.seats) ? st.seats : [];
   seats.forEach((sid,i)=>{
+    // Seitenplätze an der Kante auslassen
+    if (i === 2 || i === 6) return;
+
     const p = sid ? st.players[sid] : null;
     const seat = h(`<div class="seat s${i}"></div>`);
     if(p){
@@ -153,11 +203,36 @@ function renderState(st){
         <div class="name">${escapeHtml(p.name||'')}</div>
         <div class="chips">${fmt(p.chips ?? 0)} Chips</div>
       `;
+
+      // DRAN
       if(typeof table.actingSeat === 'number' && table.actingSeat === p.seat){
         seat.classList.add('turn');
         if(!seat.querySelector('.turn-pill')){
           seat.appendChild(h('<div class="turn-pill">DRAN</div>'));
         }
+      }
+
+      // OUT / Fold
+      if (p.isOut){
+        seat.classList.add('out');
+        if(!seat.querySelector('.out-pill')) seat.appendChild(h('<div class="out-pill">OUT</div>'));
+      }
+      if (p.lastAction?.type === 'fold') seat.classList.add('folded');
+
+      // Letzte Aktion am Sitz
+      if (p.lastAction){
+        showActionFlag(seat, p.lastAction.type, p.lastAction.amount);
+      }
+
+      // Guess-Chip (öffentlich, ggf. „•••“)
+      const g = guessForSid(p.id);
+      if (g){
+        const text = g.revealed ? `Guess: ${g.value}` : 'Guess: •••';
+        const chip = h(`<div class="guess-chip${g.revealed?'':' dim'}">${text}</div>`);
+        seat.appendChild(chip);
+      } else if (p.hasGuessed) {
+        // Falls Stream noch nicht kam, aber wir wissen, dass er geschätzt hat
+        seat.appendChild(h('<div class="guess-chip dim">Guess abgegeben</div>'));
       }
     }else{
       seat.innerHTML = `<div class="name">(frei)</div><div class="chips">—</div>`;
@@ -165,6 +240,7 @@ function renderState(st){
     seatsWrap.appendChild(seat);
   });
 
+  // Pot / Bet Info
   $('pot').textContent = fmt(table.pot ?? 0);
   $('betInfo').textContent = `Bet: ${fmt(table.currentBet ?? 0)} | Min Raise: ${fmt(table.minRaise ?? 0)}`;
 
