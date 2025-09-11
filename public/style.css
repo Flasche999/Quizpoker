@@ -66,10 +66,6 @@
 }
 .seat .name{font-weight:600;margin-top:4px}
 .seat .chips{font-size:12px;color:#a5b4fc}
-.seat.turn{
-  outline:2px solid var(--accent);
-  box-shadow:0 0 0 4px rgba(124,58,237,.25)
-}
 
 /* Sitzpositionen (0 top, dann Uhrzeigersinn) */
 .seat.s0{left:50%;top:4%;transform:translate(-50%,0)}
@@ -83,6 +79,7 @@
 .seat.s5{left:8%;bottom:20%}
 .seat.s6{left:2%;top:50%;transform:translate(0,-50%)}
 .seat.s7{left:8%;top:18%}
+
 /* Aktiver Spieler extra betonen + "DRAN"-Badge */
 .seat.turn{
   outline:3px solid var(--accent);
@@ -108,5 +105,3 @@
   50%{ transform:translate(-50%,-100%) scale(1.06); opacity:1 }
   100%{ transform:translate(-50%,-100%) scale(1); opacity:.9 }
 }
-
-
