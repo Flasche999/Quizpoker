@@ -1,5 +1,5 @@
 // server.js – QuizPoker v2.1 (Admin-only Chips/Rebuys, zensierte Schätzungen,
-// SB/BB-Sperre in Runde 1, stabile Betting-Logik, Action-Broadcasts, OUT-Status)
+// SB/BB-Sperre in Runde 1, stabile Betting-Logik, Action-Broadcasts, OUT-Status, Test-Bots)
 import express from 'express';
 import http from 'http';
 import { Server } from 'socket.io';
@@ -25,7 +25,7 @@ const MAX_SEATS   = 8;
 const START_CHIPS = 1500;
 
 const state = {
-  players: {},                      // socketId -> {id,name,avatar,seat,chips,inHand,committed,isOut,lastAction}
+  players: {},                      // socketId/ botId -> {id,name,avatar,seat,chips,inHand,committed,isOut,lastAction,isBot?}
   seats: Array(MAX_SEATS).fill(null),
   table: {
     dealerSeat: 0,
@@ -42,8 +42,8 @@ const state = {
   round: {                         // Phasen: lobby | collect_guesses | bet1 | hint1 | bet2 | hint2 | bet3 | reveal | showdown
     phase: 'lobby',
     question: null,
-    guesses: {},                  // socketId -> number (geheim)
-    guessRevealed: {},            // socketId -> bool (für öffentliche Sichtbarkeit)
+    guesses: {},                  // sid -> number (geheim)
+    guessRevealed: {},            // sid -> bool (öffentliche Sichtbarkeit)
     hintsRevealed: 0,
   },
 };
@@ -66,6 +66,7 @@ try {
 // ─────────────────────────────────────────────────────────────
 // Helper
 // ─────────────────────────────────────────────────────────────
+function rand(min, max){ return Math.floor(Math.random()*(max-min+1))+min; }
 function roleForSeat(seat) {
   if (seat === state.table.sbSeat) return 'SB';
   if (seat === state.table.bbSeat) return 'BB';
@@ -79,7 +80,8 @@ function publicPlayers() {
       hasGuessed: state.round.guesses[sid] !== undefined,
       role: roleForSeat(p.seat),
       isOut: !!p.isOut,
-      lastAction: p.lastAction || null, // z.B. {type:'raise', amount:120}
+      lastAction: p.lastAction || null, // {type:'raise', amount:120} o. ä.
+      isBot: !!p.isBot,
     }])
   );
 }
@@ -138,7 +140,6 @@ function publicState() {
 
 function broadcast(){
   io.emit('state', publicState());
-  // Extra-Streams für Guesses
   io.emit('guesses:public', publicGuessesForPlayers());
   admin.emit('admin:guesses', adminGuessesFull());
 }
@@ -184,7 +185,7 @@ function postBlinds(){
     p.chips -= pay;
     p.committed = (p.committed||0) + pay;
     state.table.pot += pay;
-    if (p.chips <= 0) p.isOut = true; // NEW: OUT, falls blind all-in war
+    if (p.chips <= 0) p.isOut = true; // OUT, falls blind all-in war
   }
   state.table.currentBet = Math.max(SB, BB);
   state.table.minRaise = BB;
@@ -216,7 +217,7 @@ function newHandSetup(){
   for(const {sid} of seated()){
     if (!sidExists(sid)) continue;
     const p = state.players[sid];
-    p.inHand = (p.chips > 0) && !p.isOut; // NEW: OUT-Spieler bleiben draußen
+    p.inHand = (p.chips > 0) && !p.isOut; // OUT-Spieler bleiben draußen
     p.committed = 0;
     p.lastAction = null;
   }
@@ -248,11 +249,155 @@ function isSBorBB(sid){
 function setAction(sid, type, amount){
   const p = state.players[sid]; if(!p) return;
   p.lastAction = amount!=null ? { type, amount } : { type };
-  io.emit('actionInfo', { sid, type, amount }); // NEW: Broadcast
+  io.emit('actionInfo', { sid, type, amount });
 }
 
 // ─────────────────────────────────────────────────────────────
-// Socket.IO – Spieler
+// Test-Bots (KI) – Verwaltung & Verhalten
+// ─────────────────────────────────────────────────────────────
+function addBot(name){
+  const seat = state.seats.findIndex(x=>x===null);
+  if (seat === -1) return null;
+  const botId = 'bot_' + Date.now() + '_' + rand(100,999);
+  const botName = name || `Bot ${rand(1,99)}`;
+  state.seats[seat] = botId;
+  state.players[botId] = {
+    id: botId,
+    name: botName,
+    avatar: `https://api.dicebear.com/7.x/thumbs/svg?seed=${encodeURIComponent(botName)}`,
+    seat,
+    chips: START_CHIPS,
+    inHand: false,
+    committed: 0,
+    isOut: false,
+    lastAction: null,
+    isBot: true,
+  };
+  return botId;
+}
+
+function scheduleBotGuesses(){
+  if (state.round.phase !== 'collect_guesses') return;
+  for (const {sid} of seated()){
+    const p = state.players[sid];
+    if (!p?.isBot) continue;
+    if (state.round.guesses[sid] !== undefined) continue;
+    const delay = rand(400, 1500);
+    setTimeout(()=>{
+      // Schätzwert — wenn Lösung bekannt, leichtes Rauschen darum, sonst 0–5000
+      let g;
+      const sol = Number(state.round.question?.loesung);
+      if (Number.isFinite(sol)){
+        g = Math.max(0, Math.round(sol + rand(-200, 200)));
+      } else {
+        g = rand(0, 5000);
+      }
+      state.round.guesses[sid] = g;
+      state.round.guessRevealed[sid] = false;
+      broadcast();
+
+      // Wechsel zu bet1, wenn alle (inkl. Bots) geschätzt haben
+      const seatsNow = seated();
+      const allSubmitted = seatsNow.length>0 && seatsNow.every(({sid})=> state.round.guesses[sid]!==undefined);
+      if (allSubmitted && state.round.phase === 'collect_guesses') {
+        state.round.phase = 'bet1';
+        newHandSetup();
+        postBlinds();
+        broadcast();
+      }
+    }, delay);
+  }
+}
+
+function botLoop(){
+  // nur in Bet-Phasen aktiv
+  if (!['bet1','bet2','bet3'].includes(state.round.phase)) return;
+
+  const actingSeat = state.table.actingSeat;
+  if (actingSeat == null) return;
+  const actingSid = state.seats[actingSeat];
+  const p = state.players[actingSid];
+  if (!p?.isBot || !p.inHand) return;
+
+  // Bot-Entscheidung
+  const toCall = Math.max(0, state.table.currentBet - (p.committed||0));
+  const canCheck = toCall === 0;
+
+  // In bet1: SB/BB dürfen nicht folden
+  const isBlindProtected = (state.round.phase === 'bet1') && isSBorBB(actingSid);
+
+  // Simple Heuristik:
+  // - wenn all-in möglich & Chips klein -> einige gehen all-in
+  // - sonst: manchmal raise, häufig call/check, gelegentlich fold (aber nicht wenn blind geschützt)
+  const r = Math.random();
+
+  if (p.chips <= state.table.bigBlind && r < 0.35){
+    // all-in short stack
+    const pay = p.chips;
+    p.chips = 0; p.committed = (p.committed||0) + pay; state.table.pot += pay;
+    if (p.committed > state.table.currentBet) {
+      state.table.currentBet = p.committed;
+      state.table.lastAggressorSeat = p.seat;
+    }
+    p.isOut = true;
+    setAction(actingSid, 'allin', p.committed);
+    goNextActor();
+    broadcast();
+    return;
+  }
+
+  if (!canCheck && !isBlindProtected && r < 0.2){
+    // fold (nur wenn call nötig und nicht blind-geschützt)
+    p.inHand = false;
+    setAction(actingSid, 'fold');
+    const activesLeft = active();
+    if (activesLeft.length <= 1) finishBettingPhase();
+    else goNextActor();
+    broadcast();
+    return;
+  }
+
+  if (r < 0.25){
+    // min-raise
+    const target = Math.max(state.table.currentBet + state.table.minRaise, state.table.bigBlind);
+    const need   = Math.max(0, target - (p.committed||0));
+    const pay    = Math.min(p.chips, need);
+    if (pay > 0){
+      p.chips -= pay; p.committed = (p.committed||0) + pay; state.table.pot += pay;
+      if (p.chips <= 0) p.isOut = true;
+      state.table.currentBet = Math.max(state.table.currentBet, p.committed);
+      state.table.lastAggressorSeat = p.seat;
+      state.table.minRaise = Math.max(state.table.minRaise, state.table.bigBlind);
+      setAction(actingSid, 'raise', p.committed);
+      goNextActor();
+      broadcast();
+      return;
+    }
+  }
+
+  if (canCheck){
+    setAction(actingSid, 'check');
+    goNextActor();
+    if (everyoneDone()) finishBettingPhase();
+    broadcast();
+    return;
+  }
+
+  // default: call
+  const pay = Math.min(p.chips, toCall);
+  p.chips -= pay; p.committed = (p.committed||0) + pay; state.table.pot += pay;
+  if (p.chips <= 0) p.isOut = true;
+  setAction(actingSid, 'call', pay);
+  goNextActor();
+  if (everyoneDone()) finishBettingPhase();
+  broadcast();
+}
+
+// Starte Bot-Schleife
+setInterval(botLoop, 1200);
+
+// ─────────────────────────────────────────────────────────────
+// Socket.IO – Spieler (menschliche Sockets)
 // ─────────────────────────────────────────────────────────────
 io.on('connection', socket => {
   socket.on('join', ({ name, avatar }) => {
@@ -262,7 +407,7 @@ io.on('connection', socket => {
     if (seat === -1) return socket.emit('errorMsg', 'Tisch ist voll.');
 
     state.seats[seat] = socket.id;
-    state.players[socket.id] = { id: socket.id, name, avatar, seat, chips: START_CHIPS, inHand: false, committed: 0, isOut:false, lastAction:null };
+    state.players[socket.id] = { id: socket.id, name, avatar, seat, chips: START_CHIPS, inHand: false, committed: 0, isOut:false, lastAction:null, isBot:false };
     socket.emit('joined', { seat });
     broadcast();
   });
@@ -416,6 +561,9 @@ admin.on('connection', socket => {
     state.round.guessRevealed = {};
     admin.emit('state', publicState());
     broadcast();
+
+    // Bots automatisch schätzen lassen
+    scheduleBotGuesses();
   });
 
   // Hinweise auflösen (1/2) → jeweils Betting-Runde danach öffnen
@@ -480,7 +628,7 @@ admin.on('connection', socket => {
     const p = state.players[sid];
     if (!p) return;
     p.chips = Math.max(0, (p.chips || 0) + Number(delta || 0));
-    if (p.chips > 0) p.isOut = false; // NEW: Out zurücknehmen, wenn wieder Chips
+    if (p.chips > 0) p.isOut = false; // Out zurücknehmen, wenn wieder Chips
     broadcast();
   });
 
@@ -490,7 +638,7 @@ admin.on('connection', socket => {
     const add = Number(amount ?? START_CHIPS);
     if (!Number.isFinite(add) || add <= 0) return;
     p.chips += add;
-    if (p.chips > 0) p.isOut = false; // NEW
+    if (p.chips > 0) p.isOut = false; // wieder aktivierbar
     broadcast();
   });
 
@@ -536,6 +684,13 @@ admin.on('connection', socket => {
     for (const sid of Object.keys(state.round.guesses)) {
       state.round.guessRevealed[sid] = !!reveal;
     }
+    broadcast();
+  });
+
+  // ── Admin: Test-KI hinzufügen ──
+  socket.on('admin:addBot', ({ name }) => {
+    const id = addBot(name);
+    if (!id) return; // kein Sitz frei
     broadcast();
   });
 });
