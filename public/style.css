@@ -83,3 +83,30 @@
 .seat.s5{left:8%;bottom:20%}
 .seat.s6{left:2%;top:50%;transform:translate(0,-50%)}
 .seat.s7{left:8%;top:18%}
+/* Aktiver Spieler extra betonen + "DRAN"-Badge */
+.seat.turn{
+  outline:3px solid var(--accent);
+  box-shadow:0 0 0 6px rgba(124,58,237,.2), 0 0 24px rgba(124,58,237,.35);
+  position:relative;
+}
+.seat .turn-pill{
+  position:absolute;
+  left:50%;
+  top:-10px;
+  transform:translate(-50%,-100%);
+  background:var(--accent);
+  color:#fff;
+  font-weight:700;
+  font-size:11px;
+  padding:3px 8px;
+  border-radius:999px;
+  box-shadow:0 2px 8px rgba(0,0,0,.35);
+  animation:pulseTurn 1.4s ease-in-out infinite;
+}
+@keyframes pulseTurn{
+  0%{ transform:translate(-50%,-100%) scale(1); opacity:.9 }
+  50%{ transform:translate(-50%,-100%) scale(1.06); opacity:1 }
+  100%{ transform:translate(-50%,-100%) scale(1); opacity:.9 }
+}
+
+
