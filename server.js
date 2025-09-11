@@ -5,6 +5,7 @@
 // stabile Betting-Logik, Action-Broadcasts, OUT-Status,
 // Bots (add/remove), Reveal-Bet-Phase nach Lösung, Auto-Showdown
 // + Neu: Massen-Chips (admin:setAllChips, admin:addChipsAll)
+// + Neu: Split-Pot bei Gleichstand (mehrere Gewinner teilen den Pot)
 
 import express from 'express';
 import http from 'http';
@@ -260,17 +261,28 @@ function newHandSetup(){
   if (nextDealer != null) state.table.dealerSeat = nextDealer;
 }
 
-function autoWinnerSid(){
+// --- NEU: Alle Gewinner (näherster Abstand) ermitteln
+function closestWinnerSids(){
   const sol = Number(state.round.question?.loesung);
-  if (!Number.isFinite(sol)) return null;
-  let best=null;
-  for(const {sid} of active()){
+  if (!Number.isFinite(sol)) return [];
+
+  // Kandidaten: aktive Spieler mit valider Schätzung
+  const cand = [];
+  for (const {sid} of active()){
     const g = Number(state.round.guesses[sid]);
-    if (!Number.isFinite(g)) continue;
-    const diff = Math.abs(g - sol);
-    if (!best || diff < best.diff) best = { sid, diff };
+    if (Number.isFinite(g)) {
+      cand.push({ sid, seat: state.players[sid].seat, diff: Math.abs(g - sol) });
+    }
   }
-  return best?.sid || null;
+  if (cand.length === 0) return [];
+
+  // minimalen Abstand bestimmen
+  const minDiff = Math.min(...cand.map(c => c.diff));
+  const winners = cand.filter(c => c.diff === minDiff);
+
+  // Stabil sortieren (Sitznummer intern 0..5) – relevant für Restchips
+  winners.sort((a,b)=> a.seat - b.seat);
+  return winners.map(w => w.sid);
 }
 
 function isSBorBB(sid){
@@ -284,19 +296,46 @@ function setAction(sid, type, amount){
   io.emit('actionInfo', { sid, type, amount }); // Broadcast (Clients nutzen CSS-seat aus publicPlayers)
 }
 
+// --- NEU: Split-Pot Showdown
 function resolveWinnerAndShowdown(){
-  const w = autoWinnerSid();
-  if (w && sidExists(w)) {
-    state.players[w].chips += state.table.pot;
+  const winners = closestWinnerSids();           // 0, 1 oder mehrere
+  const pot = state.table.pot || 0;
+
+  if (pot > 0 && winners.length > 0) {
+    const n = winners.length;
+    const share = Math.floor(pot / n);
+    let remainder = pot - share * n;
+
+    // Grundanteil an alle Gewinner
+    for (const sid of winners) {
+      if (sidExists(sid)) state.players[sid].chips += share;
+    }
+    // Restchips in Sitzreihenfolge verteilen
+    if (remainder > 0) {
+      const ordered = [...winners].sort((a,b)=> state.players[a].seat - state.players[b].seat);
+      for (let i=0; i<ordered.length && remainder>0; i++, remainder--){
+        const sid = ordered[i];
+        if (sidExists(sid)) state.players[sid].chips += 1;
+      }
+    }
   }
+
+  // Pot leeren
   state.table.pot = 0;
+
   // Spieler mit 0 Chips sind OUT
   for (const {sid} of seated()){
     const p = state.players[sid];
     if (p.chips <= 0) p.isOut = true;
   }
   state.round.phase = 'showdown';
-  admin.emit('winner', { winnerSid: w, solution: state.round.question?.loesung });
+
+  // Admin über Gewinner informieren (backwards-kompatibles winnerSid + neues winnerSids)
+  admin.emit('winner', { 
+    winnerSid: winners[0] || null, 
+    winnerSids: winners, 
+    solution: state.round.question?.loesung 
+  });
 }
 
 function tryAutoFinishRevealBet(){
