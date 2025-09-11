@@ -111,7 +111,6 @@
           <tbody></tbody>
         </table>
 
-        <!-- NEU: Massen-Chips -->
         <div class="row" style="margin-top:10px; align-items:center">
           <div>
             <div class="tiny">Massen-Chips</div>
@@ -154,6 +153,11 @@ let GLOBAL_STATE = null;
 function el(id){ return document.getElementById(id); }
 function h(html){ const d=document.createElement('div'); d.innerHTML=html.trim(); return d.firstElementChild; }
 function fmt(n){ return Number(n||0).toString(); }
+
+// Beim Connect einmal aktiv Guesses ziehen (falls vorher schon vorhanden)
+adminSock.on('connect', ()=> {
+  adminSock.emit('admin:getGuesses');
+});
 
 // Fragen
 (async function fillQuestions(){
@@ -265,6 +269,9 @@ function renderState(st){
 
   // Pot
   el('pot').textContent = fmt(st.table.pot);
+
+  // Nach jedem State auch aktiv die Guesses nachladen
+  adminSock.emit('admin:getGuesses');
 }
 
 // Admin sieht Guesses (Klartext) + pro Spieler Reveal-Schalter (Playersicht)
@@ -342,8 +349,11 @@ function onState(st){ renderState(st); renderChipTable(st); }
 adminSock.on('state', onState);
 clientSock.on('state', renderState);
 
-// >>> WICHTIG: Admin sieht Unzensiert – Live-Update <<<
-adminSock.on('admin:guesses', renderAdminGuesses);
+// >>> Admin-Guesses: mit Debug-Log
+adminSock.on('admin:guesses', (rows)=>{
+  console.log('[admin:guesses]', rows);
+  renderAdminGuesses(Array.isArray(rows) ? rows : []);
+});
 
 // Gewinner Popup (optional; bei Split kommt winnerSids zusätzlich im Server-Event)
 adminSock.on('winner', ({ winnerSid, solution, winnerSids }) => {
