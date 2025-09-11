@@ -1,5 +1,6 @@
 // server.js – QuizPoker v2.3
-// Features: 6-Sitz-Tisch, Admin-only Chips/Rebuys, zensierte Schätzungen (Players),
+// Features: 6-Sitz-Tisch (intern), UI-Mapping auf 8 Slots (2/6 leer),
+// Admin-only Chips/Rebuys, zensierte Schätzungen (Players),
 // Admin sieht Schätzungen immer im Klartext, SB/BB-Sperre in Bet1,
 // stabile Betting-Logik, Action-Broadcasts, OUT-Status,
 // Bots (add/remove), Reveal-Bet-Phase nach Lösung, Auto-Showdown
@@ -25,23 +26,28 @@ app.get('/healthz', (_req, res) => res.status(200).type('text').send('OK'));
 // ─────────────────────────────────────────────────────────────
 // Konfiguration & State
 // ─────────────────────────────────────────────────────────────
-const MAX_SEATS   = 6;            // <<< nur noch 6 Plätze (0..5) – 2/6 komplett entfernt
+const MAX_SEATS   = 6;            // 6 interne Plätze (0..5)
 const START_CHIPS = 1500;
 
+// Abbildung interne Sitz-IDs → CSS-Sitze (8-Slot-Layout, 2 & 6 leer)
+const CSS_SLOTS = 8;
+const CSS_POS   = [0, 1, 3, 4, 5, 7]; // interne 0..5 → CSS 0,1,3,4,5,7
+const seatIdxToCss = (i)=> (Number.isInteger(i) && i>=0 && i<MAX_SEATS) ? CSS_POS[i] : null;
+
 const state = {
-  players: {},   // sid -> {id,name,avatar,seat,chips,inHand,committed,isOut,lastAction,isBot}
-  seats: Array(MAX_SEATS).fill(null),
+  players: {},   // sid -> {id,name,avatar,seat(int),chips,inHand,committed,isOut,lastAction,isBot}
+  seats: Array(MAX_SEATS).fill(null), // interne Sitzliste 0..5
   table: {
-    dealerSeat: 0,
+    dealerSeat: 0,           // intern (0..5)
     smallBlind: 10,
     bigBlind: 20,
     pot: 0,
     currentBet: 0,
     minRaise: 20,
-    actingSeat: null,
-    lastAggressorSeat: null,
-    sbSeat: null,
-    bbSeat: null,
+    actingSeat: null,        // intern (0..5)
+    lastAggressorSeat: null, // intern (0..5)
+    sbSeat: null,            // intern (0..5)
+    bbSeat: null,            // intern (0..5)
   },
   // Phasen: lobby | collect_guesses | bet1 | hint1 | bet2 | hint2 | bet3 | reveal | reveal_bet | showdown
   round: {
@@ -69,25 +75,29 @@ try {
 }
 
 // ─────────────────────────────────────────────────────────────
-// Helper
+// Helper – Public Mapping (intern → CSS/Client)
 // ─────────────────────────────────────────────────────────────
-function roleForSeat(seat) {
-  if (seat === state.table.sbSeat) return 'SB';
-  if (seat === state.table.bbSeat) return 'BB';
+function roleForSeat(seatInt) {
+  if (seatInt === state.table.sbSeat) return 'SB';
+  if (seatInt === state.table.bbSeat) return 'BB';
   return null;
 }
 
 function publicPlayers() {
   return Object.fromEntries(
-    Object.entries(state.players).map(([sid, p]) => [sid, {
-      id: p.id, name: p.name, seat: p.seat, avatar: p.avatar,
-      chips: p.chips, inHand: p.inHand, committed: p.committed||0,
-      hasGuessed: state.round.guesses[sid] !== undefined,
-      role: roleForSeat(p.seat),
-      isOut: !!p.isOut,
-      lastAction: p.lastAction || null,
-      isBot: !!p.isBot,
-    }])
+    Object.entries(state.players).map(([sid, p]) => {
+      const seatCss = seatIdxToCss(p.seat);
+      const role = roleForSeat(p.seat);
+      return [sid, {
+        id: p.id, name: p.name, seat: seatCss, avatar: p.avatar,
+        chips: p.chips, inHand: p.inHand, committed: p.committed||0,
+        hasGuessed: state.round.guesses[sid] !== undefined,
+        role: role ? role : null,
+        isOut: !!p.isOut,
+        lastAction: p.lastAction || null,
+        isBot: !!p.isBot,
+      }];
+    })
   );
 }
 
@@ -102,8 +112,18 @@ function publicQuestion() {
   };
 }
 
+function publicSeatsCssArray() {
+  // 8er-Array für die UI; Slots 2 & 6 bleiben leer
+  const arr = Array(CSS_SLOTS).fill(null);
+  state.seats.forEach((sid, seatInt) => {
+    const css = seatIdxToCss(seatInt);
+    if (css != null) arr[css] = sid;
+  });
+  return arr;
+}
+
 function publicGuessesForPlayers() {
-  // Spieler sehen nur zensiert, außer Admin hat exakt diesen Spieler freigegeben
+  // Spieler sehen nur zensiert (ausgenommen individuell "revealed")
   return Object.entries(state.round.guesses).map(([sid, val]) => ({
     sid,
     name: state.players[sid]?.name || '???',
@@ -113,7 +133,7 @@ function publicGuessesForPlayers() {
 }
 
 function adminGuessesFull() {
-  // Admin sieht immer Klartext + Reveal-Flag (für Spieler)
+  // Admin sieht immer Klartext
   return Object.entries(state.round.guesses).map(([sid, val]) => ({
     sid,
     name: state.players[sid]?.name || '???',
@@ -125,17 +145,17 @@ function adminGuessesFull() {
 function publicState() {
   return {
     players: publicPlayers(),
-    seats: state.seats,
+    seats: publicSeatsCssArray(), // UI-kompatibel (8 Slots; 2 & 6 leer)
     table: {
-      dealerSeat: state.table.dealerSeat,
+      dealerSeat: seatIdxToCss(state.table.dealerSeat),
       smallBlind: state.table.smallBlind,
       bigBlind: state.table.bigBlind,
       pot: state.table.pot,
       currentBet: state.table.currentBet,
       minRaise: state.table.minRaise,
-      actingSeat: state.table.actingSeat,
-      sbSeat: state.table.sbSeat,
-      bbSeat: state.table.bbSeat,
+      actingSeat: seatIdxToCss(state.table.actingSeat),
+      sbSeat: seatIdxToCss(state.table.sbSeat),
+      bbSeat: seatIdxToCss(state.table.bbSeat),
     },
     round: {
       phase: state.round.phase,
@@ -148,10 +168,13 @@ function publicState() {
 
 function broadcast(){
   io.emit('state', publicState());
-  io.emit('guesses:public', publicGuessesForPlayers()); // für alle Spieler
-  admin.emit('admin:guesses', adminGuessesFull());      // Admin immer Klartext
+  io.emit('guesses:public', publicGuessesForPlayers());
+  admin.emit('admin:guesses', adminGuessesFull());
 }
 
+// ─────────────────────────────────────────────────────────────
+// Helper – Engine (intern arbeitet mit 0..5)
+// ─────────────────────────────────────────────────────────────
 function sidExists(sid){ return !!(sid && state.players[sid]); }
 function seated(){ return state.seats.map((sid,seat)=>({sid,seat})).filter(x=>sidExists(x.sid)); }
 function active(){ return seated().filter(x=>state.players[x.sid].inHand); }
@@ -197,7 +220,7 @@ function postBlinds(){
   }
   state.table.currentBet = Math.max(SB, BB);
   state.table.minRaise = BB;
-  // Erste Action: Spieler nach BB
+  // Erste Action: Spieler nach BB (intern)
   state.table.actingSeat = nextActiveSeat(bbSeat);
 }
 
@@ -231,7 +254,7 @@ function newHandSetup(){
   }
   state.table.pot = 0;
   resetBets();
-  // Dealer-Rotation: nächster aktiver Spieler
+  // Dealer-Rotation: nächster aktiver Spieler (intern)
   const nextDealer = nextActiveSeat(state.table.dealerSeat ?? 0) ?? nextActiveSeat(-1);
   if (nextDealer != null) state.table.dealerSeat = nextDealer;
 }
@@ -257,7 +280,7 @@ function isSBorBB(sid){
 function setAction(sid, type, amount){
   const p = state.players[sid]; if(!p) return;
   p.lastAction = amount!=null ? { type, amount } : { type };
-  io.emit('actionInfo', { sid, type, amount }); // Broadcast für Admin & Spieler
+  io.emit('actionInfo', { sid, type, amount }); // Broadcast (Clients nutzen CSS-seat aus publicPlayers)
 }
 
 function resolveWinnerAndShowdown(){
@@ -452,12 +475,18 @@ io.on('connection', socket => {
   socket.on('join', ({ name, avatar }) => {
     name = String(name||'').trim().slice(0,20) || 'Spieler';
     avatar = String(avatar||'').trim().slice(0,200);
+
+    // freien internen Sitz (0..5) suchen
     const seat = state.seats.findIndex(x=>x===null);
     if (seat === -1) return socket.emit('errorMsg', 'Tisch ist voll.');
 
     state.seats[seat] = socket.id;
-    state.players[socket.id] = { id: socket.id, name, avatar, seat, chips: START_CHIPS, inHand: false, committed: 0, isOut:false, lastAction:null, isBot:false };
-    socket.emit('joined', { seat });
+    state.players[socket.id] = {
+      id: socket.id, name, avatar, seat,
+      chips: START_CHIPS, inHand: false, committed: 0,
+      isOut:false, lastAction:null, isBot:false
+    };
+    socket.emit('joined', { seatCss: seatIdxToCss(seat) });
     broadcast();
   });
 
