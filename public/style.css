@@ -98,6 +98,7 @@ body{
   z-index:3;
 }
 
+/* Seats */
 .seat{
   position:absolute;
   width:140px;
@@ -122,11 +123,11 @@ body{
 /* Sitzpositionen (0 top, Uhrzeigersinn) */
 .seat.s0{left:50%;top:4%;transform:translate(-50%,0)}
 .seat.s1{right:8%;top:18%}
-/* s2 und s6 optional entfernt, wenn gewünscht → einfach nicht rendern */
+/* s2 und s6 dauerhaft entfernt */
 .seat.s2{display:none}
-.seat.s3{right:8%;bottom:20%}              /* leicht höher */
-.seat.s4{left:50%;bottom:8%;transform:translate(-50%,0)} /* höher */
-.seat.s5{left:8%;bottom:20%}               /* leicht höher */
+.seat.s3{right:8%;bottom:20%}
+.seat.s4{left:50%;bottom:8%;transform:translate(-50%,0)}
+.seat.s5{left:8%;bottom:20%}
 .seat.s6{display:none}
 .seat.s7{left:8%;top:18%}
 
@@ -156,7 +157,7 @@ body{
   100%{ transform:translate(-50%,-100%) scale(1); opacity:.9 }
 }
 
-/* Action-Flags */
+/* Action-Flags (Spieleransicht: untereinander) */
 .act-flag{
   margin-top:4px;
   font-size:11px;
@@ -171,7 +172,11 @@ body{
 .act-flag.allin{ background:#dc2626; color:#fff; animation:pulseTurn 1.2s infinite; }
 .act-flag.fold{ background:#991b1b; color:#fff; }
 
-/* OUT Badge */
+/* Fold/Out Status */
+.seat.folded{ opacity:.6 }
+.seat.out{ opacity:.6; filter:saturate(.45) }
+
+/* OUT Badge (Spieleransicht) */
 .seat .out-badge{
   margin-top:6px;
   display:inline-block;
@@ -184,4 +189,17 @@ body{
   text-transform:uppercase;
 }
 
-
+/* Guess-Chip (am Sitzboden) */
+.guess-chip{
+  position:absolute;
+  left:50%;
+  bottom:-8px;
+  transform:translate(-50%,100%);
+  font-size:11px;
+  padding:3px 8px;
+  border-radius:999px;
+  border:1px solid #334155;
+  background:#0b1324;
+  white-space:nowrap;
+}
+.guess-chip.dim{ opacity:.55 }
