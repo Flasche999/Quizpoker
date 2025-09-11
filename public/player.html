@@ -90,10 +90,9 @@ sock.on('connect', ()=>{ MY_ID = sock.id; });
 sock.on('sound', ({key})=>{ const a = sounds[key]; if(a){ try{ a.currentTime=0; a.play(); }catch(e){} }});
 sock.on('errorMsg', (m)=> alert(m));
 
-// Öffentliche Schätzungen (für alle Spieler sichtbar, abhängig vom Reveal pro Spieler)
+// Öffentliche Schätzungen (abhängig vom Reveal pro Spieler)
 sock.on('guesses:public', rows => {
   PUBLIC_GUESSES = Array.isArray(rows) ? rows : [];
-  // wenn bereits State gerendert ist, Sitz-Chips aktualisieren
   if (GLOBAL_STATE) renderState(GLOBAL_STATE);
 });
 
@@ -178,13 +177,14 @@ function renderState(st){
         : 'Schätz-Phase vorbei.')
     : 'Warte auf nächste Frage…';
 
-  // Action-Buttons aktivieren, wenn Bet-Phase & „dran“ & in Hand
-  const isBet = ['bet1','bet2','bet3'].includes(round?.phase);
+  // Bet-Phasen: klassische bet1/bet2/bet3 + finale Bet in reveal/final_bet
+  const betPhases = ['bet1','bet2','bet3','reveal','final_bet'];
+  const isBet = betPhases.includes(round?.phase);
   const iAmActing = isBet && me && (table.actingSeat === me.seat) && me.inHand;
   setDisabled('.act', !iAmActing);
   $('actInfo').textContent = iAmActing
-    ? 'Du bist dran.'
-    : 'Aktionen sind nur in Bet-Phasen möglich und wenn du dran bist.';
+    ? (round?.phase==='reveal' || round?.phase==='final_bet' ? 'Finale Setzrunde: Du bist dran.' : 'Du bist dran.')
+    : (isBet ? 'Warte bis du dran bist…' : 'Aktionen nur in Bet-Phasen.');
 
   // Seats rendern
   const seatsWrap = $('seats'); seatsWrap.innerHTML='';
@@ -231,7 +231,6 @@ function renderState(st){
         const chip = h(`<div class="guess-chip${g.revealed?'':' dim'}">${text}</div>`);
         seat.appendChild(chip);
       } else if (p.hasGuessed) {
-        // Falls Stream noch nicht kam, aber wir wissen, dass er geschätzt hat
         seat.appendChild(h('<div class="guess-chip dim">Guess abgegeben</div>'));
       }
     }else{
