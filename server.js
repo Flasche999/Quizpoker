@@ -1,4 +1,5 @@
-// server.js – QuizPoker v2.1 (Admin-only Chips/Rebuys, zensierte Schätzungen, SB/BB-Sperre in Runde 1, stabile Betting-Logik)
+// server.js – QuizPoker v2.1 (Admin-only Chips/Rebuys, zensierte Schätzungen,
+// SB/BB-Sperre in Runde 1, stabile Betting-Logik, Action-Broadcasts, OUT-Status)
 import express from 'express';
 import http from 'http';
 import { Server } from 'socket.io';
@@ -24,7 +25,7 @@ const MAX_SEATS   = 8;
 const START_CHIPS = 1500;
 
 const state = {
-  players: {},                      // socketId -> {id,name,avatar,seat,chips,inHand,committed}
+  players: {},                      // socketId -> {id,name,avatar,seat,chips,inHand,committed,isOut,lastAction}
   seats: Array(MAX_SEATS).fill(null),
   table: {
     dealerSeat: 0,
@@ -77,6 +78,8 @@ function publicPlayers() {
       chips: p.chips, inHand: p.inHand, committed: p.committed||0,
       hasGuessed: state.round.guesses[sid] !== undefined,
       role: roleForSeat(p.seat),
+      isOut: !!p.isOut,
+      lastAction: p.lastAction || null, // z.B. {type:'raise', amount:120}
     }])
   );
 }
@@ -181,6 +184,7 @@ function postBlinds(){
     p.chips -= pay;
     p.committed = (p.committed||0) + pay;
     state.table.pot += pay;
+    if (p.chips <= 0) p.isOut = true; // NEW: OUT, falls blind all-in war
   }
   state.table.currentBet = Math.max(SB, BB);
   state.table.minRaise = BB;
@@ -211,8 +215,10 @@ function finishBettingPhase(){
 function newHandSetup(){
   for(const {sid} of seated()){
     if (!sidExists(sid)) continue;
-    state.players[sid].inHand = state.players[sid].chips > 0;
-    state.players[sid].committed = 0;
+    const p = state.players[sid];
+    p.inHand = (p.chips > 0) && !p.isOut; // NEW: OUT-Spieler bleiben draußen
+    p.committed = 0;
+    p.lastAction = null;
   }
   state.table.pot = 0;
   resetBets();
@@ -239,6 +245,12 @@ function isSBorBB(sid){
   return seat === state.table.sbSeat || seat === state.table.bbSeat;
 }
 
+function setAction(sid, type, amount){
+  const p = state.players[sid]; if(!p) return;
+  p.lastAction = amount!=null ? { type, amount } : { type };
+  io.emit('actionInfo', { sid, type, amount }); // NEW: Broadcast
+}
+
 // ─────────────────────────────────────────────────────────────
 // Socket.IO – Spieler
 // ─────────────────────────────────────────────────────────────
@@ -250,7 +262,7 @@ io.on('connection', socket => {
     if (seat === -1) return socket.emit('errorMsg', 'Tisch ist voll.');
 
     state.seats[seat] = socket.id;
-    state.players[socket.id] = { id: socket.id, name, avatar, seat, chips: START_CHIPS, inHand: false, committed: 0 };
+    state.players[socket.id] = { id: socket.id, name, avatar, seat, chips: START_CHIPS, inHand: false, committed: 0, isOut:false, lastAction:null };
     socket.emit('joined', { seat });
     broadcast();
   });
@@ -265,7 +277,7 @@ io.on('connection', socket => {
     broadcast();
   });
 
-  // Spieler-Schätzung: nur während collect_guesses; nur einmal; danach gesperrt bis nächste Frage
+  // Spieler-Schätzung
   socket.on('submitGuess', ({ value }) => {
     if (state.round.phase !== 'collect_guesses') return socket.emit('errorMsg', 'Schätzen ist aktuell gesperrt.');
     const num = Number(value);
@@ -277,7 +289,7 @@ io.on('connection', socket => {
     state.round.guessRevealed[socket.id] = false; // standard: zensiert
     broadcast();
 
-    // Wenn alle sitzenden Spieler (nicht nur inHand) geschätzt haben → weiter zur Bet1
+    // Wenn alle sitzenden Spieler geschätzt haben → weiter zu Bet1
     const seatsNow = seated();
     const allSubmitted = seatsNow.length>0 && seatsNow.every(({sid})=> state.round.guesses[sid]!==undefined);
     if (allSubmitted) {
@@ -306,6 +318,7 @@ io.on('connection', socket => {
 
     if (type === 'fold') {
       p.inHand = false;
+      setAction(socket.id, 'fold');
       const activesLeft = active();
       if (activesLeft.length <= 1) finishBettingPhase();
       else { goNextActor(); }
@@ -315,6 +328,7 @@ io.on('connection', socket => {
 
     if (type === 'check') {
       if (toCall !== 0) return;
+      setAction(socket.id, 'check');
       goNextActor();
       if (everyoneDone()) finishBettingPhase();
       broadcast();
@@ -324,6 +338,8 @@ io.on('connection', socket => {
     if (type === 'call') {
       const pay = Math.min(p.chips, toCall);
       p.chips -= pay; p.committed = (p.committed||0) + pay; state.table.pot += pay;
+      if (p.chips <= 0) p.isOut = true; // kann nach der Hand OUT sein
+      setAction(socket.id, 'call', pay);
       goNextActor();
       if (everyoneDone()) finishBettingPhase();
       broadcast();
@@ -339,10 +355,12 @@ io.on('connection', socket => {
       if (pay <= 0) return;
 
       p.chips -= pay; p.committed = (p.committed||0) + pay; state.table.pot += pay;
+      if (p.chips <= 0) p.isOut = true;
       state.table.currentBet = Math.max(state.table.currentBet, p.committed);
       state.table.lastAggressorSeat = p.seat;
       state.table.minRaise = Math.max(state.table.minRaise, state.table.bigBlind);
 
+      setAction(socket.id, 'raise', p.committed);
       goNextActor();
       broadcast();
       return;
@@ -356,13 +374,15 @@ io.on('connection', socket => {
         state.table.currentBet = p.committed;
         state.table.lastAggressorSeat = p.seat;
       }
+      p.isOut = true; // nach der Hand OUT
+      setAction(socket.id, 'allin', p.committed);
       goNextActor();
       broadcast();
       return;
     }
   });
 
-  // WICHTIG: Spieler können NICHT selbst Rebuy/Chips ändern – blockieren
+  // Spieler können KEIN Rebuy / Chips ändern
   socket.on('rebuy', () => socket.emit('errorMsg', 'Rebuy/Chips nur durch den Admin.'));
   socket.on('adjustChips', () => socket.emit('errorMsg', 'Chips können nur vom Admin geändert werden.'));
 
@@ -386,7 +406,7 @@ admin.on('connection', socket => {
   socket.emit('state', publicState());
   socket.emit('admin:guesses', adminGuessesFull());
 
-  // Runde starten → Schätzen SOFORT offen, danach gesperrt (nach Abgabe)
+  // Runde starten → Schätzen SOFORT offen
   socket.on('startRound', ({ questionId }) => {
     const q = FRAGEN.find(f => String(f.id) === String(questionId)) || FRAGEN[0];
     state.round.phase = 'collect_guesses';
@@ -394,7 +414,6 @@ admin.on('connection', socket => {
     state.round.hintsRevealed = 0;
     state.round.guesses = {};
     state.round.guessRevealed = {};
-    // Hand-Setup erst NACH Abschluss der Schätzungen (wenn wir in bet1 wechseln)
     admin.emit('state', publicState());
     broadcast();
   });
@@ -431,13 +450,18 @@ admin.on('connection', socket => {
     broadcast();
   });
 
-  // Gewinner automatisch nach nächster Distanz zur Lösung
+  // Gewinner automatisch nach Distanz zur Lösung
   socket.on('resolveWinner', () => {
     const w = autoWinner();
     if (w && sidExists(w)) {
       state.players[w].chips += state.table.pot;
       state.table.pot = 0;
       admin.emit('sound', { key: 'correct' });
+      // Spieler, die jetzt 0 haben, sind OUT
+      for (const {sid} of seated()){
+        const p = state.players[sid];
+        if (p.chips <= 0) p.isOut = true;
+      }
     }
     state.round.phase = 'showdown';
     admin.emit('winner', { winnerSid: w, solution: state.round.question?.loesung });
@@ -456,6 +480,7 @@ admin.on('connection', socket => {
     const p = state.players[sid];
     if (!p) return;
     p.chips = Math.max(0, (p.chips || 0) + Number(delta || 0));
+    if (p.chips > 0) p.isOut = false; // NEW: Out zurücknehmen, wenn wieder Chips
     broadcast();
   });
 
@@ -465,6 +490,7 @@ admin.on('connection', socket => {
     const add = Number(amount ?? START_CHIPS);
     if (!Number.isFinite(add) || add <= 0) return;
     p.chips += add;
+    if (p.chips > 0) p.isOut = false; // NEW
     broadcast();
   });
 
@@ -492,7 +518,6 @@ admin.on('connection', socket => {
 
   // ── Schätzungen sperren/öffnen & Sichtbarkeit steuern ──
   socket.on('admin:lockGuesses', () => {
-    // Nach unserem Flow sind Guesses nur in collect_guesses möglich; Lock = Phasewechsel erzwungen
     if (state.round.phase === 'collect_guesses') {
       state.round.phase = 'bet1';
       newHandSetup();
