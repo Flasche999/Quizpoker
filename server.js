@@ -509,14 +509,11 @@ function playerAction(sid, type, amount){
 }
 
 // ─────────────────────────────────────────────────────────────
-// Socket.IO – Spieler (menschliche)
-// ─────────────────────────────────────────────────────────────
 io.on('connection', socket => {
   socket.on('join', ({ name, avatar }) => {
     name = String(name||'').trim().slice(0,20) || 'Spieler';
     avatar = String(avatar||'').trim().slice(0,200);
 
-    // freien internen Sitz (0..5) suchen
     const seat = state.seats.findIndex(x=>x===null);
     if (seat === -1) return socket.emit('errorMsg', 'Tisch ist voll.');
 
@@ -552,26 +549,22 @@ io.on('connection', socket => {
     state.round.guessRevealed[socket.id] = false; // standard zensiert (Playersicht)
     broadcast();
 
-    // Wenn alle sitzenden Spieler geschätzt haben → weiter zu Bet1
     const seatsNow = seated();
     const allSubmitted = seatsNow.length>0 && seatsNow.every(({sid})=> state.round.guesses[sid]!==undefined);
     if (allSubmitted) {
       state.round.phase = 'bet1';
-      newHandSetup();          // setzt inHand & committed zurück
-      postBlinds();            // SB/BB + erste Action
+      newHandSetup();
+      postBlinds();
       broadcast();
       setTimeout(botActIfTurn, 200);
     }
   });
 
-  // Spieler-Aktionen (menschlich)
   socket.on('action', ({ type, amount }) => {
     playerAction(socket.id, type, amount);
-    // Evtl. ist nun ein Bot dran
     setTimeout(botActIfTurn, 200);
   });
 
-  // Spieler können KEIN Rebuy / Chips ändern
   socket.on('rebuy', () => socket.emit('errorMsg', 'Rebuy/Chips nur durch den Admin.'));
   socket.on('adjustChips', () => socket.emit('errorMsg', 'Chips können nur vom Admin geändert werden.'));
 
@@ -593,6 +586,11 @@ const admin = io.of('/admin');
 admin.on('connection', socket => {
   socket.emit('state', publicState());
   socket.emit('admin:guesses', adminGuessesFull());
+
+  // >>> NEU: aktives Nachladen der Guesses
+  socket.on('admin:getGuesses', () => {
+    socket.emit('admin:guesses', adminGuessesFull());
+  });
 
   // Runde starten → Schätzen offen
   socket.on('startRound', ({ questionId }) => {
@@ -631,7 +629,6 @@ admin.on('connection', socket => {
   socket.on('goReveal', () => {
     state.round.phase = 'reveal';
     broadcast();
-    // Start der letzten Setzrunde
     state.round.phase = 'reveal_bet';
     resetBets();
     state.table.actingSeat = nextActiveSeat(state.table.dealerSeat);
@@ -680,7 +677,7 @@ admin.on('connection', socket => {
     for (const p of Object.values(state.players)) {
       p.chips = a;
       p.isOut = p.chips <= 0;
-      p.inHand = false;       // sauberer Reset – neue Hand setzt wieder korrekt
+      p.inHand = false;
       p.committed = 0;
       p.lastAction = null;
     }
@@ -695,7 +692,6 @@ admin.on('connection', socket => {
     for (const p of Object.values(state.players)) {
       p.chips = Math.max(0, (p.chips || 0) + d);
       p.isOut = p.chips <= 0;
-      // inHand bleibt unverändert; committed ggf. begrenzen
       if ((p.committed || 0) > p.chips) p.committed = p.chips;
     }
     broadcast();
