@@ -98,6 +98,10 @@
     <div class="row">
       <div class="card" style="flex:1;min-width:420px">
         <h2 class="h">Schätzungen (Admin – immer Klartext)</h2>
+        <div class="row" style="align-items:center; margin-bottom:6px">
+          <button class="btn" id="refreshGuesses">Guesses neu laden</button>
+          <span class="tiny">Wird außerdem nach jedem State automatisch aktualisiert.</span>
+        </div>
         <table class="tbl" id="guessTable">
           <thead><tr><th>Spieler</th><th>Schätzung</th><th>Playersicht sichtbar</th></tr></thead>
           <tbody></tbody>
@@ -146,20 +150,37 @@
   </div>
 
 <script>
-const adminSock = io('/admin');
-const clientSock = io();
-let GLOBAL_STATE = null;
+/* ──────────────────────────────────────────────────────────
+   Sockets: Admin-Namespace + Default-Namespace (Dual-Wiring)
+   ────────────────────────────────────────────────────────── */
+const adminSock  = io('/admin'); // Admin-NS
+const clientSock = io();         // Default-NS
 
-function el(id){ return document.getElementById(id); }
-function h(html){ const d=document.createElement('div'); d.innerHTML=html.trim(); return d.firstElementChild; }
-function fmt(n){ return Number(n||0).toString(); }
+// Beim Default-NS auch dem Admin-Room beitreten (für Server, der ADMIN_ROOM nutzt)
+clientSock.on('connect', ()=> {
+  clientSock.emit('joinAdmin'); // erhält sofort state + admin:guesses vom Server
+});
 
-// Beim Connect einmal aktiv Guesses ziehen (falls vorher schon vorhanden)
+// Nach Connect im Admin-NS initiale Guesses ziehen (Snapshot)
 adminSock.on('connect', ()=> {
   adminSock.emit('admin:getGuesses');
 });
 
-// Fragen
+// Helper: gleichzeitig auf BEIDEN Kanälen senden → maximale Kompatibilität
+function emitAdmin(event, payload){
+  try { adminSock.emit(event, payload); } catch(e){}
+  try { clientSock.emit(event, payload); } catch(e){}
+}
+
+/* ──────────────────────────────────────────────────────────
+   Utils & Rendering
+   ────────────────────────────────────────────────────────── */
+let GLOBAL_STATE = null;
+function el(id){ return document.getElementById(id); }
+function h(html){ const d=document.createElement('div'); d.innerHTML=html.trim(); return d.firstElementChild; }
+function fmt(n){ return Number(n||0).toString(); }
+
+// Fragen-Dropdown befüllen
 (async function fillQuestions(){
   const sel = el('questionSelect'); sel.innerHTML='';
   try{
@@ -189,7 +210,7 @@ function playSound(key){
   const src = m[key]; if(src){ const a=new Audio(src); a.play().catch(()=>{}); }
 }
 adminSock.on('sound', ({key})=> playSound(key));
-clientSock.on('sound', ({key})=> playSound(key));
+clientSock.on('sound', ({key})=> playSound(key)); // Fallback
 
 // Action-Flag am Sitz
 function showActionFlag(seatEl, type, amount){
@@ -271,7 +292,7 @@ function renderState(st){
   el('pot').textContent = fmt(st.table.pot);
 
   // Nach jedem State auch aktiv die Guesses nachladen
-  adminSock.emit('admin:getGuesses');
+  emitAdmin('admin:getGuesses');
 }
 
 // Admin sieht Guesses (Klartext) + pro Spieler Reveal-Schalter (Playersicht)
@@ -290,7 +311,7 @@ function renderAdminGuesses(rows){
       <td style="text-align:center"><input type="checkbox" ${r.revealed?'checked':''} data-sid="${r.sid}" /></td>
     </tr>`);
     tr.querySelector('input[type=checkbox]').onchange = (e)=>{
-      adminSock.emit('admin:revealGuess', { sid: e.target.dataset.sid, reveal: e.target.checked });
+      emitAdmin('admin:revealGuess', { sid: e.target.dataset.sid, reveal: e.target.checked });
     };
     tb.appendChild(tr);
 
@@ -326,17 +347,17 @@ function renderChipTable(st){
       b.onclick = ()=>{
         const sid = b.dataset.sid;
         if (b.dataset.act === 'add'){
-          adminSock.emit('admin:adjustChips', { sid, delta: Number(b.dataset.d) });
+          emitAdmin('admin:adjustChips', { sid, delta: Number(b.dataset.d) });
         } else if (b.dataset.act === 'custom'){
           const amt = prompt('Chips (+/-) eingeben:','100');
           const delta = Number(amt);
           if (Number.isFinite(delta) && delta!==0){
-            adminSock.emit('admin:adjustChips', { sid, delta });
+            emitAdmin('admin:adjustChips', { sid, delta });
           }
         } else if (b.dataset.act === 'rb'){
           const amt = prompt('Rebuy-Betrag eingeben (leer = Standard):','');
           const amount = amt === '' ? undefined : Number(amt);
-          adminSock.emit('admin:rebuy', { sid, amount });
+          emitAdmin('admin:rebuy', { sid, amount });
         }
       };
     });
@@ -347,16 +368,18 @@ function renderChipTable(st){
 // Verdrahten
 function onState(st){ renderState(st); renderChipTable(st); }
 adminSock.on('state', onState);
-clientSock.on('state', renderState);
+clientSock.on('state', renderState); // Fallback
 
-// >>> Admin-Guesses: mit Debug-Log
-adminSock.on('admin:guesses', (rows)=>{
+// >>> Admin-Guesses: auf BEIDEN Sockets hören
+function onAdminGuesses(rows){
   console.log('[admin:guesses]', rows);
   renderAdminGuesses(Array.isArray(rows) ? rows : []);
-});
+}
+adminSock.on('admin:guesses', onAdminGuesses);
+clientSock.on('admin:guesses', onAdminGuesses); // Fallback
 
-// Gewinner Popup (optional; bei Split kommt winnerSids zusätzlich im Server-Event)
-adminSock.on('winner', ({ winnerSid, solution, winnerSids }) => {
+// Gewinner Popup (unterstützt winnerSids für Split-Pot)
+function onWinner({ winnerSid, solution, winnerSids }){
   if (Array.isArray(winnerSids) && winnerSids.length > 1) {
     const names = winnerSids.map(sid => GLOBAL_STATE?.players?.[sid]?.name || '—').join(', ');
     alert(`Split-Pot! Gewinner: ${names} (Lösung: ${solution})`);
@@ -364,7 +387,9 @@ adminSock.on('winner', ({ winnerSid, solution, winnerSids }) => {
     const p = GLOBAL_STATE?.players?.[winnerSid];
     alert(`Gewinner: ${p?.name || '—'} (Lösung: ${solution})`);
   }
-});
+}
+adminSock.on('winner', onWinner);
+clientSock.on('winner', onWinner); // Fallback
 
 // Live-Action-Flags
 function onActionInfo({sid, type, amount}){
@@ -374,49 +399,52 @@ function onActionInfo({sid, type, amount}){
   showActionFlag(seatEl, type, amount);
 }
 adminSock.on('actionInfo', onActionInfo);
-clientSock.on('actionInfo', onActionInfo);
+clientSock.on('actionInfo', onActionInfo); // Fallback
 
 // Buttons – Rundensteuerung
-document.querySelectorAll('[data-snd]').forEach(b=> b.onclick=()=> adminSock.emit('playSound', { key: b.dataset.snd }));
-el('startRound').onclick   = ()=> adminSock.emit('startRound', { questionId: el('questionSelect').value });
-el('lockGuesses').onclick  = ()=> adminSock.emit('admin:lockGuesses');
-el('revealHint1').onclick  = ()=> adminSock.emit('revealHint', 1);
-el('revealHint2').onclick  = ()=> adminSock.emit('revealHint', 2);
-el('goReveal').onclick     = ()=> adminSock.emit('goReveal');
-el('resolveWinner').onclick= ()=> adminSock.emit('resolveWinner');
+document.querySelectorAll('[data-snd]').forEach(b=> b.onclick=()=> emitAdmin('playSound', { key: b.dataset.snd }));
+el('startRound').onclick   = ()=> emitAdmin('startRound', { questionId: el('questionSelect').value });
+el('lockGuesses').onclick  = ()=> emitAdmin('admin:lockGuesses');
+el('revealHint1').onclick  = ()=> emitAdmin('revealHint', 1);
+el('revealHint2').onclick  = ()=> emitAdmin('revealHint', 2);
+el('goReveal').onclick     = ()=> emitAdmin('goReveal');
+el('resolveWinner').onclick= ()=> emitAdmin('resolveWinner');
 
-el('setBlinds').onclick    = ()=> adminSock.emit('admin:setBlinds', { small:Number(el('sbVal').value), big:Number(el('bbVal').value) });
-el('assignBlinds').onclick = ()=> adminSock.emit('admin:assignBlinds');
+el('setBlinds').onclick    = ()=> emitAdmin('admin:setBlinds', { small:Number(el('sbVal').value), big:Number(el('bbVal').value) });
+el('assignBlinds').onclick = ()=> emitAdmin('admin:assignBlinds');
 
-el('revealAll').onchange   = (e)=> adminSock.emit('admin:revealAllGuesses', { reveal: e.target.checked });
+el('revealAll').onchange   = (e)=> emitAdmin('admin:revealAllGuesses', { reveal: e.target.checked });
+
+// NEU: Guesses-Refresh Button
+el('refreshGuesses').onclick = ()=> emitAdmin('admin:getGuesses');
 
 // NEU: Massen-Chips Buttons
 el('setAllChips').onclick = ()=>{
   const v = Number(el('allChipsVal').value);
   if (!Number.isFinite(v) || v < 0) return alert('Bitte gültigen Betrag eingeben (≥ 0).');
   if (!confirm(`Wirklich ALLEN Spielern genau ${v} Chips setzen?`)) return;
-  adminSock.emit('admin:setAllChips', { amount: v });
+  emitAdmin('admin:setAllChips', { amount: v });
 };
 el('addAllChips').onclick = ()=>{
   const v = Number(el('allChipsVal').value);
   if (!Number.isFinite(v)) return alert('Bitte gültigen Betrag eingeben.');
-  adminSock.emit('admin:addChipsAll', { delta: v });
+  emitAdmin('admin:addChipsAll', { delta: v });
 };
 
 // KI-Buttons
 el('addBot').onclick = ()=>{
   const name = (el('botName').value||'').trim() || undefined;
-  adminSock.emit('admin:addBot', { name });
+  emitAdmin('admin:addBot', { name });
 };
 el('addBot3').onclick = ()=>{
   const base = (el('botName').value||'Bot').trim() || 'Bot';
   for(let i=1;i<=3;i++){
-    adminSock.emit('admin:addBot', { name: `${base} ${i}` });
+    emitAdmin('admin:addBot', { name: `${base} ${i}` });
   }
 };
 el('removeBots').onclick = ()=>{
   if (!confirm('Wirklich alle Bots entfernen?')) return;
-  adminSock.emit('admin:removeAllBots');
+  emitAdmin('admin:removeAllBots');
 };
 </script>
 </body>
