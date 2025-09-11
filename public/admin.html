@@ -24,7 +24,7 @@
     .btn.warn{ border-color:#7c2d12; background:#2b140f }
     .btn.bad{ border-color:#7f1d1d; background:#2b0f0f }
     .btn:disabled{ opacity:.6; cursor:not-allowed }
-    input[type=number]{ width:90px }
+    input[type=number]{ width:120px }
     .w120{ width:120px }
 
     /* Sitz-Overlays */
@@ -110,6 +110,17 @@
           <thead><tr><th>Spieler</th><th>Chips</th><th>Aktionen</th></tr></thead>
           <tbody></tbody>
         </table>
+
+        <!-- NEU: Massen-Chips -->
+        <div class="row" style="margin-top:10px; align-items:center">
+          <div>
+            <div class="tiny">Massen-Chips</div>
+            <input class="input" id="allChipsVal" type="number" value="10000" min="0" />
+          </div>
+          <button class="btn ok" id="setAllChips">Allen auf Betrag setzen</button>
+          <button class="btn" id="addAllChips">Allen +Betrag geben</button>
+          <div class="tiny">Setzen = exakt, +Betrag = additiv.</div>
+        </div>
       </div>
     </div>
 
@@ -213,7 +224,7 @@ function renderState(st){
   el('sbVal').value = st.table.smallBlind ?? el('sbVal').value;
   el('bbVal').value = st.table.bigBlind ?? el('bbVal').value;
 
-  // Seats – KEIN Filter mehr auf 2/6 (Admin sieht alle)
+  // Seats – Slots 2 & 6 werden im CSS/Mapping ohnehin leer bleiben
   const seatsWrap = el('seats'); seatsWrap.innerHTML='';
   st.seats.forEach((sid,i)=>{
     const p = sid ? st.players[sid] : null;
@@ -358,6 +369,19 @@ el('setBlinds').onclick    = ()=> adminSock.emit('admin:setBlinds', { small:Numb
 el('assignBlinds').onclick = ()=> adminSock.emit('admin:assignBlinds');
 
 el('revealAll').onchange   = (e)=> adminSock.emit('admin:revealAllGuesses', { reveal: e.target.checked });
+
+// NEU: Massen-Chips Buttons
+el('setAllChips').onclick = ()=>{
+  const v = Number(el('allChipsVal').value);
+  if (!Number.isFinite(v) || v < 0) return alert('Bitte gültigen Betrag eingeben (≥ 0).');
+  if (!confirm(`Wirklich ALLEN Spielern genau ${v} Chips setzen?`)) return;
+  adminSock.emit('admin:setAllChips', { amount: v });
+};
+el('addAllChips').onclick = ()=>{
+  const v = Number(el('allChipsVal').value);
+  if (!Number.isFinite(v)) return alert('Bitte gültigen Betrag eingeben.');
+  adminSock.emit('admin:addChipsAll', { delta: v });
+};
 
 // KI-Buttons
 el('addBot').onclick = ()=>{
