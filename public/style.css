@@ -56,6 +56,9 @@ body{
   border:12px solid var(--ring);
   box-shadow:inset 0 0 80px rgba(0,0,0,.35), 0 10px 35px rgba(0,0,0,.45)
 }
+/* Seats-Layer unbedingt absolut über dem Tisch halten */
+#seats{position:absolute; inset:0; z-index:2}
+
 .pot{
   position:absolute;
   left:50%;
@@ -64,7 +67,8 @@ body{
   background:#0b1324;
   border:1px solid #22314b;
   border-radius:16px;
-  padding:10px 14px
+  padding:10px 14px;
+  z-index:4;
 }
 .badge{
   display:inline-block;
@@ -86,7 +90,8 @@ body{
   justify-content:center;
   font-weight:700;
   border:2px solid #333;
-  box-shadow:0 2px 8px rgba(0,0,0,.35)
+  box-shadow:0 2px 8px rgba(0,0,0,.35);
+  z-index:3;
 }
 
 .seat{
