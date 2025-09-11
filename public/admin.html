@@ -7,50 +7,22 @@
   <link rel="stylesheet" href="/style.css" />
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
   <style>
+    /* Nur UI-Controls, KEIN Tisch-/Seat-Layout hier! */
     .tbl { width:100%; border-collapse:collapse; font-size:14px }
     .tbl th,.tbl td{ border:1px solid #2a2f3a; padding:6px 8px; text-align:left }
     .badge{ display:inline-block; padding:1px 6px; border-radius:6px; font-size:11px; border:1px solid #2a2f3a; margin-left:6px }
     .badge.sb{ background:#20324b }
     .badge.bb{ background:#4b2020 }
     .tiny{ font-size:12px; opacity:.8 }
-    .turn{ outline:2px solid #7aa2ff; border-radius:12px }
-
-    /* --- Tisch & Seats: absolute Layer, keine Flex-Row --- */
-    .table-wrap{ position:relative; min-height:520px }
-    .table{ position:absolute; inset:0; border-radius:999px;
-            background:radial-gradient(circle at 50% 35%, #203142 0, #111826 60%);
-            box-shadow:0 0 40px rgba(0,0,0,.5); z-index:1; }
-    #seats{ position:absolute; inset:0; z-index:2; }       /* WICHTIG: keine .row/.flex hier */
-    .seat{ position:absolute; width:160px; text-align:center;
-           padding:8px; border:1px solid #262b36; border-radius:12px; background:#0b0f18 }
-    .seat img{ width:44px; height:44px; border-radius:10px; object-fit:cover }
-    .seat .name{ margin-top:4px }
-    .dealer{ position:absolute; width:20px; height:20px; background:#ffd54a; color:#000;
-             border-radius:50%; display:flex; align-items:center; justify-content:center;
-             font-weight:700; z-index:3 }
-    .pot{ position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
-          padding:6px 12px; border:1px solid #262b36; border-radius:999px;
-          background:#0f1118; z-index:4 }
-
-    /* 8 feste Sitz-Positionen am Oval (s0..s7) */
-    .s0{left:50%;top:6%; transform:translate(-50%,0)}
-    .s1{left:80%;top:18%; transform:translate(-50%,0)}
-    .s2{left:92%;top:50%; transform:translate(-50%,-50%)}
-    .s3{left:80%;top:82%; transform:translate(-50%,-100%)}
-    .s4{left:50%;top:94%; transform:translate(-50%,-100%)}
-    .s5{left:20%;top:82%; transform:translate(-50%,-100%)}
-    .s6{left:8%; top:50%; transform:translate(-50%,-50%)}
-    .s7{left:20%;top:18%; transform:translate(-50%,0)}
-
     .controls .btn{ margin-right:6px; margin-top:6px }
-    .row { display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end }
-    .card { background:#0f1118; border:1px solid #262b36; border-radius:12px; padding:12px; margin-bottom:12px }
-    .container{ max-width:1200px; margin:0 auto; padding:12px }
-    .h{ margin:0 0 8px 0 }
-    .btn{ padding:8px 10px; border-radius:10px; border:1px solid #2a2f3a; background:#1a1f2b; cursor:pointer }
-    .btn.ok{ background:#1f3a24 }
-    .btn.warn{ background:#3a2a1f }
-    .btn.bad{ background:#3a1f1f }
+    .row { display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end }
+    .card { background:var(--panel); border:1px solid #1f2937; border-radius:16px; padding:16px; box-shadow:0 8px 30px rgba(0,0,0,.25) }
+    .container{ max-width:1100px; margin:0 auto; padding:16px }
+    .h{ margin:0 0 8px 0; font-weight:700; font-size:20px }
+    .btn{ padding:10px 14px; border-radius:12px; border:1px solid #30374a; background:#141b2d; color:var(--text); cursor:pointer }
+    .btn.ok{ border-color:#14532d; background:#0f2f1f }
+    .btn.warn{ border-color:#7c2d12; background:#2b140f }
+    .btn.bad{ border-color:#7f1d1d; background:#2b0f0f }
     .btn:disabled{ opacity:.6; cursor:not-allowed }
     input[type=number]{ width:90px }
     .w120{ width:120px }
@@ -132,7 +104,7 @@
       <div class="table-wrap">
         <div class="table"></div>
         <div id="dealer" class="dealer" style="display:none">D</div>
-        <!-- Wichtig: #seats ohne class="row" -->
+        <!-- #seats holt Skin/Positionen komplett aus style.css -->
         <div id="seats"></div>
         <div class="pot">Pot: <span id="pot">0</span></div>
       </div>
@@ -195,7 +167,7 @@ function renderState(st){
     <div><b>Lösung:</b> ${q.loesung ?? '—'}</div>
   ` : 'Keine Frage aktiv.';
 
-  // Status (Pot/Bet aus table)
+  // Status
   el('status').innerHTML = `
     <div>Phase: <b>${st.round.phase}</b></div>
     <div>Pot: <b>${fmt(st.table.pot)}</b> | Current Bet: <b>${fmt(st.table.currentBet)}</b> | Min Raise: <b>${fmt(st.table.minRaise)}</b></div>
@@ -210,7 +182,7 @@ function renderState(st){
   el('sbVal').value = st.table.smallBlind ?? el('sbVal').value;
   el('bbVal').value = st.table.bigBlind ?? el('bbVal').value;
 
-  // Seats zeichnen (absolute Positionen s0..s7)
+  // Seats
   const seatsWrap = el('seats'); seatsWrap.innerHTML='';
   st.seats.forEach((sid,i)=>{
     const p = sid ? st.players[sid] : null;
@@ -223,20 +195,24 @@ function renderState(st){
         <div class="chips">${fmt(p.chips)} Chips</div>
         <div class="tiny">Committed: ${fmt(p.committed||0)}</div>
       `;
-      if(st.table.actingSeat===p.seat){ seat.classList.add('turn'); }
+      if(st.table.actingSeat === p.seat){
+        seat.classList.add('turn');
+        if(!seat.querySelector('.turn-pill')){
+          seat.appendChild(h('<div class="turn-pill">DRAN</div>'));
+        }
+      }
     } else {
       seat.innerHTML = `<div class="name">(frei)</div><div class="chips">—</div>`;
     }
     seatsWrap.appendChild(seat);
   });
 
-  // Dealer-Marker positionieren
+  // Dealer
   const dealer = el('dealer'); dealer.style.display='none';
   const dSeat = st.table.dealerSeat;
   const dEl = seatsWrap.querySelector('.seat.s'+dSeat);
   if(dEl){
     dealer.style.display='block';
-    // mit OffsetLeft/Top relativ zu seatsWrap
     dealer.style.left = (dEl.offsetLeft + 8) + 'px';
     dealer.style.top  = (dEl.offsetTop - 12) + 'px';
   }
