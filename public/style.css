@@ -122,11 +122,12 @@ body{
 /* Sitzpositionen (0 top, Uhrzeigersinn) */
 .seat.s0{left:50%;top:4%;transform:translate(-50%,0)}
 .seat.s1{right:8%;top:18%}
-.seat.s2{right:2%;top:50%;transform:translate(0,-50%)}
+/* s2 und s6 optional entfernt, wenn gewünscht → einfach nicht rendern */
+.seat.s2{display:none}
 .seat.s3{right:8%;bottom:20%}              /* leicht höher */
 .seat.s4{left:50%;bottom:8%;transform:translate(-50%,0)} /* höher */
 .seat.s5{left:8%;bottom:20%}               /* leicht höher */
-.seat.s6{left:2%;top:50%;transform:translate(0,-50%)}
+.seat.s6{display:none}
 .seat.s7{left:8%;top:18%}
 
 /* Aktiver Spieler + "DRAN"-Badge */
@@ -154,3 +155,33 @@ body{
   50%{ transform:translate(-50%,-100%) scale(1.06); opacity:1 }
   100%{ transform:translate(-50%,-100%) scale(1); opacity:.9 }
 }
+
+/* Action-Flags */
+.act-flag{
+  margin-top:4px;
+  font-size:11px;
+  font-weight:600;
+  padding:2px 6px;
+  border-radius:8px;
+  display:inline-block;
+}
+.act-flag.check{ background:#1e293b; color:#fff; }
+.act-flag.call{ background:#14532d; color:#fff; }
+.act-flag.raise{ background:#7c3aed; color:#fff; }
+.act-flag.allin{ background:#dc2626; color:#fff; animation:pulseTurn 1.2s infinite; }
+.act-flag.fold{ background:#991b1b; color:#fff; }
+
+/* OUT Badge */
+.seat .out-badge{
+  margin-top:6px;
+  display:inline-block;
+  background:#374151;
+  color:#f87171;
+  font-size:11px;
+  font-weight:700;
+  padding:3px 8px;
+  border-radius:999px;
+  text-transform:uppercase;
+}
+
+
