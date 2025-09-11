@@ -14,15 +14,39 @@
     .badge.bb{ background:#4b2020 }
     .tiny{ font-size:12px; opacity:.8 }
     .turn{ outline:2px solid #7aa2ff; border-radius:12px }
-    .dealer{ position:absolute; width:20px; height:20px; background:#ffd54a; color:#000; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:700 }
-    .table-wrap{ position:relative }
+
+    /* --- Tisch & Seats: absolute Layer, keine Flex-Row --- */
+    .table-wrap{ position:relative; min-height:520px }
+    .table{ position:absolute; inset:0; border-radius:999px;
+            background:radial-gradient(circle at 50% 35%, #203142 0, #111826 60%);
+            box-shadow:0 0 40px rgba(0,0,0,.5); z-index:1; }
+    #seats{ position:absolute; inset:0; z-index:2; }       /* WICHTIG: keine .row/.flex hier */
+    .seat{ position:absolute; width:160px; text-align:center;
+           padding:8px; border:1px solid #262b36; border-radius:12px; background:#0b0f18 }
+    .seat img{ width:44px; height:44px; border-radius:10px; object-fit:cover }
+    .seat .name{ margin-top:4px }
+    .dealer{ position:absolute; width:20px; height:20px; background:#ffd54a; color:#000;
+             border-radius:50%; display:flex; align-items:center; justify-content:center;
+             font-weight:700; z-index:3 }
+    .pot{ position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+          padding:6px 12px; border:1px solid #262b36; border-radius:999px;
+          background:#0f1118; z-index:4 }
+
+    /* 8 feste Sitz-Positionen am Oval (s0..s7) */
+    .s0{left:50%;top:6%; transform:translate(-50%,0)}
+    .s1{left:80%;top:18%; transform:translate(-50%,0)}
+    .s2{left:92%;top:50%; transform:translate(-50%,-50%)}
+    .s3{left:80%;top:82%; transform:translate(-50%,-100%)}
+    .s4{left:50%;top:94%; transform:translate(-50%,-100%)}
+    .s5{left:20%;top:82%; transform:translate(-50%,-100%)}
+    .s6{left:8%; top:50%; transform:translate(-50%,-50%)}
+    .s7{left:20%;top:18%; transform:translate(-50%,0)}
+
     .controls .btn{ margin-right:6px; margin-top:6px }
     .row { display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end }
     .card { background:#0f1118; border:1px solid #262b36; border-radius:12px; padding:12px; margin-bottom:12px }
     .container{ max-width:1200px; margin:0 auto; padding:12px }
     .h{ margin:0 0 8px 0 }
-    .seat img{ width:44px; height:44px; border-radius:10px; object-fit:cover }
-    .seat .name{ margin-top:4px }
     .btn{ padding:8px 10px; border-radius:10px; border:1px solid #2a2f3a; background:#1a1f2b; cursor:pointer }
     .btn.ok{ background:#1f3a24 }
     .btn.warn{ background:#3a2a1f }
@@ -108,7 +132,8 @@
       <div class="table-wrap">
         <div class="table"></div>
         <div id="dealer" class="dealer" style="display:none">D</div>
-        <div id="seats" class="row" style="position:relative; flex-wrap:wrap"></div>
+        <!-- Wichtig: #seats ohne class="row" -->
+        <div id="seats"></div>
         <div class="pot">Pot: <span id="pot">0</span></div>
       </div>
     </div>
@@ -124,7 +149,7 @@ function el(id){ return document.getElementById(id); }
 function h(html){ const d=document.createElement('div'); d.innerHTML=html.trim(); return d.firstElementChild; }
 function fmt(n){ return Number(n||0).toString(); }
 
-// Fragen laden (aus /public/fragen.json)
+// Fragen laden
 async function fillQuestions(){
   const sel = el('questionSelect'); sel.innerHTML='';
   try{
@@ -170,7 +195,7 @@ function renderState(st){
     <div><b>Lösung:</b> ${q.loesung ?? '—'}</div>
   ` : 'Keine Frage aktiv.';
 
-  // Status (ACHTUNG: pot/currentBet kommen aus table, nicht round)
+  // Status (Pot/Bet aus table)
   el('status').innerHTML = `
     <div>Phase: <b>${st.round.phase}</b></div>
     <div>Pot: <b>${fmt(st.table.pot)}</b> | Current Bet: <b>${fmt(st.table.currentBet)}</b> | Min Raise: <b>${fmt(st.table.minRaise)}</b></div>
@@ -181,15 +206,15 @@ function renderState(st){
     }).join(', ')}</div>
   `;
 
-  // SB/BB Werte in Inputs spiegeln
+  // SB/BB Inputs spiegeln
   el('sbVal').value = st.table.smallBlind ?? el('sbVal').value;
   el('bbVal').value = st.table.bigBlind ?? el('bbVal').value;
 
-  // Seats (S/B-Badge + Turn-Highlight)
+  // Seats zeichnen (absolute Positionen s0..s7)
   const seatsWrap = el('seats'); seatsWrap.innerHTML='';
   st.seats.forEach((sid,i)=>{
     const p = sid ? st.players[sid] : null;
-    const seat = h(`<div class="seat s${i}" style="width:160px; padding:8px; margin:6px; border:1px solid #262b36; border-radius:12px; text-align:center"></div>`);
+    const seat = h(`<div class="seat s${i}"></div>`);
     if (p){
       const roleBadge = p.role ? `<span class="badge ${p.role==='SB'?'sb':'bb'}">${p.role==='SB'?'S':'B'}</span>` : '';
       seat.innerHTML = `
@@ -210,18 +235,14 @@ function renderState(st){
   const dSeat = st.table.dealerSeat;
   const dEl = seatsWrap.querySelector('.seat.s'+dSeat);
   if(dEl){
-    const r = dEl.getBoundingClientRect();
-    const parentR = seatsWrap.getBoundingClientRect();
     dealer.style.display='block';
+    // mit OffsetLeft/Top relativ zu seatsWrap
     dealer.style.left = (dEl.offsetLeft + 8) + 'px';
     dealer.style.top  = (dEl.offsetTop - 12) + 'px';
   }
 
   // Pot
   el('pot').textContent = fmt(st.table.pot);
-
-  // Admin Guess-Tabelle (voller Klartext)
-  // wird zusätzlich via 'admin:guesses' live gefüttert, aber wir bauen auch hier eine sichere Fallback-Ansicht
 }
 
 function renderAdminGuesses(rows){
