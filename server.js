@@ -4,6 +4,7 @@
 // Admin sieht Schätzungen immer im Klartext, SB/BB-Sperre in Bet1,
 // stabile Betting-Logik, Action-Broadcasts, OUT-Status,
 // Bots (add/remove), Reveal-Bet-Phase nach Lösung, Auto-Showdown
+// + Neu: Massen-Chips (admin:setAllChips, admin:addChipsAll)
 
 import express from 'express';
 import http from 'http';
@@ -612,7 +613,7 @@ admin.on('connection', socket => {
     io.emit('sound', { key });
   });
 
-  // Chips/Rebuy
+  // Chips/Rebuy – EINZELN
   socket.on('admin:adjustChips', ({ sid, delta }) => {
     const p = state.players[sid];
     if (!p) return;
@@ -632,6 +633,35 @@ admin.on('connection', socket => {
     if (p.chips > 0) p.isOut = false;
     broadcast();
   });
+
+  // ── NEU: Massenaktionen ───────────────────────────────────
+  socket.on('admin:setAllChips', ({ amount }) => {
+    const a = Number(amount);
+    if (!Number.isFinite(a) || a < 0) return;
+    for (const p of Object.values(state.players)) {
+      p.chips = a;
+      p.isOut = p.chips <= 0;
+      p.inHand = false;       // sauberer Reset – neue Hand setzt wieder korrekt
+      p.committed = 0;
+      p.lastAction = null;
+    }
+    state.table.pot = 0;
+    resetBets();
+    broadcast();
+  });
+
+  socket.on('admin:addChipsAll', ({ delta }) => {
+    const d = Number(delta);
+    if (!Number.isFinite(d)) return;
+    for (const p of Object.values(state.players)) {
+      p.chips = Math.max(0, (p.chips || 0) + d);
+      p.isOut = p.chips <= 0;
+      // inHand bleibt unverändert; committed ggf. begrenzen
+      if ((p.committed || 0) > p.chips) p.committed = p.chips;
+    }
+    broadcast();
+  });
+  // ──────────────────────────────────────────────────────────
 
   // Blinds
   socket.on('admin:setBlinds', ({ small, big }) => {
