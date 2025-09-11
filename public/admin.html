@@ -7,7 +7,7 @@
   <link rel="stylesheet" href="/style.css" />
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
   <style>
-    /* Nur UI-Controls, KEIN Tisch-/Seat-Layout hier! */
+    /* nur UI-Controls – Tisch/Seats kommen aus style.css */
     .tbl { width:100%; border-collapse:collapse; font-size:14px }
     .tbl th,.tbl td{ border:1px solid #2a2f3a; padding:6px 8px; text-align:left }
     .badge{ display:inline-block; padding:1px 6px; border-radius:6px; font-size:11px; border:1px solid #2a2f3a; margin-left:6px }
@@ -104,7 +104,7 @@
       <div class="table-wrap">
         <div class="table"></div>
         <div id="dealer" class="dealer" style="display:none">D</div>
-        <!-- #seats holt Skin/Positionen komplett aus style.css -->
+        <!-- #seats: Skin/Positionen aus style.css -->
         <div id="seats"></div>
         <div class="pot">Pot: <span id="pot">0</span></div>
       </div>
@@ -154,6 +154,20 @@ function playSound(key){
   const src = m[key]; if(src){ const a=new Audio(src); a.play().catch(()=>{}); }
 }
 
+// Action-Flag direkt am Sitz zeigen
+function showActionFlag(seatEl, type, amount){
+  if (!seatEl) return;
+  seatEl.querySelectorAll('.act-flag').forEach(n=>n.remove());
+  const label = type==='raise' ? `Raise ${amount??''}` :
+                type==='allin' ? 'All-In' :
+                type==='call'  ? 'Call' :
+                type==='check' ? 'Check' :
+                type==='fold'  ? 'Fold'  : type;
+  const flag = h(`<div class="act-flag ${type}">${label}</div>`);
+  seatEl.appendChild(flag);
+  if (type === 'fold') seatEl.classList.add('folded');
+}
+
 // Rendering
 function renderState(st){
   GLOBAL_STATE = st;
@@ -185,6 +199,9 @@ function renderState(st){
   // Seats
   const seatsWrap = el('seats'); seatsWrap.innerHTML='';
   st.seats.forEach((sid,i)=>{
+    // Seitenplätze (rechts/links) komplett auslassen
+    if (i === 2 || i === 6) return;
+
     const p = sid ? st.players[sid] : null;
     const seat = h(`<div class="seat s${i}"></div>`);
     if (p){
@@ -195,11 +212,36 @@ function renderState(st){
         <div class="chips">${fmt(p.chips)} Chips</div>
         <div class="tiny">Committed: ${fmt(p.committed||0)}</div>
       `;
+
+      // Turn-Badge
       if(st.table.actingSeat === p.seat){
         seat.classList.add('turn');
         if(!seat.querySelector('.turn-pill')){
           seat.appendChild(h('<div class="turn-pill">DRAN</div>'));
         }
+      }
+
+      // OUT/Fold visuell
+      if (p.isOut) {
+        seat.classList.add('out');
+        if(!seat.querySelector('.out-pill')) seat.appendChild(h('<div class="out-pill">OUT</div>'));
+      }
+      if (p.lastAction?.type === 'fold') seat.classList.add('folded');
+
+      // Guess-Overlay (Admin sieht Werte immer, gedimmt falls nicht revealed)
+      const guessPub = (st.round?.hasAnyGuesses) ? p.hasGuessed : false;
+      if (guessPub){
+        // versuche Wert aus separatem Stream nachzubauen: Admin sieht Klartext in Tabelle;
+        // hier direkt aus GLOBAL_STATE nicht verfügbar -> wir lassen „Guess: •••“, wenn nicht revealed.
+        // Für Admin-Ansicht: server sendet admin:guesses separat → dort wird Tabelle gepflegt.
+        // Wir zeigen am Sitz einen Chip; revealed-Status wird im Public-Stream nicht mitgeliefert,
+        // daher blenden wir ihn standardmäßig „dim“ ein, bis admin:guesses uns Details gibt.
+        seat.appendChild(h('<div class="guess-chip dim">Guess abgegeben</div>'));
+      }
+
+      // Letzte Action am Sitz anzeigen, falls vorhanden
+      if (p.lastAction){
+        showActionFlag(seat, p.lastAction.type, p.lastAction.amount);
       }
     } else {
       seat.innerHTML = `<div class="name">(frei)</div><div class="chips">—</div>`;
@@ -234,6 +276,17 @@ function renderAdminGuesses(rows){
       adminSock.emit('admin:revealGuess', { sid: e.target.dataset.sid, reveal: e.target.checked });
     };
     tb.appendChild(tr);
+
+    // Zusätzlich am Sitz die Guess-Chips aktualisieren (dim ↔ normal)
+    const st = GLOBAL_STATE; if (!st) return;
+    const p = st.players?.[r.sid]; if (!p) return;
+    const seatEl = el('seats').querySelector('.seat.s'+p.seat);
+    if (seatEl){
+      // entferne alten guess-chip
+      seatEl.querySelectorAll('.guess-chip').forEach(n=>n.remove());
+      const chip = h(`<div class="guess-chip${r.revealed?'':' dim'}">Guess: ${r.revealed ? r.value : '•••'}</div>`);
+      seatEl.appendChild(chip);
+    }
   });
 }
 
@@ -248,7 +301,9 @@ function renderChipTable(st){
       <td>
         <button class="btn" data-act="add" data-sid="${p.id}" data-d="50">+50</button>
         <button class="btn" data-act="add" data-sid="${p.id}" data-d="100">+100</button>
+        <button class="btn" data-act="add" data-sid="${p.id}" data-d="500">+500</button>
         <button class="btn" data-act="add" data-sid="${p.id}" data-d="-50">-50</button>
+        <button class="btn" data-act="custom" data-sid="${p.id}">+Custom</button>
         <button class="btn" data-act="rb"  data-sid="${p.id}">Rebuy</button>
       </td>
     </tr>`);
@@ -257,6 +312,12 @@ function renderChipTable(st){
         const sid = b.dataset.sid;
         if (b.dataset.act === 'add'){
           adminSock.emit('admin:adjustChips', { sid, delta: Number(b.dataset.d) });
+        } else if (b.dataset.act === 'custom'){
+          const amt = prompt('Chips (+/-) eingeben:','100');
+          const delta = Number(amt);
+          if (Number.isFinite(delta) && delta!==0){
+            adminSock.emit('admin:adjustChips', { sid, delta });
+          }
         } else if (b.dataset.act === 'rb'){
           const amt = prompt('Rebuy-Betrag eingeben (leer = Standard):','');
           const amount = amt === '' ? undefined : Number(amt);
@@ -279,6 +340,16 @@ adminSock.on('winner', ({ winnerSid, solution }) => {
 });
 adminSock.on('sound', ({key})=> playSound(key));
 clientSock.on('sound', ({key})=> playSound(key));
+
+// Live-Action-Flags vom Server (check/call/raise/allin/fold)
+function onActionInfo({sid, type, amount}){
+  const st = GLOBAL_STATE; if(!st) return;
+  const p = st.players?.[sid]; if(!p) return;
+  const seatEl = el('seats').querySelector('.seat.s'+p.seat);
+  showActionFlag(seatEl, type, amount);
+}
+adminSock.on('actionInfo', onActionInfo);
+clientSock.on('actionInfo', onActionInfo);
 
 // Buttons
 document.querySelectorAll('[data-snd]').forEach(b=> b.onclick=()=> adminSock.emit('playSound', { key: b.dataset.snd }));
