@@ -224,7 +224,7 @@ function renderState(st){
   el('sbVal').value = st.table.smallBlind ?? el('sbVal').value;
   el('bbVal').value = st.table.bigBlind ?? el('bbVal').value;
 
-  // Seats – Slots 2 & 6 werden im CSS/Mapping ohnehin leer bleiben
+  // Seats – Slots 2 & 6 bleiben leer
   const seatsWrap = el('seats'); seatsWrap.innerHTML='';
   st.seats.forEach((sid,i)=>{
     const p = sid ? st.players[sid] : null;
@@ -271,6 +271,11 @@ function renderState(st){
 function renderAdminGuesses(rows){
   const tb = el('guessTable').querySelector('tbody');
   tb.innerHTML = '';
+
+  // Vor dem Rendern alle bestehenden Guess-Badges an Sitzen entfernen
+  const seatsWrap = el('seats');
+  seatsWrap.querySelectorAll('.guess-chip').forEach(n=>n.remove());
+
   rows.forEach(r=>{
     const tr = h(`<tr>
       <td>${r.name}</td>
@@ -287,7 +292,6 @@ function renderAdminGuesses(rows){
     const p = st.players?.[r.sid]; if (!p) return;
     const seatEl = el('seats').querySelector('.seat.s'+p.seat);
     if (seatEl){
-      seatEl.querySelectorAll('.guess-chip').forEach(n=>n.remove());
       const chip = h(`<div class="guess-chip">Guess: ${r.value}</div>`);
       seatEl.appendChild(chip);
     }
@@ -338,12 +342,18 @@ function onState(st){ renderState(st); renderChipTable(st); }
 adminSock.on('state', onState);
 clientSock.on('state', renderState);
 
+// >>> WICHTIG: Admin sieht Unzensiert – Live-Update <<<
 adminSock.on('admin:guesses', renderAdminGuesses);
 
-// Gewinner Popup (optional)
-adminSock.on('winner', ({ winnerSid, solution }) => {
-  const p = GLOBAL_STATE?.players?.[winnerSid];
-  alert(`Gewinner: ${p?.name || '—'} (Lösung: ${solution})`);
+// Gewinner Popup (optional; bei Split kommt winnerSids zusätzlich im Server-Event)
+adminSock.on('winner', ({ winnerSid, solution, winnerSids }) => {
+  if (Array.isArray(winnerSids) && winnerSids.length > 1) {
+    const names = winnerSids.map(sid => GLOBAL_STATE?.players?.[sid]?.name || '—').join(', ');
+    alert(`Split-Pot! Gewinner: ${names} (Lösung: ${solution})`);
+  } else {
+    const p = GLOBAL_STATE?.players?.[winnerSid];
+    alert(`Gewinner: ${p?.name || '—'} (Lösung: ${solution})`);
+  }
 });
 
 // Live-Action-Flags
