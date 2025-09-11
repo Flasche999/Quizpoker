@@ -7,7 +7,7 @@
   <link rel="stylesheet" href="/style.css" />
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
   <style>
-    /* nur UI-Controls – Tisch/Seats kommen aus style.css */
+    /* Nur UI-Controls – Tisch/Seats kommen aus /style.css */
     .tbl { width:100%; border-collapse:collapse; font-size:14px }
     .tbl th,.tbl td{ border:1px solid #2a2f3a; padding:6px 8px; text-align:left }
     .badge{ display:inline-block; padding:1px 6px; border-radius:6px; font-size:11px; border:1px solid #2a2f3a; margin-left:6px }
@@ -23,9 +23,27 @@
     .btn.ok{ border-color:#14532d; background:#0f2f1f }
     .btn.warn{ border-color:#7c2d12; background:#2b140f }
     .btn.bad{ border-color:#7f1d1d; background:#2b0f0f }
+    .btn.ghost{ background:transparent }
     .btn:disabled{ opacity:.6; cursor:not-allowed }
     input[type=number]{ width:90px }
     .w120{ width:120px }
+
+    /* Kleine Overlays direkt am Sitz (ergänzend zum Skin) */
+    .turn { outline:3px solid var(--accent); box-shadow:0 0 0 6px rgba(124,58,237,.2), 0 0 24px rgba(124,58,237,.35); position:relative }
+    .turn-pill{ position:absolute; left:50%; top:-10px; transform:translate(-50%,-100%); background:var(--accent); color:#fff; font-weight:700; font-size:11px; padding:3px 8px; border-radius:999px; box-shadow:0 2px 8px rgba(0,0,0,.35) }
+    .out { opacity:.6; filter:saturate(.4) }
+    .out-pill{ position:absolute; left:8px; top:8px; background:#991b1b; color:#fff; font-size:11px; padding:2px 6px; border-radius:999px }
+    .folded { opacity:.6 }
+    .act-flag{ position:absolute; right:8px; top:8px; font-size:11px; padding:3px 8px; border-radius:999px; border:1px solid #334155; background:#0b1324 }
+    .act-flag.check{ background:#15311f; border-color:#1f4d2d }
+    .act-flag.call{ background:#102a3a; border-color:#173e58 }
+    .act-flag.raise{ background:#2b2341; border-color:#403469 }
+    .act-flag.allin{ background:#4a1e1e; border-color:#6b2b2b; font-weight:700 }
+    .act-flag.fold{ background:#3a1111; border-color:#5b1a1a; font-weight:700 }
+    .guess-chip{ position:absolute; left:50%; bottom:-8px; transform:translate(-50%,100%); font-size:11px; padding:3px 8px; border-radius:999px; border:1px solid #334155; background:#0b1324 }
+    .guess-chip.dim{ opacity:.6 }
+
+    /* Hinweis: die Sitzpositionen/Dealer/Pot etc. kommen aus /style.css */
   </style>
 </head>
 <body>
@@ -99,12 +117,24 @@
       </div>
     </div>
 
+    <!-- KI / Testspieler -->
+    <div class="card">
+      <h2 class="h">KI-Testspieler</h2>
+      <div class="row">
+        <input class="input" id="botName" placeholder="Name (optional)" style="width:220px" />
+        <button class="btn" id="addBot">Bot hinzufügen</button>
+        <button class="btn" id="addBot3">+3 Bots</button>
+        <button class="btn bad" id="removeBots">Alle Bots entfernen</button>
+        <span class="tiny">Bots schätzen automatisch und spielen Bet-Phasen.</span>
+      </div>
+    </div>
+
     <div class="card">
       <h2 class="h">Virtueller Tisch</h2>
       <div class="table-wrap">
         <div class="table"></div>
         <div id="dealer" class="dealer" style="display:none">D</div>
-        <!-- #seats: Skin/Positionen aus style.css -->
+        <!-- #seats: Skin/Positionen aus /style.css -->
         <div id="seats"></div>
         <div class="pot">Pot: <span id="pot">0</span></div>
       </div>
@@ -196,11 +226,10 @@ function renderState(st){
   el('sbVal').value = st.table.smallBlind ?? el('sbVal').value;
   el('bbVal').value = st.table.bigBlind ?? el('bbVal').value;
 
-  // Seats
+  // Seats – Seitenplätze (2 & 6) auslassen
   const seatsWrap = el('seats'); seatsWrap.innerHTML='';
   st.seats.forEach((sid,i)=>{
-    // Seitenplätze (rechts/links) komplett auslassen
-    if (i === 2 || i === 6) return;
+    if (i === 2 || i === 6) return; // rechts/links entfernt
 
     const p = sid ? st.players[sid] : null;
     const seat = h(`<div class="seat s${i}"></div>`);
@@ -228,14 +257,8 @@ function renderState(st){
       }
       if (p.lastAction?.type === 'fold') seat.classList.add('folded');
 
-      // Guess-Overlay (Admin sieht Werte immer, gedimmt falls nicht revealed)
-      const guessPub = (st.round?.hasAnyGuesses) ? p.hasGuessed : false;
-      if (guessPub){
-        // versuche Wert aus separatem Stream nachzubauen: Admin sieht Klartext in Tabelle;
-        // hier direkt aus GLOBAL_STATE nicht verfügbar -> wir lassen „Guess: •••“, wenn nicht revealed.
-        // Für Admin-Ansicht: server sendet admin:guesses separat → dort wird Tabelle gepflegt.
-        // Wir zeigen am Sitz einen Chip; revealed-Status wird im Public-Stream nicht mitgeliefert,
-        // daher blenden wir ihn standardmäßig „dim“ ein, bis admin:guesses uns Details gibt.
+      // Guess-Info am Sitz (Admin sieht Werte – über admin:guesses wird Text gesetzt)
+      if (st.round?.hasAnyGuesses && p.hasGuessed){
         seat.appendChild(h('<div class="guess-chip dim">Guess abgegeben</div>'));
       }
 
@@ -277,14 +300,14 @@ function renderAdminGuesses(rows){
     };
     tb.appendChild(tr);
 
-    // Zusätzlich am Sitz die Guess-Chips aktualisieren (dim ↔ normal)
+    // Guess-Chip am Sitz aktualisieren (dim ↔ normal und Text)
     const st = GLOBAL_STATE; if (!st) return;
     const p = st.players?.[r.sid]; if (!p) return;
     const seatEl = el('seats').querySelector('.seat.s'+p.seat);
     if (seatEl){
-      // entferne alten guess-chip
       seatEl.querySelectorAll('.guess-chip').forEach(n=>n.remove());
-      const chip = h(`<div class="guess-chip${r.revealed?'':' dim'}">Guess: ${r.revealed ? r.value : '•••'}</div>`);
+      const txt = r.revealed ? `Guess: ${r.value}` : 'Guess: •••';
+      const chip = h(`<div class="guess-chip${r.revealed?'':' dim'}">${txt}</div>`);
       seatEl.appendChild(chip);
     }
   });
@@ -296,7 +319,7 @@ function renderChipTable(st){
   tb.innerHTML = '';
   Object.values(st.players).forEach(p=>{
     const tr = h(`<tr>
-      <td>${p.name}</td>
+      <td>${p.name}${p.isBot?' (Bot)':''}</td>
       <td>${fmt(p.chips)}</td>
       <td>
         <button class="btn" data-act="add" data-sid="${p.id}" data-d="50">+50</button>
@@ -338,10 +361,10 @@ adminSock.on('winner', ({ winnerSid, solution }) => {
   const p = GLOBAL_STATE?.players?.[winnerSid];
   alert(`Gewinner: ${p?.name || '—'} (Lösung: ${solution})`);
 });
-adminSock.on('sound', ({key})=> playSound(key));
-clientSock.on('sound', ({key})=> playSound(key));
+function onSound({key}){ playSound(key); }
+adminSock.on('sound', onSound); clientSock.on('sound', onSound);
 
-// Live-Action-Flags vom Server (check/call/raise/allin/fold)
+// Live-Action-Flags (check/call/raise/allin/fold)
 function onActionInfo({sid, type, amount}){
   const st = GLOBAL_STATE; if(!st) return;
   const p = st.players?.[sid]; if(!p) return;
@@ -351,7 +374,7 @@ function onActionInfo({sid, type, amount}){
 adminSock.on('actionInfo', onActionInfo);
 clientSock.on('actionInfo', onActionInfo);
 
-// Buttons
+// Buttons – Rundensteuerung
 document.querySelectorAll('[data-snd]').forEach(b=> b.onclick=()=> adminSock.emit('playSound', { key: b.dataset.snd }));
 el('startRound').onclick   = ()=> adminSock.emit('startRound', { questionId: el('questionSelect').value });
 el('lockGuesses').onclick  = ()=> adminSock.emit('admin:lockGuesses');
@@ -364,6 +387,23 @@ el('setBlinds').onclick    = ()=> adminSock.emit('admin:setBlinds', { small:Numb
 el('assignBlinds').onclick = ()=> adminSock.emit('admin:assignBlinds');
 
 el('revealAll').onchange   = (e)=> adminSock.emit('admin:revealAllGuesses', { reveal: e.target.checked });
+
+// KI-Testspieler – Buttons
+el('addBot').onclick = ()=>{
+  const name = (el('botName').value||'').trim() || undefined;
+  adminSock.emit('admin:addBot', { name });
+};
+el('addBot3').onclick = ()=>{
+  const base = (el('botName').value||'Bot').trim() || 'Bot';
+  for(let i=1;i<=3;i++){
+    adminSock.emit('admin:addBot', { name: `${base} ${i}` });
+  }
+};
+el('removeBots').onclick = ()=>{
+  if (!confirm('Wirklich alle Bots entfernen?')) return;
+  // Dieses Event muss serverseitig unterstützt werden (siehe server.js Vorschlag)
+  adminSock.emit('admin:removeAllBots');
+};
 </script>
 </body>
 </html>
