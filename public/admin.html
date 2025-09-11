@@ -213,10 +213,9 @@ function renderState(st){
   el('sbVal').value = st.table.smallBlind ?? el('sbVal').value;
   el('bbVal').value = st.table.bigBlind ?? el('bbVal').value;
 
-  // Seats – Seitenplätze 2 & 6 auslassen
+  // Seats – KEIN Filter mehr auf 2/6 (Admin sieht alle)
   const seatsWrap = el('seats'); seatsWrap.innerHTML='';
   st.seats.forEach((sid,i)=>{
-    if (i===2 || i===6) return;
     const p = sid ? st.players[sid] : null;
     const seat = h(`<div class="seat s${i}"></div>`);
     if (p){
