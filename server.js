@@ -1,9 +1,10 @@
-// server.js – QuizPoker v2.1+
-// Features: Admin-only Chips/Rebuys, zensierte Schätzungen (Players),
-// Admin sieht Schätzungen immer im Klartext, SB/BB-Sperre in Bet1,
-// stabile Betting-Logik, Action-Broadcasts, OUT-Status,
-// Bots (add/remove), Reveal-Bet-Phase nach Lösung, Auto-Showdown
-
+// server.js – QuizPoker v2.2
+// - 6-Sitz-Tisch (keine Kantenplätze)
+// - Admin-only Chips/Rebuys
+// - Zensierte Player-Guesses + volle Admin-Guesses
+// - SB/BB-Sperre in Bet1
+// - Action-Broadcasts, OUT-Status
+// - Reveal pro Spieler
 import express from 'express';
 import http from 'http';
 import { Server } from 'socket.io';
@@ -25,11 +26,11 @@ app.get('/healthz', (_req, res) => res.status(200).type('text').send('OK'));
 // ─────────────────────────────────────────────────────────────
 // Konfiguration & State
 // ─────────────────────────────────────────────────────────────
-const MAX_SEATS   = 8;
+const MAX_SEATS   = 6;          // <<< nur noch 6 Plätze (0..5)
 const START_CHIPS = 1500;
 
 const state = {
-  players: {},   // socketId -> {id,name,avatar,seat,chips,inHand,committed,isOut,lastAction,isBot?}
+  players: {},                      // sid -> {id,name,avatar,seat,chips,inHand,committed,isOut,lastAction}
   seats: Array(MAX_SEATS).fill(null),
   table: {
     dealerSeat: 0,
@@ -43,12 +44,11 @@ const state = {
     sbSeat: null,
     bbSeat: null,
   },
-  // Phasen: lobby | collect_guesses | bet1 | hint1 | bet2 | hint2 | bet3 | reveal | reveal_bet | showdown
-  round: {
+  round: {                         // lobby | collect_guesses | bet1 | hint1 | bet2 | hint2 | bet3 | reveal | showdown
     phase: 'lobby',
     question: null,
-    guesses: {},         // socketId -> number
-    guessRevealed: {},   // socketId -> bool (für Playersicht)
+    guesses: {},                  // sid -> number
+    guessRevealed: {},            // sid -> bool (für öffentliche Sichtbarkeit)
     hintsRevealed: 0,
   },
 };
@@ -71,6 +71,10 @@ try {
 // ─────────────────────────────────────────────────────────────
 // Helper
 // ─────────────────────────────────────────────────────────────
+function sidExists(sid){ return !!(sid && state.players[sid]); }
+function seated(){ return state.seats.map((sid,seat)=>({sid,seat})).filter(x=>sidExists(x.sid)); }
+function active(){ return seated().filter(x=>state.players[x.sid].inHand); }
+
 function roleForSeat(seat) {
   if (seat === state.table.sbSeat) return 'SB';
   if (seat === state.table.bbSeat) return 'BB';
@@ -86,10 +90,10 @@ function publicPlayers() {
       role: roleForSeat(p.seat),
       isOut: !!p.isOut,
       lastAction: p.lastAction || null,
-      isBot: !!p.isBot,
     }])
   );
 }
+
 function publicQuestion() {
   if (!state.round.question) return null;
   return {
@@ -97,11 +101,12 @@ function publicQuestion() {
     frage: state.round.question.frage,
     hinweis1: state.round.hintsRevealed >= 1 ? state.round.question.hinweis1 : null,
     hinweis2: state.round.hintsRevealed >= 2 ? state.round.question.hinweis2 : null,
-    loesung: ['reveal','reveal_bet','showdown'].includes(state.round.phase) ? state.round.question.loesung : null,
+    loesung: ['reveal','showdown'].includes(state.round.phase) ? state.round.question.loesung : null,
   };
 }
+
 function publicGuessesForPlayers() {
-  // Spieler sehen nur zensiert, außer der Admin hat sie für genau diesen Spieler freigegeben
+  // Spieler sehen zensiert, bis Admin pro Spieler aufdeckt
   return Object.entries(state.round.guesses).map(([sid, val]) => ({
     sid,
     name: state.players[sid]?.name || '???',
@@ -109,8 +114,9 @@ function publicGuessesForPlayers() {
     revealed: !!state.round.guessRevealed[sid],
   }));
 }
+
 function adminGuessesFull() {
-  // Admin sieht alles im Klartext
+  // Admin immer Klartext
   return Object.entries(state.round.guesses).map(([sid, val]) => ({
     sid,
     name: state.players[sid]?.name || '???',
@@ -145,13 +151,9 @@ function publicState() {
 
 function broadcast(){
   io.emit('state', publicState());
-  io.emit('guesses:public', publicGuessesForPlayers()); // für alle Spieler
-  admin.emit('admin:guesses', adminGuessesFull());      // Admin immer Klartext
+  io.emit('guesses:public', publicGuessesForPlayers()); // für Spieler
+  admin.emit('admin:guesses', adminGuessesFull());      // Admin: Klartext
 }
-
-function sidExists(sid){ return !!(sid && state.players[sid]); }
-function seated(){ return state.seats.map((sid,seat)=>({sid,seat})).filter(x=>sidExists(x.sid)); }
-function active(){ return seated().filter(x=>state.players[x.sid].inHand); }
 
 function nextActiveSeat(from){
   if (from == null) return null;
@@ -190,11 +192,10 @@ function postBlinds(){
     p.chips -= pay;
     p.committed = (p.committed||0) + pay;
     state.table.pot += pay;
-    if (p.chips <= 0) p.isOut = true; // blind all-in -> nach Hand OUT
+    if (p.chips <= 0) p.isOut = true;
   }
   state.table.currentBet = Math.max(SB, BB);
   state.table.minRaise = BB;
-  // Erste Action: Spieler nach BB
   state.table.actingSeat = nextActiveSeat(bbSeat);
 }
 
@@ -228,12 +229,11 @@ function newHandSetup(){
   }
   state.table.pot = 0;
   resetBets();
-  // Dealer-Rotation: nächster aktiver Spieler
   const nextDealer = nextActiveSeat(state.table.dealerSeat ?? 0) ?? nextActiveSeat(-1);
   if (nextDealer != null) state.table.dealerSeat = nextDealer;
 }
 
-function autoWinnerSid(){
+function autoWinner(){
   const sol = Number(state.round.question?.loesung);
   if (!Number.isFinite(sol)) return null;
   let best=null;
@@ -254,193 +254,11 @@ function isSBorBB(sid){
 function setAction(sid, type, amount){
   const p = state.players[sid]; if(!p) return;
   p.lastAction = amount!=null ? { type, amount } : { type };
-  io.emit('actionInfo', { sid, type, amount }); // Broadcast für Admin & Spieler
-}
-
-function resolveWinnerAndShowdown(){
-  const w = autoWinnerSid();
-  if (w && sidExists(w)) {
-    state.players[w].chips += state.table.pot;
-  }
-  state.table.pot = 0;
-  // Spieler mit 0 Chips sind OUT
-  for (const {sid} of seated()){
-    const p = state.players[sid];
-    if (p.chips <= 0) p.isOut = true;
-  }
-  state.round.phase = 'showdown';
-  admin.emit('winner', { winnerSid: w, solution: state.round.question?.loesung });
-}
-
-function tryAutoFinishRevealBet(){
-  if (state.round.phase !== 'reveal_bet') return;
-  if (everyoneDone()){
-    finishBettingPhase();
-    resolveWinnerAndShowdown();
-    broadcast();
-  }
+  io.emit('actionInfo', { sid, type, amount });
 }
 
 // ─────────────────────────────────────────────────────────────
-// BOTs – simple Logik zum Testen
-// ─────────────────────────────────────────────────────────────
-let botInc = 1;
-function addBot(nameOpt){
-  const seat = state.seats.findIndex(x=>x===null);
-  if (seat === -1) return null;
-  const sid = 'BOT_'+Date.now()+'_'+(botInc++);
-  const name = nameOpt || `Bot ${botInc}`;
-  state.seats[seat] = sid;
-  state.players[sid] = {
-    id: sid, name, avatar: '', seat, chips: START_CHIPS, inHand: false,
-    committed: 0, isOut:false, lastAction:null, isBot:true
-  };
-  // Bot schätzt automatisch, wenn collect_guesses
-  setTimeout(()=> botMaybeGuess(sid), 300);
-  broadcast();
-  return sid;
-}
-function removeAllBots(){
-  for (const {sid, seat} of seated()){
-    const p = state.players[sid];
-    if (p?.isBot){
-      state.seats[seat] = null;
-      delete state.players[sid];
-      delete state.round.guesses[sid];
-      delete state.round.guessRevealed[sid];
-    }
-  }
-  broadcast();
-}
-function botMaybeGuess(sid){
-  if (!sidExists(sid)) return;
-  if (state.round.phase !== 'collect_guesses') return;
-  // simple random guess in range 0..2000
-  const v = Math.floor(Math.random()*2000);
-  state.round.guesses[sid] = v;
-  state.round.guessRevealed[sid] = false;
-  broadcast();
-  // falls alle geschätzt haben → zu bet1
-  const seatsNow = seated();
-  const allSubmitted = seatsNow.length>0 && seatsNow.every(({sid})=> state.round.guesses[sid]!==undefined);
-  if (allSubmitted) {
-    state.round.phase = 'bet1';
-    newHandSetup();
-    postBlinds();
-    broadcast();
-  }
-}
-function botActIfTurn(){
-  if (!['bet1','bet2','bet3','reveal_bet'].includes(state.round.phase)) return;
-  const seat = state.table.actingSeat;
-  if (seat==null) return;
-  const sid = state.seats[seat];
-  const p = state.players[sid];
-  if (!p?.isBot || !p.inHand) return;
-
-  const toCall = Math.max(0, state.table.currentBet - (p.committed||0));
-  // super simple: 60% call/check, 20% raise min, 20% fold (außer SB/BB in bet1)
-  const r = Math.random();
-  if (toCall === 0){
-    if (r < 0.7) playerAction(sid, 'check');
-    else playerAction(sid, 'bet', state.table.minRaise);
-  } else {
-    if (state.round.phase==='bet1' && isSBorBB(sid)){
-      // SB/BB dürfen in bet1 nicht folden
-      if (r < 0.8) playerAction(sid, 'call');
-      else playerAction(sid, 'raise', state.table.currentBet + state.table.minRaise);
-    } else if (r < 0.15) {
-      playerAction(sid, 'fold');
-    } else if (r < 0.8) {
-      playerAction(sid, 'call');
-    } else {
-      playerAction(sid, 'raise', state.table.currentBet + state.table.minRaise);
-    }
-  }
-}
-
-// ─────────────────────────────────────────────────────────────
-// Gemeinsame Action-Engine (Server ruft sie auch für Bots auf)
-// ─────────────────────────────────────────────────────────────
-function playerAction(sid, type, amount){
-  if (!['bet1','bet2','bet3','reveal_bet'].includes(state.round.phase)) return;
-  if (!sidExists(sid)) return;
-  const p = state.players[sid];
-  if (!p.inHand) return;
-  if (state.seats[state.table.actingSeat] !== sid) return;
-
-  const toCall = Math.max(0, state.table.currentBet - (p.committed||0));
-
-  if (type === 'fold' && state.round.phase === 'bet1' && isSBorBB(sid)) {
-    return; // SB/BB dürfen in Bet1 nicht folden
-  }
-  if (type === 'fold') {
-    p.inHand = false;
-    setAction(sid, 'fold');
-    const activesLeft = active();
-    if (activesLeft.length <= 1) finishBettingPhase();
-    else { goNextActor(); }
-    broadcast();
-    if (state.round.phase === 'reveal_bet') tryAutoFinishRevealBet();
-    return;
-  }
-  if (type === 'check') {
-    if (toCall !== 0) return;
-    setAction(sid, 'check');
-    goNextActor();
-    if (everyoneDone()) finishBettingPhase();
-    broadcast();
-    if (state.round.phase === 'reveal_bet') tryAutoFinishRevealBet();
-    return;
-  }
-  if (type === 'call') {
-    const pay = Math.min(p.chips, toCall);
-    p.chips -= pay; p.committed = (p.committed||0) + pay; state.table.pot += pay;
-    if (p.chips <= 0) p.isOut = true;
-    setAction(sid, 'call', pay);
-    goNextActor();
-    if (everyoneDone()) finishBettingPhase();
-    broadcast();
-    if (state.round.phase === 'reveal_bet') tryAutoFinishRevealBet();
-    return;
-  }
-  if (type === 'raise' || type === 'bet') {
-    amount = Number(amount);
-    if (!Number.isFinite(amount)) return;
-    const target = Math.max(state.table.currentBet + state.table.minRaise, amount);
-    const need   = Math.max(0, target - (p.committed||0));
-    const pay    = Math.min(p.chips, need);
-    if (pay <= 0) return;
-
-    p.chips -= pay; p.committed = (p.committed||0) + pay; state.table.pot += pay;
-    if (p.chips <= 0) p.isOut = true;
-    state.table.currentBet = Math.max(state.table.currentBet, p.committed);
-    state.table.lastAggressorSeat = p.seat;
-    state.table.minRaise = Math.max(state.table.minRaise, state.table.bigBlind);
-
-    setAction(sid, 'raise', p.committed);
-    goNextActor();
-    broadcast();
-    return;
-  }
-  if (type === 'allin') {
-    if (p.chips <= 0) return;
-    const pay = p.chips;
-    p.chips = 0; p.committed = (p.committed||0) + pay; state.table.pot += pay;
-    if (p.committed > state.table.currentBet) {
-      state.table.currentBet = p.committed;
-      state.table.lastAggressorSeat = p.seat;
-    }
-    p.isOut = true;
-    setAction(sid, 'allin', p.committed);
-    goNextActor();
-    broadcast();
-    return;
-  }
-}
-
-// ─────────────────────────────────────────────────────────────
-// Socket.IO – Spieler (menschliche)
+// Socket.IO – Spieler
 // ─────────────────────────────────────────────────────────────
 io.on('connection', socket => {
   socket.on('join', ({ name, avatar }) => {
@@ -450,7 +268,7 @@ io.on('connection', socket => {
     if (seat === -1) return socket.emit('errorMsg', 'Tisch ist voll.');
 
     state.seats[seat] = socket.id;
-    state.players[socket.id] = { id: socket.id, name, avatar, seat, chips: START_CHIPS, inHand: false, committed: 0, isOut:false, lastAction:null, isBot:false };
+    state.players[socket.id] = { id: socket.id, name, avatar, seat, chips: START_CHIPS, inHand: false, committed: 0, isOut:false, lastAction:null };
     socket.emit('joined', { seat });
     broadcast();
   });
@@ -465,7 +283,6 @@ io.on('connection', socket => {
     broadcast();
   });
 
-  // Spieler-Schätzung
   socket.on('submitGuess', ({ value }) => {
     if (state.round.phase !== 'collect_guesses') return socket.emit('errorMsg', 'Schätzen ist aktuell gesperrt.');
     const num = Number(value);
@@ -474,30 +291,100 @@ io.on('connection', socket => {
     if (state.round.guesses[socket.id] !== undefined) return socket.emit('errorMsg', 'Du hast bereits geschätzt.');
 
     state.round.guesses[socket.id] = num;
-    state.round.guessRevealed[socket.id] = false; // standard zensiert (Playersicht)
-    broadcast();
+    state.round.guessRevealed[socket.id] = false;
+    broadcast(); // ← Admin bekommt admin:guesses mit Klartext
 
-    // Wenn alle sitzenden Spieler geschätzt haben → weiter zu Bet1
+    // Wenn alle sitzenden Spieler geschätzt haben → bet1
     const seatsNow = seated();
     const allSubmitted = seatsNow.length>0 && seatsNow.every(({sid})=> state.round.guesses[sid]!==undefined);
     if (allSubmitted) {
       state.round.phase = 'bet1';
-      newHandSetup();          // setzt inHand & committed zurück
-      postBlinds();            // SB/BB + erste Action
+      newHandSetup();
+      postBlinds();
       broadcast();
     }
   });
 
-  // Spieler-Aktionen (menschlich)
   socket.on('action', ({ type, amount }) => {
-    playerAction(socket.id, type, amount);
-    if (state.players[socket.id]?.isBot === false) {
-      // nach menschlicher Aktion evtl. Bot an der Reihe:
-      setTimeout(botActIfTurn, 200);
+    const validBetPhases = ['bet1','bet2','bet3'];
+    if (!validBetPhases.includes(state.round.phase)) return;
+    if (!sidExists(socket.id)) return;
+    const p = state.players[socket.id];
+    if (!p.inHand) return;
+    if (state.seats[state.table.actingSeat] !== socket.id) return;
+
+    const toCall = Math.max(0, state.table.currentBet - (p.committed||0));
+
+    if (type === 'fold' && state.round.phase === 'bet1' && isSBorBB(socket.id)) {
+      return socket.emit('errorMsg', 'Small/Big Blind dürfen in Runde 1 nicht folden.');
+    }
+
+    if (type === 'fold') {
+      p.inHand = false;
+      setAction(socket.id, 'fold');
+      const activesLeft = active();
+      if (activesLeft.length <= 1) finishBettingPhase();
+      else { goNextActor(); }
+      broadcast();
+      return;
+    }
+
+    if (type === 'check') {
+      if (toCall !== 0) return;
+      setAction(socket.id, 'check');
+      goNextActor();
+      if (everyoneDone()) finishBettingPhase();
+      broadcast();
+      return;
+    }
+
+    if (type === 'call') {
+      const pay = Math.min(p.chips, toCall);
+      p.chips -= pay; p.committed = (p.committed||0) + pay; state.table.pot += pay;
+      if (p.chips <= 0) p.isOut = true;
+      setAction(socket.id, 'call', pay);
+      goNextActor();
+      if (everyoneDone()) finishBettingPhase();
+      broadcast();
+      return;
+    }
+
+    if (type === 'raise' || type === 'bet') {
+      amount = Number(amount);
+      if (!Number.isFinite(amount)) return;
+      const target = Math.max(state.table.currentBet + state.table.minRaise, amount);
+      const need   = Math.max(0, target - (p.committed||0));
+      const pay    = Math.min(p.chips, need);
+      if (pay <= 0) return;
+
+      p.chips -= pay; p.committed = (p.committed||0) + pay; state.table.pot += pay;
+      if (p.chips <= 0) p.isOut = true;
+      state.table.currentBet = Math.max(state.table.currentBet, p.committed);
+      state.table.lastAggressorSeat = p.seat;
+      state.table.minRaise = Math.max(state.table.minRaise, state.table.bigBlind);
+
+      setAction(socket.id, 'raise', p.committed);
+      goNextActor();
+      broadcast();
+      return;
+    }
+
+    if (type === 'allin') {
+      if (p.chips <= 0) return;
+      const pay = p.chips;
+      p.chips = 0; p.committed = (p.committed||0) + pay; state.table.pot += pay;
+      if (p.committed > state.table.currentBet) {
+        state.table.currentBet = p.committed;
+        state.table.lastAggressorSeat = p.seat;
+      }
+      p.isOut = true;
+      setAction(socket.id, 'allin', p.committed);
+      goNextActor();
+      broadcast();
+      return;
     }
   });
 
-  // Spieler können KEIN Rebuy / Chips ändern
   socket.on('rebuy', () => socket.emit('errorMsg', 'Rebuy/Chips nur durch den Admin.'));
   socket.on('adjustChips', () => socket.emit('errorMsg', 'Chips können nur vom Admin geändert werden.'));
 
@@ -518,9 +405,8 @@ io.on('connection', socket => {
 const admin = io.of('/admin');
 admin.on('connection', socket => {
   socket.emit('state', publicState());
-  socket.emit('admin:guesses', adminGuessesFull());
+  socket.emit('admin:guesses', adminGuessesFull()); // Admin sieht Klartext sofort
 
-  // Runde starten → Schätzen offen
   socket.on('startRound', ({ questionId }) => {
     const q = FRAGEN.find(f => String(f.id) === String(questionId)) || FRAGEN[0];
     state.round.phase = 'collect_guesses';
@@ -531,7 +417,6 @@ admin.on('connection', socket => {
     broadcast();
   });
 
-  // Hinweise → Bet-Runden
   socket.on('revealHint', (n) => {
     if (n === 1 && state.round.phase === 'bet1') {
       state.round.hintsRevealed = 1;
@@ -552,36 +437,39 @@ admin.on('connection', socket => {
     broadcast();
   });
 
-  // Lösung zeigen → NEU: reveal_bet (letzte Setzrunde NACH Lösung)
   socket.on('goReveal', () => {
     state.round.phase = 'reveal';
     broadcast();
-    // Start der letzten Setzrunde
-    state.round.phase = 'reveal_bet';
-    resetBets();
-    state.table.actingSeat = nextActiveSeat(state.table.dealerSeat);
-    broadcast();
-    setTimeout(botActIfTurn, 200);
   });
 
-  // Gewinner bestimmen (manuell)
   socket.on('resolveWinner', () => {
-    resolveWinnerAndShowdown();
-    admin.emit('sound', { key: 'correct' });
+    const w = autoWinner();
+    if (w && sidExists(w)) {
+      state.players[w].chips += state.table.pot;
+      state.table.pot = 0;
+      admin.emit('sound', { key: 'correct' });
+      for (const {sid} of seated()){
+        const p = state.players[sid];
+        if (p.chips <= 0) p.isOut = true;
+      }
+    }
+    state.round.phase = 'showdown';
+    admin.emit('winner', { winnerSid: w, solution: state.round.question?.loesung });
     broadcast();
   });
 
-  // Sounds
   socket.on('playSound', ({ key }) => {
     admin.emit('sound', { key });
     io.emit('sound', { key });
   });
 
-  // Chips/Rebuy
+  // Chips / Rebuy
   socket.on('admin:adjustChips', ({ sid, delta }) => {
     const p = state.players[sid];
     if (!p) return;
-    p.chips = Math.max(0, (p.chips || 0) + Number(delta || 0));
+    const d = Number(delta || 0);
+    if (!Number.isFinite(d)) return;
+    p.chips = Math.max(0, (p.chips || 0) + d);
     if (p.chips > 0) p.isOut = false;
     broadcast();
   });
@@ -615,14 +503,13 @@ admin.on('connection', socket => {
     broadcast();
   });
 
-  // Guesses steuern
+  // Schätzen sperren / Reveal
   socket.on('admin:lockGuesses', () => {
     if (state.round.phase === 'collect_guesses') {
       state.round.phase = 'bet1';
       newHandSetup();
       postBlinds();
       broadcast();
-      setTimeout(botActIfTurn, 200);
     }
   });
 
@@ -638,18 +525,10 @@ admin.on('connection', socket => {
     }
     broadcast();
   });
-
-  // Bots
-  socket.on('admin:addBot', ({ name }) => {
-    addBot(name);
-  });
-  socket.on('admin:removeAllBots', () => {
-    removeAllBots();
-  });
 });
 
 // ─────────────────────────────────────────────────────────────
-// Start Server
+// Start
 // ─────────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log('Listening on :' + PORT));
