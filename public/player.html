@@ -71,7 +71,7 @@
 <script>
 const sock = io({ autoConnect: true });
 let MY_ID = null, GLOBAL_STATE = null;
-let PUBLIC_GUESSES = []; // vom Server: [{sid,name,value,revealed}]
+let PUBLIC_GUESSES = []; // [{sid,name,value,revealed}]
 
 const $ = (id)=>document.getElementById(id);
 const h = (html)=>{ const d=document.createElement('div'); d.innerHTML=html.trim(); return d.firstElementChild; };
@@ -112,6 +112,7 @@ $('joinBtn').onclick = ()=>{
   const room = $('room').value.trim();
   const avatar = $('avatar').value.trim();
   if(!name){ alert('Bitte Namen eingeben.'); return; }
+  // room wird serverseitig ignoriert – stört aber nicht
   sock.emit('join', { room, name, avatar });
 };
 $('leaveBtn').onclick = ()=> sock.emit('leaveTable');
@@ -163,7 +164,7 @@ function renderState(st){
     `<div><b>Frage:</b> ${q.frage ?? '—'}</div>`,
     `<div class="small"><b>Hinweis 1:</b> ${round?.hintsRevealed >= 1 ? (q.hinweis1 ?? '—') : '• • •'}</div>`,
     `<div class="small"><b>Hinweis 2:</b> ${round?.hintsRevealed >= 2 ? (q.hinweis2 ?? '—') : '• • •'}</div>`,
-    `<div class="small"><b>Lösung:</b> ${['reveal','showdown'].includes(round?.phase) ? (q.loesung ?? '—') : '• • •'}</div>`,
+    `<div class="small"><b>Lösung:</b> ${['reveal','reveal_bet','showdown'].includes(round?.phase) ? (q.loesung ?? '—') : '• • •'}</div>`,
     `<div><b>Phase:</b> ${round?.phase ?? '—'}</div>`
   ].join('') : 'Warte auf neue Runde…';
 
@@ -177,21 +178,20 @@ function renderState(st){
         : 'Schätz-Phase vorbei.')
     : 'Warte auf nächste Frage…';
 
-  // Bet-Phasen: klassische bet1/bet2/bet3 + finale Bet in reveal/final_bet
-  const betPhases = ['bet1','bet2','bet3','reveal','final_bet'];
+  // Bet-Phasen: nur diese Phasen sind für Spieleraktionen relevant
+  const betPhases = ['bet1','bet2','bet3','reveal_bet'];
   const isBet = betPhases.includes(round?.phase);
   const iAmActing = isBet && me && (table.actingSeat === me.seat) && me.inHand;
   setDisabled('.act', !iAmActing);
   $('actInfo').textContent = iAmActing
-    ? (round?.phase==='reveal' || round?.phase==='final_bet' ? 'Finale Setzrunde: Du bist dran.' : 'Du bist dran.')
+    ? (round?.phase==='reveal_bet' ? 'Finale Setzrunde: Du bist dran.' : 'Du bist dran.')
     : (isBet ? 'Warte bis du dran bist…' : 'Aktionen nur in Bet-Phasen.');
 
-  // Seats rendern
+  // Seats rendern – SITZ 2 und 6 komplett entfernen (nicht anzeigen)
   const seatsWrap = $('seats'); seatsWrap.innerHTML='';
   const seats = Array.isArray(st?.seats) ? st.seats : [];
   seats.forEach((sid,i)=>{
-    // Seitenplätze an der Kante auslassen
-    if (i === 2 || i === 6) return;
+    if (i === 2 || i === 6) return; // komplett aus der Spieler-Ansicht raus
 
     const p = sid ? st.players[sid] : null;
     const seat = h(`<div class="seat s${i}"></div>`);
@@ -253,6 +253,8 @@ function positionDealerBadge(){
   dealer.style.display = 'none';
   const dSeat = st?.table?.dealerSeat;
   if(typeof dSeat !== 'number') return;
+  // In der Spieler-Ansicht existieren 2/6 nicht – Badge dort ausblenden
+  if (dSeat === 2 || dSeat === 6) return;
   const dEl = seatsWrap.querySelector('.seat.s'+dSeat);
   if(!dEl) return;
   dealer.style.display = 'block';
