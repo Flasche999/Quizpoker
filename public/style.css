@@ -1,3 +1,62 @@
+:root{
+  --bg:#0a1018; 
+  --felt1:#144c4c; 
+  --felt2:#0b2e2e; 
+  --ring:#063; 
+  --panel:#0f172a; 
+  --text:#e5e7eb; 
+  --muted:#9aa4b2; 
+  --accent:#7c3aed;
+}
+
+/* Base */
+*{box-sizing:border-box}
+body{
+  margin:0;
+  font-family:Inter,system-ui,Segoe UI,Roboto,Arial;
+  background:radial-gradient(1200px 600px at 70% 0%, #12182a, var(--bg));
+  color:var(--text);
+}
+.container{max-width:1100px;margin:0 auto;padding:16px}
+.card{
+  background:var(--panel);
+  border:1px solid #1f2937;
+  border-radius:16px;
+  box-shadow:0 8px 30px rgba(0,0,0,.25);
+  padding:16px;
+}
+.h{font-weight:700;font-size:20px;margin:0 0 12px}
+.row{display:flex;gap:12px;flex-wrap:wrap}
+.btn{
+  border:1px solid #30374a;
+  background:#141b2d;
+  color:var(--text);
+  border-radius:12px;
+  padding:10px 14px;
+  cursor:pointer;
+}
+.btn:hover{border-color:#475569}
+.btn.ok{border-color:#14532d;background:#0f2f1f}
+.btn.warn{border-color:#7c2d12;background:#2b140f}
+.btn.bad{border-color:#7f1d1d;background:#2b0f0f}
+.btn:disabled{opacity:.6;cursor:not-allowed}
+.input, select{
+  background:#0f172a;
+  border:1px solid #263043;
+  border-radius:10px;
+  color:var(--text);
+  padding:10px 12px;
+}
+.small{font-size:12px;color:var(--muted)}
+.badge{
+  display:inline-block;
+  border:1px solid #334155;
+  border-radius:999px;
+  padding:2px 8px;
+  font-size:12px;
+  margin-left:6px;
+}
+
 /* Virtueller Tisch */
 .table-wrap{position:relative;width:100%;height:540px;margin:12px auto}
 .table{
@@ -6,7 +65,8 @@
   border-radius:50%;
   background:radial-gradient(60% 60% at 50% 50%, var(--felt1), var(--felt2));
   border:12px solid var(--ring);
-  box-shadow:inset 0 0 80px rgba(0,0,0,.35), 0 10px 35px rgba(0,0,0,.45)
+  box-shadow:inset 0 0 80px rgba(0,0,0,.35), 0 10px 35px rgba(0,0,0,.45);
+  z-index:1;
 }
 /* Seats-Layer absolut über dem Tisch */
 #seats{position:absolute; inset:0; z-index:2}
@@ -21,14 +81,6 @@
   border-radius:16px;
   padding:10px 14px;
   z-index:4;
-}
-.badge{
-  display:inline-block;
-  border:1px solid #334155;
-  border-radius:999px;
-  padding:2px 8px;
-  font-size:12px;
-  margin-left:6px
 }
 .dealer{
   position:absolute;
@@ -55,32 +107,29 @@
   border-radius:16px;
   padding:8px;
   text-align:center;
-  color:#fff
+  color:#fff;
 }
 .seat img{
   width:60px;
   height:60px;
   border-radius:50%;
   object-fit:cover;
-  border:2px solid #2b3a57
+  border:2px solid #2b3a57;
 }
 .seat .name{font-weight:600;margin-top:4px}
 .seat .chips{font-size:12px;color:#a5b4fc}
 
-/* Sitzpositionen (0 top, dann Uhrzeigersinn) */
+/* Sitzpositionen (0 top, Uhrzeigersinn) */
 .seat.s0{left:50%;top:4%;transform:translate(-50%,0)}
 .seat.s1{right:8%;top:18%}
 .seat.s2{right:2%;top:50%;transform:translate(0,-50%)}
-/* seitlich unten leicht höher (von 18% → 20%) */
-.seat.s3{right:8%;bottom:20%}
-/* unten mittig leicht höher (von 4% → 8%) */
-.seat.s4{left:50%;bottom:8%;transform:translate(-50%,0)}
-/* seitlich unten leicht höher (von 18% → 20%) */
-.seat.s5{left:8%;bottom:20%}
+.seat.s3{right:8%;bottom:20%}              /* leicht höher */
+.seat.s4{left:50%;bottom:8%;transform:translate(-50%,0)} /* höher */
+.seat.s5{left:8%;bottom:20%}               /* leicht höher */
 .seat.s6{left:2%;top:50%;transform:translate(0,-50%)}
 .seat.s7{left:8%;top:18%}
 
-/* Aktiver Spieler extra betonen + "DRAN"-Badge */
+/* Aktiver Spieler + "DRAN"-Badge */
 .seat.turn{
   outline:3px solid var(--accent);
   box-shadow:0 0 0 6px rgba(124,58,237,.2), 0 0 24px rgba(124,58,237,.35);
