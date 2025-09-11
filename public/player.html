@@ -6,16 +6,50 @@
   <title>QuizPoker – Spieler</title>
   <link rel="stylesheet" href="/style.css" />
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <style>
+    /* Fallbacks, falls style.css das nicht hat */
+    .container{max-width:1100px;margin:24px auto;padding:0 12px}
+    .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+    .card{background:#0f1118;border:1px solid #262b36;border-radius:14px;padding:14px;margin-bottom:12px}
+    .h{margin:0 0 8px 0}
+    .input{background:#0a0d14;border:1px solid #262b36;border-radius:10px;padding:8px 10px;color:#e7e9ee}
+    .btn{border:1px solid #262b36;border-radius:10px;background:#151a23;padding:8px 12px;color:#e7e9ee;cursor:pointer}
+    .btn.ok{background:#1d4933}
+    .btn.bad{background:#522d2d}
+    .small{opacity:.8;font-size:12px}
+    .table-wrap{position:relative;min-height:420px}
+    .table{position:absolute;inset:0;border-radius:999px;background:radial-gradient(circle at 50% 35%, #203142 0, #111826 60%);box-shadow:0 0 40px rgba(0,0,0,.5);margin:10px}
+    #seats{position:absolute;inset:0}
+    .seat{position:absolute;width:130px;text-align:center}
+    .seat img{width:64px;height:64px;border-radius:50%;object-fit:cover;border:2px solid #2a3242}
+    .seat .name{margin-top:6px;font-weight:600}
+    .seat .chips{font-size:12px;opacity:.85}
+    .seat.turn{filter:drop-shadow(0 0 8px rgba(255,255,255,.35))}
+    .dealer{position:absolute;width:24px;height:24px;line-height:24px;text-align:center;border-radius:50%;background:#e7e9ee;color:#111;font-weight:700;display:none}
+    .pot{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);padding:6px 12px;border:1px solid #262b36;border-radius:999px;background:#0f1118}
+    /* 8 Sitzpositionen um den Tisch (s0..s7) */
+    .s0{left:50%;top:4%;transform:translate(-50%,0)}
+    .s1{left:82%;top:16%;transform:translate(-50%,0)}
+    .s2{left:92%;top:50%;transform:translate(-50%,-50%)}
+    .s3{left:82%;top:84%;transform:translate(-50%,-100%)}
+    .s4{left:50%;top:96%;transform:translate(-50%,-100%)}
+    .s5{left:18%;top:84%;transform:translate(-50%,-100%)}
+    .s6{left:8%;top:50%;transform:translate(-50%,-50%)}
+    .s7{left:18%;top:16%;transform:translate(-50%,0)}
+    #questionBox div{margin:2px 0}
+    .muted{opacity:.7}
+  </style>
 </head>
 <body>
   <div class="container">
     <div class="card">
       <h2 class="h">Beitreten</h2>
       <div class="row">
+        <input class="input" id="room" placeholder="Raumcode" style="width:140px" />
         <input class="input" id="name" placeholder="Dein Name" style="width:220px" />
         <input class="input" id="avatar" placeholder="Avatar-URL (optional)" style="width:320px" />
         <button class="btn ok" id="joinBtn">Beitreten</button>
-        <button class="btn bad" id="leaveBtn">Verlassen</button>
+        <button class="btn bad" id="leaveBtn" title="Tisch verlassen">Verlassen</button>
         <button class="btn" id="rebuyBtn" title="+Startchips hinzufügen">Rebuy</button>
       </div>
       <div class="small">Ohne Avatar-URL bekommst du automatisch einen generierten Avatar.</div>
@@ -37,10 +71,10 @@
     </div>
 
     <div class="row">
-      <div class="card" style="flex:1">
+      <div class="card" style="flex:1;min-width:320px">
         <h2 class="h">Deine Schätzantwort</h2>
         <div id="guessBox">
-          <div class="small">Gib sofort nach Start deine Zahl ein (nur in Phase "Schätzung").</div>
+          <div class="small">Gib nach Start deine Zahl ein (nur in Phase „Schätzung“).</div>
           <div class="row">
             <input class="input" id="guess" type="number" placeholder="z. B. 123" style="width:160px" />
             <button class="btn ok" id="sendGuess">Abschicken</button>
@@ -49,88 +83,168 @@
         </div>
       </div>
 
-      <div class="card" style="flex:1">
+      <div class="card" style="flex:1;min-width:320px">
         <h2 class="h">Aktionen</h2>
         <div class="row">
-          <button class="btn" data-act="check">Check</button>
-          <button class="btn" data-act="call">Call</button>
-          <button class="btn" data-act="raise">Raise</button>
+          <button class="btn act" data-act="check">Check</button>
+          <button class="btn act" data-act="call">Call</button>
+          <button class="btn act" data-act="raise">Raise</button>
           <input class="input" id="raiseAmt" type="number" placeholder="Betrag" style="width:120px" />
-          <button class="btn" data-act="allin">All-In</button>
-          <button class="btn bad" data-act="fold">Fold</button>
+          <button class="btn act" data-act="allin">All-In</button>
+          <button class="btn bad act" data-act="fold">Fold</button>
         </div>
-        <div class="small">Aktionen sind nur in den Bet-Phasen möglich und wenn du dran bist.</div>
+        <div class="small" id="actInfo">Aktionen sind nur in den Bet-Phasen möglich und wenn du dran bist.</div>
       </div>
     </div>
   </div>
 
 <script>
-const sock = io();
+const sock = io({ autoConnect: true });
 let MY_ID = null, GLOBAL_STATE = null;
 
-function el(id){return document.getElementById(id)}
-function h(html){const d=document.createElement('div');d.innerHTML=html;return d.firstElementChild}
+/* Utilities */
+const $ = (id)=>document.getElementById(id);
+const h = (html)=>{ const d=document.createElement('div'); d.innerHTML=html.trim(); return d.firstElementChild; };
+const setDisabled = (sel, v)=> document.querySelectorAll(sel).forEach(b=> b.disabled = v);
 
-sock.on('connect', ()=>{ MY_ID = sock.id; });
+/* Preload Sounds (verhindert ersten „Stumm“-Klick auf iOS/Browsern manchmal nicht, aber hilft) */
+const sounds = {
+  buzzer: new Audio('/sounds/buzzer.mp3'),
+  correct: new Audio('/sounds/correct.mp3'),
+  wrong: new Audio('/sounds/wrong.mp3'),
+};
+Object.values(sounds).forEach(a=>{ a.preload = 'auto'; a.volume = 1.0; });
 
-el('joinBtn').onclick = ()=> sock.emit('join', { name: el('name').value, avatar: el('avatar').value });
-el('leaveBtn').onclick = ()=> sock.emit('leaveTable');
-el('rebuyBtn').onclick = ()=> sock.emit('rebuy');
+/* Socket lifecycle */
+sock.on('connect', ()=>{ MY_ID = sock.id; /* Server sollte direkt einen 'state' pushen */ });
+sock.on('disconnect', ()=>{ /* UI leicht abdunkeln? Optional */ });
 
-el('sendGuess').onclick = ()=>{
-  const v = Number(el('guess').value);
-  if(Number.isFinite(v)) sock.emit('submitGuess', { value: v });
+/* Join/Leave/Rebuy */
+$('joinBtn').onclick = ()=>{
+  const name = $('name').value.trim();
+  const room = $('room').value.trim();
+  if(!room){ alert('Bitte Raumcode eingeben.'); return; }
+  if(!name){ alert('Bitte Namen eingeben.'); return; }
+  const avatar = $('avatar').value.trim();
+  sock.emit('join', { room, name, avatar });
+};
+$('leaveBtn').onclick = ()=> sock.emit('leaveTable');
+$('rebuyBtn').onclick = ()=> sock.emit('rebuy');
+
+/* Guess */
+$('sendGuess').onclick = ()=>{
+  const v = Number($('guess').value);
+  if(!Number.isFinite(v)){ alert('Bitte eine Zahl eingeben.'); return; }
+  sock.emit('submitGuess', { value: v });
 };
 
-document.querySelectorAll('[data-act]').forEach(btn=>{
+/* Actions */
+document.querySelectorAll('.act[data-act]').forEach(btn=>{
   btn.onclick = ()=>{
     const type = btn.getAttribute('data-act');
-    const amount = Number(el('raiseAmt').value);
+    const amountRaw = Number($('raiseAmt').value);
+    const amount = Number.isFinite(amountRaw) ? Math.floor(amountRaw) : 0;
+    if(type === 'raise' && amount <= 0){ alert('Bitte gültigen Raise-Betrag eingeben.'); return; }
     sock.emit('action', { type, amount });
   };
 });
 
-function renderState(st){
-  GLOBAL_STATE = st; const me = st.players[MY_ID];
-  const q = st.round?.question;
-  el('questionBox').innerHTML = q ? `
-    <div><b>Frage:</b> ${q.frage}</div>
-    <div><b>Hinweis 1:</b> ${q.hinweis1 ?? '—'}</div>
-    <div><b>Hinweis 2:</b> ${q.hinweis2 ?? '—'}</div>
-    <div><b>Lösung:</b> ${q.loesung ?? '—'}</div>
-    <div><b>Phase:</b> ${st.round.phase}</div>
-  ` : 'Warte auf neue Runde…';
-
-  const canGuess = st.round.phase === 'collect_guesses' && me;
-  el('guess').disabled = !canGuess || me?.hasGuessed;
-  el('sendGuess').disabled = !canGuess || me?.hasGuessed;
-  el('guessInfo').textContent = canGuess ? (me?.hasGuessed ? 'Schätzung abgegeben. Warte auf andere…' : 'Gib jetzt deine Schätzung ab!') : 'Warte auf nächste Frage…';
-
-  const seatsWrap = el('seats'); seatsWrap.innerHTML='';
-  st.seats.forEach((sid,i)=>{
-    const p = sid ? st.players[sid] : null;
-    const seat = h(`<div class="seat s${i}"></div>`);
-    seat.innerHTML = p ? `
-      ${p.avatar?`<img src="${p.avatar}" alt="avatar"/>`:`<img src="https://api.dicebear.com/7.x/thumbs/svg?seed=${encodeURIComponent(p?.name||'X')}" alt="avatar"/>`}
-      <div class="name">${p.name}</div>
-      <div class="chips">${p.chips} Chips</div>
-    ` : `<div class="name">(frei)</div><div class="chips">—</div>`;
-    if(p && st.round.actingSeat===p.seat){ seat.classList.add('turn'); }
-    seatsWrap.appendChild(seat);
-  });
-  el('pot').textContent = st.round.pot;
-
-  const dealer = el('dealer'); dealer.style.display='none';
-  const dSeat = st.table.dealerSeat; const dEl = seatsWrap.querySelector('.seat.s'+dSeat);
-  if(dEl){ dealer.style.display='block'; dealer.style.left=(dEl.offsetLeft + 8)+'px'; dealer.style.top=(dEl.offsetTop - 12)+'px'; }
-}
-
-sock.on('state', renderState);
+/* Server events */
+sock.on('state', (st)=> renderState(st));
 sock.on('errorMsg', (m)=> alert(m));
 sock.on('sound', ({key})=>{
-  const m={buzzer:'/sounds/buzzer.mp3',correct:'/sounds/correct.mp3',wrong:'/sounds/wrong.mp3'};
-  const a=new Audio(m[key]); a&&a.play&&a.play().catch(()=>{});
+  const a = sounds[key];
+  if(a){ try{ a.currentTime = 0; a.play(); }catch(e){} }
 });
+
+/* Render */
+function renderState(st){
+  GLOBAL_STATE = st;
+  const me = st?.players?.[MY_ID] || null;
+  const round = st?.round || null;
+  const q = round?.question || null;
+
+  /* Frage / Hinweise / Lösung nach Phase sichtbar machen */
+  $('questionBox').innerHTML = q ? [
+    `<div><b>Frage:</b> ${q.frage ?? '—'}</div>`,
+    `<div class="muted"><b>Hinweis 1:</b> ${round?.phase_index >= (q.revealIndexHint1 ?? 1) ? (q.hinweis1 ?? '—') : '• • •'}</div>`,
+    `<div class="muted"><b>Hinweis 2:</b> ${round?.phase_index >= (q.revealIndexHint2 ?? 2) ? (q.hinweis2 ?? '—') : '• • •'}</div>`,
+    `<div class="muted"><b>Lösung:</b> ${round?.phase === 'showdown' || round?.showSolution ? (q.loesung ?? '—') : '• • •'}</div>`,
+    `<div><b>Phase:</b> ${round?.phase ?? '—'}</div>`
+  ].join('') : 'Warte auf neue Runde…';
+
+  /* Guess-UI (nur in collect_guesses) */
+  const canGuess = !!(round && round.phase === 'collect_guesses' && me);
+  $('guess').disabled = !canGuess || !!me?.hasGuessed;
+  $('sendGuess').disabled = !canGuess || !!me?.hasGuessed;
+  $('guessInfo').textContent = canGuess
+    ? (me?.hasGuessed ? 'Schätzung abgegeben. Warte auf andere…' : 'Gib jetzt deine Schätzung ab!')
+    : 'Warte auf nächste Frage…';
+
+  /* Seats zeichnen */
+  const seatsWrap = $('seats'); seatsWrap.innerHTML = '';
+  const seats = Array.isArray(st?.seats) ? st.seats : [];
+  seats.forEach((sid,i)=>{
+    const p = sid ? st.players[sid] : null;
+    const seat = h(`<div class="seat s${i}"></div>`);
+    if(p){
+      const avatar = p.avatar && p.avatar.length ? p.avatar
+        : `https://api.dicebear.com/7.x/thumbs/svg?seed=${encodeURIComponent(p.name||'X')}`;
+      seat.innerHTML = `
+        <img src="${avatar}" alt="avatar"/>
+        <div class="name">${escapeHtml(p.name||'')}</div>
+        <div class="chips">${p.chips ?? 0} Chips</div>
+      `;
+      if(round && typeof round.actingSeat === 'number' && round.actingSeat === p.seat){
+        seat.classList.add('turn');
+      }
+    }else{
+      seat.innerHTML = `<div class="name">(frei)</div><div class="chips">—</div>`;
+    }
+    seatsWrap.appendChild(seat);
+  });
+
+  /* Pot */
+  $('pot').textContent = round?.pot ?? 0;
+
+  /* Dealer-Badge (nach Layout, damit offsetLeft/Top stimmen) */
+  positionDealerBadge();
+
+  /* Action-Buttons freischalten nur wenn: Bet-Phase + ich bin dran + ich bin nicht gefoldet/all-in locked (falls Server diese Flags liefert) */
+  const betPhases = new Set(['bet1','bet2','bet3','showdown_bet']); // passe an eure Phase-IDs an
+  const myTurn = !!(me && round && typeof round.actingSeat === 'number' && round.actingSeat === me.seat);
+  const canAct = !!(round && betPhases.has(round.phase) && myTurn && !me?.isAllIn && !me?.hasFolded);
+  setDisabled('.act', !canAct);
+  $('actInfo').textContent = canAct
+    ? 'Du bist dran.'
+    : (round ? 'Warte auf deinen Zug…' : 'Warte auf nächste Runde…');
+}
+
+/* Dealer-Token positionieren */
+function positionDealerBadge(){
+  const st = GLOBAL_STATE;
+  const seatsWrap = $('seats');
+  const dealer = $('dealer');
+  dealer.style.display = 'none';
+  if(!st?.table || typeof st.table.dealerSeat !== 'number') return;
+  const dEl = seatsWrap.querySelector('.seat.s'+st.table.dealerSeat);
+  if(!dEl) return;
+  // kurze Verzögerung, bis Layout steht
+  setTimeout(()=>{
+    const rect = dEl.getBoundingClientRect();
+    const parent = seatsWrap.getBoundingClientRect();
+    dealer.style.display = 'block';
+    dealer.style.left = (rect.left - parent.left + 6) + 'px';
+    dealer.style.top  = (rect.top  - parent.top  - 12) + 'px';
+  }, 0);
+}
+
+/* kleine XSS-Schutzhilfe */
+function escapeHtml(str){
+  return String(str).replace(/[&<>"']/g, s => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  }[s]));
+}
 </script>
 </body>
 </html>
