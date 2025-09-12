@@ -525,6 +525,12 @@ io.on('connection', socket => {
     socket.emit('admin:guesses', adminGuessesFull());
   });
 
+  // >>> NEU: Falls dein Admin im Default-Namespace verbunden ist
+  //          (z.B. du nutzt joinAdmin), bediene auch hier den Button:
+  socket.on('admin:requestGuesses', () => {            // ← NEU
+    socket.emit('admin:guesses', adminGuessesFull());  // ← NEU
+  });                                                  // ← NEU
+
   socket.on('join', ({ name, avatar }) => {
     name = String(name||'').trim().slice(0,20) || 'Spieler';
     avatar = String(avatar||'').trim().slice(0,200);
@@ -605,10 +611,15 @@ admin.on('connection', socket => {
   socket.emit('state', publicState());
   socket.emit('admin:guesses', adminGuessesFull());
 
-  // >>> NEU: aktives Nachladen der Guesses
+  // >>> NEU: aktives Nachladen der Guesses (alter Name bleibt erhalten)
   socket.on('admin:getGuesses', () => {
     socket.emit('admin:guesses', adminGuessesFull());
   });
+
+  // >>> NEU: zusätzlicher Alias passend zu deinem Button
+  socket.on('admin:requestGuesses', () => {            // ← NEU
+    socket.emit('admin:guesses', adminGuessesFull());  // ← NEU
+  });                                                  // ← NEU
 
   // Runde starten → Schätzen offen
   socket.on('startRound', ({ questionId }) => {
