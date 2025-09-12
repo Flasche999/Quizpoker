@@ -39,7 +39,9 @@
     .act-flag.raise{ background:#2b2341; border-color:#403469 }
     .act-flag.allin{ background:#4a1e1e; border-color:#6b2b2b; font-weight:700 }
     .act-flag.fold{ background:#3a1111; border-color:#5b1a1a; font-weight:700 }
-    .guess-chip{ position:absolute; left:50%; bottom:-8px; transform:translate(-50%,100%); font-size:11px; padding:3px 8px; border-radius:999px; border:1px solid #334155; background:#0b1324 }
+
+    /* Admin-Guess-Zeile am Sitz */
+    .guess-line{ margin-top:2px }
   </style>
 </head>
 <body>
@@ -163,7 +165,7 @@ clientSock.on('connect', ()=> {
 
 // Nach Connect im Admin-NS initiale Guesses ziehen (Snapshot)
 adminSock.on('connect', ()=> {
-  // NEU: beide Events schicken → kompatibel zu 'admin:getGuesses' & 'admin:requestGuesses'
+  // beide Events schicken → kompatibel zu 'admin:getGuesses' & 'admin:requestGuesses'
   adminSock.emit('admin:getGuesses');
   adminSock.emit('admin:requestGuesses');
 });
@@ -178,6 +180,8 @@ function emitAdmin(event, payload){
    Utils & Rendering
    ────────────────────────────────────────────────────────── */
 let GLOBAL_STATE = null;
+let ADMIN_GUESSES = {}; // sid -> Klartext-Schätzung
+
 function el(id){ return document.getElementById(id); }
 function h(html){ const d=document.createElement('div'); d.innerHTML=html.trim(); return d.firstElementChild; }
 function fmt(n){ return Number(n||0).toString(); }
@@ -258,11 +262,13 @@ function renderState(st){
     const seat = h(`<div class="seat s${i}"></div>`);
     if (p){
       const roleBadge = p.role ? `<span class="badge ${p.role==='SB'?'sb':'bb'}">${p.role==='SB'?'S':'B'}</span>` : '';
+      const guessVal = ADMIN_GUESSES?.[sid]; // Klartext nur Admin
       seat.innerHTML = `
         ${p.avatar?`<img src="${p.avatar}" alt="avatar"/>`:`<img src="https://api.dicebear.com/7.x/thumbs/svg?seed=${encodeURIComponent(p.name)}" alt="avatar"/>`}
         <div class="name">${p.name} <span class="badge">Sitz ${i}</span> ${roleBadge}</div>
         <div class="chips">${fmt(p.chips)} Chips</div>
         <div class="tiny">Committed: ${fmt(p.committed||0)}</div>
+        <div class="tiny guess-line">Guess: <b>${guessVal ?? '—'}</b></div>
       `;
       if(st.table.actingSeat === p.seat){
         seat.classList.add('turn');
@@ -293,20 +299,15 @@ function renderState(st){
   // Pot
   el('pot').textContent = fmt(st.table.pot);
 
-  // NEU: Nach jedem State aktiv die Guesses nachladen (beide Events)
+  // Nach jedem State aktiv die Guesses nachladen (beide Events)
   emitAdmin('admin:getGuesses');
   emitAdmin('admin:requestGuesses');
 }
 
-// Admin sieht Guesses (Klartext) + pro Spieler Reveal-Schalter (Playersicht)
+// Tabelle der Admin-Guesses (keine Sitz-Overlays mehr)
 function renderAdminGuesses(rows){
   const tb = el('guessTable').querySelector('tbody');
   tb.innerHTML = '';
-
-  // Vor dem Rendern alle bestehenden Guess-Badges an Sitzen entfernen
-  const seatsWrap = el('seats');
-  seatsWrap.querySelectorAll('.guess-chip').forEach(n=>n.remove());
-
   (rows || []).forEach(r=>{
     const tr = h(`<tr>
       <td>${r.name}</td>
@@ -317,18 +318,7 @@ function renderAdminGuesses(rows){
       emitAdmin('admin:revealGuess', { sid: e.target.dataset.sid, reveal: e.target.checked });
     };
     tb.appendChild(tr);
-
-    // Sitz-Overlay „Guess: Wert“ (nicht zensiert im Admin)
-    const st = GLOBAL_STATE; if (!st) return;
-    const p = st.players?.[r.sid]; if (!p) return;
-    const seatEl = el('seats').querySelector('.seat.s'+p.seat);
-    if (seatEl){
-      const chip = h(`<div class="guess-chip">Guess: ${r.value}</div>`);
-      seatEl.appendChild(chip);
-    }
   });
-
-  // Button-Loading resetten
   resetRefreshBtn();
 }
 
@@ -379,7 +369,22 @@ clientSock.on('state', renderState); // Fallback
 // >>> Admin-Guesses: auf BEIDEN Sockets hören
 function onAdminGuesses(rows){
   console.log('[admin:guesses]', rows);
+  // Cache: sid -> value (Klartext)
+  ADMIN_GUESSES = Object.fromEntries((rows||[]).map(r => [r.sid, r.value]));
   renderAdminGuesses(Array.isArray(rows) ? rows : []);
+
+  // Guess-Zeilen an Sitzen aktualisieren ohne Full-Render
+  const seatsWrap = el('seats');
+  (GLOBAL_STATE?.seats || []).forEach((sid, i) => {
+    const seatEl = seatsWrap.querySelector('.seat.s'+i);
+    if (!seatEl) return;
+    // alte Guess-Line entfernen
+    seatEl.querySelectorAll('.guess-line').forEach(n=>n.remove());
+    if (!sid) return;
+    const v = ADMIN_GUESSES[sid];
+    const line = h(`<div class="tiny guess-line">Guess: <b>${v ?? '—'}</b></div>`);
+    seatEl.appendChild(line);
+  });
 }
 adminSock.on('admin:guesses', onAdminGuesses);
 clientSock.on('admin:guesses', onAdminGuesses); // Fallback
@@ -389,7 +394,7 @@ function onGuessesError(msg){
   console.warn('Guesses-Fehler:', msg);
   resetRefreshBtn();
   const tb = el('guessTable').querySelector('tbody');
-  const tr = h(`<tr><td colspan="3" style="color:#e66">${msg || 'Konnte Schätzungen nicht Laden.'}</td></tr>`);
+  const tr = h(`<tr><td colspan="3" style="color:#e66">${msg || 'Konnte Schätzungen nicht laden.'}</td></tr>`);
   tb.appendChild(tr);
 }
 adminSock.on('error:guesses', onGuessesError);
@@ -432,7 +437,7 @@ el('assignBlinds').onclick = ()=> emitAdmin('admin:assignBlinds');
 
 el('revealAll').onchange   = (e)=> emitAdmin('admin:revealAllGuesses', { reveal: e.target.checked });
 
-// NEU: Guesses-Refresh Button mit Loading-State + Dual-Event
+// Guesses-Refresh Button mit Loading-State + Dual-Event
 const refreshBtn = el('refreshGuesses');
 function resetRefreshBtn(){
   if (!refreshBtn) return;
@@ -448,7 +453,7 @@ refreshBtn.onclick = ()=> {
   setTimeout(()=> resetRefreshBtn(), 2500);
 };
 
-// NEU: Massen-Chips Buttons
+// Massen-Chips Buttons
 el('setAllChips').onclick = ()=>{
   const v = Number(el('allChipsVal').value);
   if (!Number.isFinite(v) || v < 0) return alert('Bitte gültigen Betrag eingeben (≥ 0).');
