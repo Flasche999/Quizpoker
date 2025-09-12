@@ -163,7 +163,9 @@ clientSock.on('connect', ()=> {
 
 // Nach Connect im Admin-NS initiale Guesses ziehen (Snapshot)
 adminSock.on('connect', ()=> {
+  // NEU: beide Events schicken → kompatibel zu 'admin:getGuesses' & 'admin:requestGuesses'
   adminSock.emit('admin:getGuesses');
+  adminSock.emit('admin:requestGuesses');
 });
 
 // Helper: gleichzeitig auf BEIDEN Kanälen senden → maximale Kompatibilität
@@ -291,8 +293,9 @@ function renderState(st){
   // Pot
   el('pot').textContent = fmt(st.table.pot);
 
-  // Nach jedem State auch aktiv die Guesses nachladen
+  // NEU: Nach jedem State aktiv die Guesses nachladen (beide Events)
   emitAdmin('admin:getGuesses');
+  emitAdmin('admin:requestGuesses');
 }
 
 // Admin sieht Guesses (Klartext) + pro Spieler Reveal-Schalter (Playersicht)
@@ -304,7 +307,7 @@ function renderAdminGuesses(rows){
   const seatsWrap = el('seats');
   seatsWrap.querySelectorAll('.guess-chip').forEach(n=>n.remove());
 
-  rows.forEach(r=>{
+  (rows || []).forEach(r=>{
     const tr = h(`<tr>
       <td>${r.name}</td>
       <td><b>${r.value}</b></td>
@@ -324,6 +327,9 @@ function renderAdminGuesses(rows){
       seatEl.appendChild(chip);
     }
   });
+
+  // Button-Loading resetten
+  resetRefreshBtn();
 }
 
 // Chips/ Rebuy Tabelle
@@ -378,6 +384,17 @@ function onAdminGuesses(rows){
 adminSock.on('admin:guesses', onAdminGuesses);
 clientSock.on('admin:guesses', onAdminGuesses); // Fallback
 
+// Fehlerkanal für Guesses
+function onGuessesError(msg){
+  console.warn('Guesses-Fehler:', msg);
+  resetRefreshBtn();
+  const tb = el('guessTable').querySelector('tbody');
+  const tr = h(`<tr><td colspan="3" style="color:#e66">${msg || 'Konnte Schätzungen nicht Laden.'}</td></tr>`);
+  tb.appendChild(tr);
+}
+adminSock.on('error:guesses', onGuessesError);
+clientSock.on('error:guesses', onGuessesError);
+
 // Gewinner Popup (unterstützt winnerSids für Split-Pot)
 function onWinner({ winnerSid, solution, winnerSids }){
   if (Array.isArray(winnerSids) && winnerSids.length > 1) {
@@ -415,8 +432,21 @@ el('assignBlinds').onclick = ()=> emitAdmin('admin:assignBlinds');
 
 el('revealAll').onchange   = (e)=> emitAdmin('admin:revealAllGuesses', { reveal: e.target.checked });
 
-// NEU: Guesses-Refresh Button
-el('refreshGuesses').onclick = ()=> emitAdmin('admin:getGuesses');
+// NEU: Guesses-Refresh Button mit Loading-State + Dual-Event
+const refreshBtn = el('refreshGuesses');
+function resetRefreshBtn(){
+  if (!refreshBtn) return;
+  refreshBtn.disabled = false;
+  refreshBtn.textContent = 'Guesses neu laden';
+}
+refreshBtn.onclick = ()=> {
+  refreshBtn.disabled = true;
+  refreshBtn.textContent = 'Lade…';
+  emitAdmin('admin:getGuesses');
+  emitAdmin('admin:requestGuesses');
+  // Safety-Timeout, falls keine Antwort zurückkommt
+  setTimeout(()=> resetRefreshBtn(), 2500);
+};
 
 // NEU: Massen-Chips Buttons
 el('setAllChips').onclick = ()=>{
